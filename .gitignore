@@ -15,7 +15,9 @@ build
 !.env.example
 
 # Database & SQLite
-*.db
+# Allow seeded production SQLite databases
+!server/prisma/dev.db
+!server/dev.db
 *.db-journal
 *.sqlite
 *.sqlite3

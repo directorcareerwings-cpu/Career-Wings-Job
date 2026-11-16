@@ -6,6 +6,8 @@ import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import path from 'path';
 import fs from 'fs';
+import { execSync } from 'child_process';
+import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
 
@@ -149,11 +151,61 @@ if (clientDistDir) {
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-// 7. Server Initialization
-const server = app.listen(Number(PORT), '0.0.0.0', () => {
+// Database initialization helper
+const ensureDatabaseAndAdmin = async () => {
+  try {
+    const admin = await prisma.user.findUnique({
+      where: { email: 'admin@careerwings.in' },
+    });
+    if (!admin) {
+      console.log('⚡ Admin user not found. Creating default admin...');
+      const adminPassword = await bcrypt.hash('Admin@123456', 12);
+      await prisma.user.create({
+        data: {
+          email: 'admin@careerwings.in',
+          passwordHash: adminPassword,
+          role: 'ADMIN',
+          isActive: true,
+          isVerified: true,
+        },
+      });
+      console.log('✔ Default admin created: admin@careerwings.in / Admin@123456');
+    } else {
+      console.log('✔ Admin user verified in database.');
+    }
+  } catch (err) {
+    console.warn('⚡ Database tables missing or error querying. Running prisma db push...', err);
+    try {
+      execSync('npx prisma db push --accept-data-loss', {
+        cwd: path.resolve(__dirname, '..'),
+        stdio: 'inherit',
+      });
+      const adminPassword = await bcrypt.hash('Admin@123456', 12);
+      await prisma.user.upsert({
+        where: { email: 'admin@careerwings.in' },
+        update: {},
+        create: {
+          email: 'admin@careerwings.in',
+          passwordHash: adminPassword,
+          role: 'ADMIN',
+          isActive: true,
+          isVerified: true,
+        },
+      });
+      console.log('✔ Database pushed and admin created successfully.');
+    } catch (pushError) {
+      console.error('❌ Failed to auto-initialize database:', pushError);
+    }
+  }
+};
+
+// 8. Server Initialization
+const server = app.listen(Number(PORT), '0.0.0.0', async () => {
   console.log(`🚀 Career Wings API Server running on port ${PORT}`);
   console.log(`🌐 CORS enabled for: ${CLIENT_URL}`);
   
+  await ensureDatabaseAndAdmin();
+
   // Start background schedulers
   startCronJobs();
 });

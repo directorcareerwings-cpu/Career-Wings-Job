@@ -11,6 +11,8 @@ const morgan_1 = __importDefault(require("morgan"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
+const child_process_1 = require("child_process");
+const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 dotenv_1.default.config();
@@ -132,10 +134,61 @@ if (clientDistDir) {
 // 7. Error Handling
 app.use(errors_1.notFoundHandler);
 app.use(errors_1.errorHandler);
-// 7. Server Initialization
-const server = app.listen(Number(PORT), '0.0.0.0', () => {
+// Database initialization helper
+const ensureDatabaseAndAdmin = async () => {
+    try {
+        const admin = await prisma_1.prisma.user.findUnique({
+            where: { email: 'admin@careerwings.in' },
+        });
+        if (!admin) {
+            console.log('⚡ Admin user not found. Creating default admin...');
+            const adminPassword = await bcryptjs_1.default.hash('Admin@123456', 12);
+            await prisma_1.prisma.user.create({
+                data: {
+                    email: 'admin@careerwings.in',
+                    passwordHash: adminPassword,
+                    role: 'ADMIN',
+                    isActive: true,
+                    isVerified: true,
+                },
+            });
+            console.log('✔ Default admin created: admin@careerwings.in / Admin@123456');
+        }
+        else {
+            console.log('✔ Admin user verified in database.');
+        }
+    }
+    catch (err) {
+        console.warn('⚡ Database tables missing or error querying. Running prisma db push...', err);
+        try {
+            (0, child_process_1.execSync)('npx prisma db push --accept-data-loss', {
+                cwd: path_1.default.resolve(__dirname, '..'),
+                stdio: 'inherit',
+            });
+            const adminPassword = await bcryptjs_1.default.hash('Admin@123456', 12);
+            await prisma_1.prisma.user.upsert({
+                where: { email: 'admin@careerwings.in' },
+                update: {},
+                create: {
+                    email: 'admin@careerwings.in',
+                    passwordHash: adminPassword,
+                    role: 'ADMIN',
+                    isActive: true,
+                    isVerified: true,
+                },
+            });
+            console.log('✔ Database pushed and admin created successfully.');
+        }
+        catch (pushError) {
+            console.error('❌ Failed to auto-initialize database:', pushError);
+        }
+    }
+};
+// 8. Server Initialization
+const server = app.listen(Number(PORT), '0.0.0.0', async () => {
     console.log(`🚀 Career Wings API Server running on port ${PORT}`);
     console.log(`🌐 CORS enabled for: ${CLIENT_URL}`);
+    await ensureDatabaseAndAdmin();
     // Start background schedulers
     (0, crons_1.startCronJobs)();
 });
