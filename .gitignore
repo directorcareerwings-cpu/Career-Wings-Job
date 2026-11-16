@@ -3,6 +3,7 @@ node_modules
 .pnpm-store
 
 # Build outputs
+dist
 # dist
 build
 *.tsbuildinfo
@@ -40,3 +41,4 @@ pnpm-debug.log*
 Thumbs.db
 
 deploy_hostinger/
+scratch/ 
