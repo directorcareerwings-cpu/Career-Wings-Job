@@ -58,6 +58,9 @@ export default function Footer() {
               <img
                 src={logoUrl}
                 alt={settings?.SITE_NAME || 'Career Wings'}
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = '/images/logo.png'
+                }}
                 className={cn(
                   'object-contain transition-transform group-hover:scale-105',
                   isCustomLogo

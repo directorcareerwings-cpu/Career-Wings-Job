@@ -43,6 +43,9 @@ function Logo() {
       <img
         src={logoUrl}
         alt={settings?.SITE_NAME || 'Career Wings'}
+        onError={(e) => {
+          (e.currentTarget as HTMLImageElement).src = '/images/logo.png'
+        }}
         className={cn(
           'object-contain transition-transform group-hover:scale-105',
           isCustomLogo ? 'h-10 w-auto max-w-[180px] sm:max-w-[220px]' : 'h-9 w-9 rounded-xl shadow-xs'

@@ -99,8 +99,19 @@ app.use('/api', (req, res, next) => {
 });
 
 // 3. Static Files (Uploads) with 7-day browser caching
-const uploadDir = path.join(process.cwd(), process.env.UPLOAD_DIR || 'uploads');
-app.use('/uploads', express.static(uploadDir, { maxAge: '7d', etag: true }));
+const potentialUploadDirs = [
+  path.join(process.cwd(), process.env.UPLOAD_DIR || 'uploads'),
+  path.join(process.cwd(), 'server', 'uploads'),
+  path.resolve(__dirname, '../uploads'),
+  path.resolve(__dirname, '../../uploads'),
+  path.resolve(__dirname, '../../server/uploads'),
+];
+
+for (const dir of potentialUploadDirs) {
+  if (fs.existsSync(dir)) {
+    app.use('/uploads', express.static(dir, { maxAge: '7d', etag: true }));
+  }
+}
 
 import { seoAdminRoutes, seoPublicRoutes } from './routes/seo.routes';
 

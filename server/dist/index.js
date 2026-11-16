@@ -92,8 +92,18 @@ app.use('/api', (req, res, next) => {
     next();
 });
 // 3. Static Files (Uploads) with 7-day browser caching
-const uploadDir = path_1.default.join(process.cwd(), process.env.UPLOAD_DIR || 'uploads');
-app.use('/uploads', express_1.default.static(uploadDir, { maxAge: '7d', etag: true }));
+const potentialUploadDirs = [
+    path_1.default.join(process.cwd(), process.env.UPLOAD_DIR || 'uploads'),
+    path_1.default.join(process.cwd(), 'server', 'uploads'),
+    path_1.default.resolve(__dirname, '../uploads'),
+    path_1.default.resolve(__dirname, '../../uploads'),
+    path_1.default.resolve(__dirname, '../../server/uploads'),
+];
+for (const dir of potentialUploadDirs) {
+    if (fs_1.default.existsSync(dir)) {
+        app.use('/uploads', express_1.default.static(dir, { maxAge: '7d', etag: true }));
+    }
+}
 const seo_routes_1 = require("./routes/seo.routes");
 // 4. Health Check
 app.get('/api/health', async (req, res) => {

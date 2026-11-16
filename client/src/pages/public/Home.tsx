@@ -450,6 +450,9 @@ function HeroSection() {
             <img
               src={heroBannerUrl}
               alt={publicSettings?.HERO_TITLE || 'Find The Right Job For Your Bright Future - Career Wings'}
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = '/images/hero-banner.png'
+              }}
               className="w-full h-auto object-cover block select-none rounded-2xl md:rounded-3xl"
             />
           ) : (
