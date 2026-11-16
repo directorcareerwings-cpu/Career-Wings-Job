@@ -22,10 +22,10 @@ export const clearRazorpayConfigCache = (): void => {
 };
 
 export const getRazorpayConfig = async (): Promise<RazorpayGatewayConfig> => {
-  if (cachedConfig) return cachedConfig;
+  if (cachedConfig !== null) return cachedConfig;
 
   try {
-    const settings = await prisma.adminSetting.findMany({
+    const settings: Array<{ key: string; value: string }> = await prisma.adminSetting.findMany({
       where: {
         key: {
           in: [
@@ -40,7 +40,7 @@ export const getRazorpayConfig = async (): Promise<RazorpayGatewayConfig> => {
       },
     });
 
-    const settingsMap = new Map(settings.map((s) => [s.key, s.value]));
+    const settingsMap = new Map<string, string>(settings.map((s: { key: string; value: string }) => [s.key, s.value]));
 
     const keyId = settingsMap.get('RAZORPAY_KEY_ID') || process.env.RAZORPAY_KEY_ID || '';
     const keySecret = settingsMap.get('RAZORPAY_KEY_SECRET') || process.env.RAZORPAY_KEY_SECRET || '';
@@ -49,7 +49,7 @@ export const getRazorpayConfig = async (): Promise<RazorpayGatewayConfig> => {
     const isEnabled = settingsMap.get('RAZORPAY_IS_ENABLED') !== 'false';
     const autoCapture = settingsMap.get('RAZORPAY_AUTO_CAPTURE') !== 'false';
 
-    cachedConfig = {
+    const config: RazorpayGatewayConfig = {
       keyId,
       keySecret,
       webhookSecret,
@@ -57,10 +57,11 @@ export const getRazorpayConfig = async (): Promise<RazorpayGatewayConfig> => {
       isEnabled,
       autoCapture,
     };
-    return cachedConfig;
+    cachedConfig = config;
+    return config;
   } catch (err) {
     console.error('Error reading Razorpay config from DB, falling back to process.env:', err);
-    return {
+    const fallbackConfig: RazorpayGatewayConfig = {
       keyId: process.env.RAZORPAY_KEY_ID || '',
       keySecret: process.env.RAZORPAY_KEY_SECRET || '',
       webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET || '',
@@ -68,6 +69,8 @@ export const getRazorpayConfig = async (): Promise<RazorpayGatewayConfig> => {
       isEnabled: true,
       autoCapture: true,
     };
+    cachedConfig = fallbackConfig;
+    return fallbackConfig;
   }
 };
 

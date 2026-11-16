@@ -17,7 +17,7 @@ const clearRazorpayConfigCache = () => {
 };
 exports.clearRazorpayConfigCache = clearRazorpayConfigCache;
 const getRazorpayConfig = async () => {
-    if (cachedConfig)
+    if (cachedConfig !== null)
         return cachedConfig;
     try {
         const settings = await prisma_1.prisma.adminSetting.findMany({
@@ -41,7 +41,7 @@ const getRazorpayConfig = async () => {
         const mode = settingsMap.get('RAZORPAY_MODE') || (keyId.startsWith('rzp_live') ? 'LIVE' : 'TEST');
         const isEnabled = settingsMap.get('RAZORPAY_IS_ENABLED') !== 'false';
         const autoCapture = settingsMap.get('RAZORPAY_AUTO_CAPTURE') !== 'false';
-        cachedConfig = {
+        const config = {
             keyId,
             keySecret,
             webhookSecret,
@@ -49,11 +49,12 @@ const getRazorpayConfig = async () => {
             isEnabled,
             autoCapture,
         };
-        return cachedConfig;
+        cachedConfig = config;
+        return config;
     }
     catch (err) {
         console.error('Error reading Razorpay config from DB, falling back to process.env:', err);
-        return {
+        const fallbackConfig = {
             keyId: process.env.RAZORPAY_KEY_ID || '',
             keySecret: process.env.RAZORPAY_KEY_SECRET || '',
             webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET || '',
@@ -61,6 +62,8 @@ const getRazorpayConfig = async () => {
             isEnabled: true,
             autoCapture: true,
         };
+        cachedConfig = fallbackConfig;
+        return fallbackConfig;
     }
 };
 exports.getRazorpayConfig = getRazorpayConfig;

@@ -18,7 +18,7 @@ exports.clearEmailConfigCache = clearEmailConfigCache;
  * Retrieve SMTP configuration from AdminSetting database table, falling back to process.env
  */
 const getSmtpConfig = async () => {
-    if (cachedSmtpConfig)
+    if (cachedSmtpConfig !== null)
         return cachedSmtpConfig;
     try {
         const settings = await prisma_1.prisma.adminSetting.findMany({
@@ -48,7 +48,7 @@ const getSmtpConfig = async () => {
         const fromName = map.get('SMTP_FROM_NAME') || process.env.SMTP_FROM_NAME || 'Career Wings';
         const replyTo = map.get('SMTP_REPLY_TO') || process.env.SMTP_REPLY_TO || 'support@careerwings.in';
         const isEnabled = map.get('SMTP_IS_ENABLED') !== 'false';
-        cachedSmtpConfig = {
+        const config = {
             host,
             port,
             secure,
@@ -59,11 +59,12 @@ const getSmtpConfig = async () => {
             replyTo,
             isEnabled,
         };
-        return cachedSmtpConfig;
+        cachedSmtpConfig = config;
+        return config;
     }
     catch (err) {
         console.error('[EMAIL] Failed to read SMTP config from DB, using fallback env:', err);
-        return {
+        const fallbackConfig = {
             host: process.env.SMTP_HOST || '',
             port: parseInt(process.env.SMTP_PORT || '587', 10),
             secure: process.env.SMTP_SECURE === 'true',
@@ -74,6 +75,8 @@ const getSmtpConfig = async () => {
             replyTo: process.env.SMTP_REPLY_TO || 'support@careerwings.in',
             isEnabled: true,
         };
+        cachedSmtpConfig = fallbackConfig;
+        return fallbackConfig;
     }
 };
 exports.getSmtpConfig = getSmtpConfig;

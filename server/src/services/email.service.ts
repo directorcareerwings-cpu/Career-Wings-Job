@@ -36,10 +36,10 @@ export const clearEmailConfigCache = (): void => {
  * Retrieve SMTP configuration from AdminSetting database table, falling back to process.env
  */
 export const getSmtpConfig = async (): Promise<SmtpConfig> => {
-  if (cachedSmtpConfig) return cachedSmtpConfig;
+  if (cachedSmtpConfig !== null) return cachedSmtpConfig;
 
   try {
-    const settings = await prisma.adminSetting.findMany({
+    const settings: Array<{ key: string; value: string }> = await prisma.adminSetting.findMany({
       where: {
         key: {
           in: [
@@ -57,7 +57,7 @@ export const getSmtpConfig = async (): Promise<SmtpConfig> => {
       },
     });
 
-    const map = new Map(settings.map((s) => [s.key, s.value]));
+    const map = new Map<string, string>(settings.map((s: { key: string; value: string }) => [s.key, s.value]));
 
     const host = map.get('SMTP_HOST') || process.env.SMTP_HOST || '';
     const port = parseInt(map.get('SMTP_PORT') || process.env.SMTP_PORT || '587', 10);
@@ -69,7 +69,7 @@ export const getSmtpConfig = async (): Promise<SmtpConfig> => {
     const replyTo = map.get('SMTP_REPLY_TO') || process.env.SMTP_REPLY_TO || 'support@careerwings.in';
     const isEnabled = map.get('SMTP_IS_ENABLED') !== 'false';
 
-    cachedSmtpConfig = {
+    const config: SmtpConfig = {
       host,
       port,
       secure,
@@ -80,10 +80,11 @@ export const getSmtpConfig = async (): Promise<SmtpConfig> => {
       replyTo,
       isEnabled,
     };
-    return cachedSmtpConfig;
+    cachedSmtpConfig = config;
+    return config;
   } catch (err) {
     console.error('[EMAIL] Failed to read SMTP config from DB, using fallback env:', err);
-    return {
+    const fallbackConfig: SmtpConfig = {
       host: process.env.SMTP_HOST || '',
       port: parseInt(process.env.SMTP_PORT || '587', 10),
       secure: process.env.SMTP_SECURE === 'true',
@@ -94,6 +95,8 @@ export const getSmtpConfig = async (): Promise<SmtpConfig> => {
       replyTo: process.env.SMTP_REPLY_TO || 'support@careerwings.in',
       isEnabled: true,
     };
+    cachedSmtpConfig = fallbackConfig;
+    return fallbackConfig;
   }
 };
 

@@ -9,6 +9,7 @@
   ],
   "main": "server/dist/index.js",
   "scripts": {
+    "postinstall": "pnpm --filter career-wings-server db:generate",
     "dev": "concurrently \"pnpm --filter career-wings-server dev\" \"pnpm --filter career-wings-client dev\"",
     "dev:server": "pnpm --filter career-wings-server dev",
     "dev:client": "pnpm --filter career-wings-client dev",
