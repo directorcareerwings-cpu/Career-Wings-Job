@@ -1,10 +1,11 @@
-import express, { Express, Request, Response } from 'express';
+import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import path from 'path';
+import fs from 'fs';
 import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
 
@@ -121,7 +122,30 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api', publicRoutes);
 
-// 6. Error Handling
+// 6.1 Serve Frontend Static Client (React SPA)
+const potentialClientDirs = [
+  path.join(process.cwd(), 'client', 'dist'),
+  path.resolve(__dirname, '../../client/dist'),
+  path.resolve(__dirname, '../client/dist'),
+  path.join(process.cwd(), 'dist'),
+];
+
+const clientDistDir = potentialClientDirs.find((dir) => fs.existsSync(path.join(dir, 'index.html')));
+
+if (clientDistDir) {
+  console.log(`📦 Serving frontend static assets from: ${clientDistDir}`);
+  app.use(express.static(clientDistDir, { maxAge: '1d', etag: true }));
+
+  // Catch-all route to serve React index.html for client-side routing
+  app.get('*', (req: Request, res: Response, next: NextFunction) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
+      return next();
+    }
+    res.sendFile(path.join(clientDistDir, 'index.html'));
+  });
+}
+
+// 7. Error Handling
 app.use(notFoundHandler);
 app.use(errorHandler);
 

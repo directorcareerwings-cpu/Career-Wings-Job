@@ -10,6 +10,7 @@ const compression_1 = __importDefault(require("compression"));
 const morgan_1 = __importDefault(require("morgan"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const path_1 = __importDefault(require("path"));
+const fs_1 = __importDefault(require("fs"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 dotenv_1.default.config();
@@ -109,7 +110,26 @@ app.use('/api/admin', admin_routes_1.default);
 app.use('/api/payments', payment_routes_1.default);
 app.use('/api/chat', chat_routes_1.default);
 app.use('/api', public_routes_1.default);
-// 6. Error Handling
+// 6.1 Serve Frontend Static Client (React SPA)
+const potentialClientDirs = [
+    path_1.default.join(process.cwd(), 'client', 'dist'),
+    path_1.default.resolve(__dirname, '../../client/dist'),
+    path_1.default.resolve(__dirname, '../client/dist'),
+    path_1.default.join(process.cwd(), 'dist'),
+];
+const clientDistDir = potentialClientDirs.find((dir) => fs_1.default.existsSync(path_1.default.join(dir, 'index.html')));
+if (clientDistDir) {
+    console.log(`📦 Serving frontend static assets from: ${clientDistDir}`);
+    app.use(express_1.default.static(clientDistDir, { maxAge: '1d', etag: true }));
+    // Catch-all route to serve React index.html for client-side routing
+    app.get('*', (req, res, next) => {
+        if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
+            return next();
+        }
+        res.sendFile(path_1.default.join(clientDistDir, 'index.html'));
+    });
+}
+// 7. Error Handling
 app.use(errors_1.notFoundHandler);
 app.use(errors_1.errorHandler);
 // 7. Server Initialization

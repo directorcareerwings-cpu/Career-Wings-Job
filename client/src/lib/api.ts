@@ -2,12 +2,20 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
 import { useAuthStore } from '@/stores/auth.store'
 
 export const getBaseURL = () => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL
+  }
   if (typeof window !== 'undefined') {
     if (window.location.hostname === '127.0.0.1') {
       return 'http://127.0.0.1:5000/api'
     }
+    if (window.location.hostname === 'localhost') {
+      return 'http://localhost:5000/api'
+    }
+    // In production on Hostinger / custom domains, use relative /api
+    return '/api'
   }
-  return import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
+  return '/api'
 }
 
 const api = axios.create({
