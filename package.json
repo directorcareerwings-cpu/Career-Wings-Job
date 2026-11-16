@@ -7,6 +7,7 @@
     "server",
     "client"
   ],
+  "main": "server/dist/index.js",
   "scripts": {
     "dev": "concurrently \"pnpm --filter career-wings-server dev\" \"pnpm --filter career-wings-client dev\"",
     "dev:server": "pnpm --filter career-wings-server dev",
@@ -14,7 +15,7 @@
     "build": "pnpm --filter career-wings-server build && pnpm --filter career-wings-client build",
     "build:server": "pnpm --filter career-wings-server build",
     "build:client": "pnpm --filter career-wings-client build",
-    "start": "pnpm --filter career-wings-server start",
+    "start": "node server/dist/index.js",
     "db:push": "pnpm --filter career-wings-server db:push",
     "db:seed": "pnpm --filter career-wings-server db:seed",
     "db:studio": "pnpm --filter career-wings-server db:studio"

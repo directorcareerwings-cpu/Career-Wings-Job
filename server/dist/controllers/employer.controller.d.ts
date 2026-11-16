@@ -1,0 +1,24 @@
+import { Response, NextFunction } from 'express';
+import { AuthenticatedRequest } from '../middleware/auth';
+export declare const getCompanyProfile: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<void>;
+export declare const updateEmployerProfile: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<void>;
+export declare const updateCompany: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<void>;
+export declare const uploadCompanyLogo: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<void>;
+export declare const getEmployerJobs: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<void>;
+export declare const postJob: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<void>;
+export declare const getEmployerJobById: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<void>;
+export declare const updateJob: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<void>;
+export declare const updateJobStatus: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<void>;
+export declare const deleteJob: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<void>;
+export declare const getApplicants: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<void>;
+export declare const updateApplicationStatus: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<void>;
+export declare const searchCandidates: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<void>;
+export declare const getCandidateDetail: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<void>;
+export declare const downloadCandidateResume: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<void>;
+export declare const getSavedCandidates: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<void>;
+export declare const saveCandidate: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<void>;
+export declare const unsaveCandidate: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<void>;
+export declare const getAnalytics: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<void>;
+export declare const getEmployerSubscription: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<void>;
+export declare const getEmployerPayments: (req: AuthenticatedRequest, res: Response, next: NextFunction) => Promise<void>;
+//# sourceMappingURL=employer.controller.d.ts.map
