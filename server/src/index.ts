@@ -105,8 +105,25 @@ app.use('/uploads', express.static(uploadDir, { maxAge: '7d', etag: true }));
 import { seoAdminRoutes, seoPublicRoutes } from './routes/seo.routes';
 
 // 4. Health Check
-app.get('/api/health', (req: Request, res: Response) => {
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString(), service: 'Career Wings API' });
+app.get('/api/health', async (req: Request, res: Response) => {
+  try {
+    const userCount = await prisma.user.count();
+    res.status(200).json({
+      status: 'ok',
+      db: 'connected',
+      users: userCount,
+      timestamp: new Date().toISOString(),
+      service: 'Career Wings API',
+    });
+  } catch (err: any) {
+    res.status(200).json({
+      status: 'degraded',
+      db: 'error',
+      error: err?.message || String(err),
+      timestamp: new Date().toISOString(),
+      service: 'Career Wings API',
+    });
+  }
 });
 
 // 5. Mount Public SEO Routes at Root & API (Robots.txt, Sitemap.xml, Sitemap-index.xml)
@@ -171,7 +188,18 @@ const ensureDatabaseAndAdmin = async () => {
       });
       console.log('✔ Default admin created: admin@careerwings.in / Admin@123456');
     } else {
-      console.log('✔ Admin user verified in database.');
+      const isMatch = await bcrypt.compare('Admin@123456', admin.passwordHash);
+      if (!isMatch) {
+        console.log('⚡ Updating admin password to default Admin@123456...');
+        const adminPassword = await bcrypt.hash('Admin@123456', 12);
+        await prisma.user.update({
+          where: { id: admin.id },
+          data: { passwordHash: adminPassword, isActive: true, isVerified: true },
+        });
+        console.log('✔ Admin password updated.');
+      } else {
+        console.log('✔ Admin user verified in database.');
+      }
     }
   } catch (err) {
     console.warn('⚡ Database tables missing or error querying. Running prisma db push...', err);

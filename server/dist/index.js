@@ -96,8 +96,26 @@ const uploadDir = path_1.default.join(process.cwd(), process.env.UPLOAD_DIR || '
 app.use('/uploads', express_1.default.static(uploadDir, { maxAge: '7d', etag: true }));
 const seo_routes_1 = require("./routes/seo.routes");
 // 4. Health Check
-app.get('/api/health', (req, res) => {
-    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString(), service: 'Career Wings API' });
+app.get('/api/health', async (req, res) => {
+    try {
+        const userCount = await prisma_1.prisma.user.count();
+        res.status(200).json({
+            status: 'ok',
+            db: 'connected',
+            users: userCount,
+            timestamp: new Date().toISOString(),
+            service: 'Career Wings API',
+        });
+    }
+    catch (err) {
+        res.status(200).json({
+            status: 'degraded',
+            db: 'error',
+            error: err?.message || String(err),
+            timestamp: new Date().toISOString(),
+            service: 'Career Wings API',
+        });
+    }
 });
 // 5. Mount Public SEO Routes at Root & API (Robots.txt, Sitemap.xml, Sitemap-index.xml)
 app.use('/', seo_routes_1.seoPublicRoutes);
@@ -155,7 +173,19 @@ const ensureDatabaseAndAdmin = async () => {
             console.log('✔ Default admin created: admin@careerwings.in / Admin@123456');
         }
         else {
-            console.log('✔ Admin user verified in database.');
+            const isMatch = await bcryptjs_1.default.compare('Admin@123456', admin.passwordHash);
+            if (!isMatch) {
+                console.log('⚡ Updating admin password to default Admin@123456...');
+                const adminPassword = await bcryptjs_1.default.hash('Admin@123456', 12);
+                await prisma_1.prisma.user.update({
+                    where: { id: admin.id },
+                    data: { passwordHash: adminPassword, isActive: true, isVerified: true },
+                });
+                console.log('✔ Admin password updated.');
+            }
+            else {
+                console.log('✔ Admin user verified in database.');
+            }
         }
     }
     catch (err) {

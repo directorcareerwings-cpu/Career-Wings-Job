@@ -3,8 +3,7 @@ node_modules
 .pnpm-store
 
 # Build outputs
-dist
-# dist
+# Keep server/dist and client/dist tracked for hosting deployment
 build
 *.tsbuildinfo
 
@@ -16,8 +15,11 @@ build
 
 # Database & SQLite
 # Allow seeded production SQLite databases
+!prisma/dev.db
 !server/prisma/dev.db
+!server/prisma/prisma/dev.db
 !server/dev.db
+!dev.db
 *.db-journal
 *.sqlite
 *.sqlite3
@@ -43,4 +45,4 @@ pnpm-debug.log*
 Thumbs.db
 
 deploy_hostinger/
-scratch/ 
+scratch/
