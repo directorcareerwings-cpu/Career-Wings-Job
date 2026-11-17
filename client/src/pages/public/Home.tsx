@@ -439,13 +439,15 @@ function HeroSection() {
   const heroBannerUrl = publicSettings?.HERO_IMAGE_URL
 
   return (
-    <section className="relative bg-[#0D1117] text-white pt-6 pb-14 md:pt-8 md:pb-20 overflow-hidden">
-      {/* Glow blobs */}
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
+    <section className="relative bg-gradient-to-b from-[#F0F6FE] via-[#E8F2FC] to-[#F3F8FE] text-slate-900 pt-6 pb-14 md:pt-8 md:pb-20 overflow-hidden border-b border-blue-100">
+      {/* Soft ambient light glow blobs */}
+      <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-blue-300/25 rounded-full blur-[130px] pointer-events-none" />
+      <div className="absolute top-1/3 right-1/4 w-[450px] h-[450px] bg-sky-200/35 rounded-full blur-[130px] pointer-events-none" />
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#0284c70a_1px,transparent_1px),linear-gradient(to_bottom,#0284c70a_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none" />
+
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 z-10">
         {/* Hero Banner */}
-        <div className="relative w-full rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl border border-white/10 bg-white/5 mb-6 md:mb-8">
+        <div className="relative w-full rounded-2xl md:rounded-3xl overflow-hidden shadow-xl shadow-blue-900/10 border border-blue-100 bg-white mb-6 md:mb-8">
           {heroBannerUrl ? (
             <img
               src={heroBannerUrl}
@@ -469,40 +471,48 @@ function HeroSection() {
           )}
         </div>
 
-        {/* Heading */}
+        {/* Heading & Subtitle */}
         <div className="mb-4 px-1">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-tight leading-tight">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">
             {publicSettings?.HERO_TITLE || (
-              <>Discover <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-400">15,000+ career</span> opportunities</>
+              <>
+                Discover{' '}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 via-orange-600 to-rose-600">
+                  15,000+ career
+                </span>{' '}
+                opportunities
+              </>
             )}
           </h2>
-          <p className="text-gray-400 text-sm mt-1.5">Northeast India's most trusted job portal — Assam, Meghalaya, Nagaland &amp; beyond.</p>
+          <p className="text-slate-600 text-sm sm:text-base mt-1.5 font-medium">
+            Northeast India's most trusted job portal — Assam, Meghalaya, Nagaland &amp; beyond.
+          </p>
         </div>
 
-        {/* Search Bar */}
-        <div className="w-full bg-white rounded-2xl shadow-2xl p-1.5">
+        {/* Elevated Search Bar */}
+        <div className="w-full bg-white rounded-2xl shadow-xl shadow-blue-900/8 border border-blue-100/90 p-1.5 sm:p-2">
           <form onSubmit={handleSearch}>
-            <div className="flex flex-col md:flex-row gap-1">
+            <div className="flex flex-col md:flex-row gap-1.5">
 
               {/* Keyword */}
-              <div className="flex-1 flex items-center gap-2.5 bg-gray-50 rounded-xl px-4 py-3">
+              <div className="flex-1 flex items-center gap-2.5 bg-slate-50 hover:bg-slate-100/80 rounded-xl px-4 py-3 transition-colors">
                 <Search className="h-4 w-4 text-orange-500 shrink-0" />
                 <input
                   type="text"
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
                   placeholder="Job title, skill or company..."
-                  className="w-full bg-transparent text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none font-medium"
+                  className="w-full bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none font-medium"
                 />
               </div>
 
               {/* Experience */}
-              <div className="flex items-center gap-2.5 bg-gray-50 rounded-xl px-4 py-3 md:w-52">
-                <Briefcase className="h-4 w-4 text-gray-400 shrink-0" />
+              <div className="flex items-center gap-2.5 bg-slate-50 hover:bg-slate-100/80 rounded-xl px-4 py-3 md:w-52 transition-colors">
+                <Briefcase className="h-4 w-4 text-slate-400 shrink-0" />
                 <select
                   value={experience}
                   onChange={(e) => setExperience(e.target.value)}
-                  className="w-full bg-transparent text-sm text-gray-700 focus:outline-none appearance-none cursor-pointer font-medium"
+                  className="w-full bg-transparent text-sm text-slate-700 focus:outline-none appearance-none cursor-pointer font-medium"
                 >
                   <option value="">Experience</option>
                   <option value="fresher">Fresher (0–1 Yr)</option>
@@ -511,16 +521,16 @@ function HeroSection() {
                   <option value="5-8">5–8 Years</option>
                   <option value="8+">8+ Years</option>
                 </select>
-                <ChevronDown className="h-4 w-4 text-gray-400 shrink-0" />
+                <ChevronDown className="h-4 w-4 text-slate-400 shrink-0" />
               </div>
 
               {/* Location */}
-              <div className="flex items-center gap-2.5 bg-gray-50 rounded-xl px-4 py-3 md:w-64">
+              <div className="flex items-center gap-2.5 bg-slate-50 hover:bg-slate-100/80 rounded-xl px-4 py-3 md:w-64 transition-colors">
                 <MapPin className="h-4 w-4 text-blue-500 shrink-0" />
                 <select
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
-                  className="w-full bg-transparent text-sm text-gray-700 focus:outline-none appearance-none cursor-pointer font-medium"
+                  className="w-full bg-transparent text-sm text-slate-700 focus:outline-none appearance-none cursor-pointer font-medium"
                 >
                   <option value="">Select city...</option>
                   <option value="Guwahati">Guwahati, Assam</option>
@@ -537,25 +547,25 @@ function HeroSection() {
                   <option value="Aizawl">Aizawl, Mizoram</option>
                   <option value="Remote">Remote / Work from Home</option>
                 </select>
-                <ChevronDown className="h-4 w-4 text-gray-400 shrink-0" />
+                <ChevronDown className="h-4 w-4 text-slate-400 shrink-0" />
               </div>
 
               {/* Search Button */}
               <button
                 type="submit"
-                className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold text-sm px-7 py-3 rounded-xl transition-all shadow-md shadow-orange-500/20 flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
+                className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold text-sm px-7 py-3 rounded-xl transition-all shadow-md shadow-orange-500/25 hover:shadow-lg hover:shadow-orange-500/35 active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
               >
                 <Search className="h-4 w-4" />
-                Search Jobs
+                <span>Search Jobs</span>
               </button>
             </div>
           </form>
         </div>
 
-        {/* Trending */}
+        {/* Trending Searches */}
         <div className="mt-3.5 flex flex-wrap items-center gap-2 text-xs px-1">
-          <span className="text-gray-500 font-semibold flex items-center gap-1">
-            <Flame className="h-3.5 w-3.5 text-orange-400 fill-orange-400" />
+          <span className="text-slate-600 font-semibold flex items-center gap-1.5">
+            <Flame className="h-3.5 w-3.5 text-orange-500 fill-orange-500" />
             Trending:
           </span>
           {[
@@ -574,53 +584,53 @@ function HeroSection() {
                 setKeyword(tag)
                 navigate(`/jobs?keyword=${encodeURIComponent(tag)}`)
               }}
-              className="bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white font-medium px-2.5 py-1 rounded-full border border-white/10 transition-colors"
+              className="bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 font-medium px-3 py-1 rounded-full border border-blue-200/80 shadow-xs hover:border-blue-300 transition-all cursor-pointer"
             >
               {tag}
             </button>
           ))}
         </div>
 
-        {/* Stats */}
+        {/* Stats Grid */}
         <div className="mt-5 md:mt-6 grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5 w-full">
           {[
             {
               label: 'Verified Active Jobs',
               value: stats?.totalJobs ? `${stats.totalJobs.toLocaleString()}+` : '1,500+',
-              icon: <Briefcase className="h-4 w-4 text-orange-400 shrink-0" />,
-              bg: 'bg-orange-500/10 border-orange-500/20',
+              icon: <Briefcase className="h-4 w-4 text-orange-500 shrink-0" />,
+              bg: 'bg-orange-50 border-orange-200/80',
             },
             {
               label: 'Hiring Companies',
               value: stats?.totalCompanies ? `${stats.totalCompanies.toLocaleString()}+` : '450+',
-              icon: <Building2 className="h-4 w-4 text-blue-400 shrink-0" />,
-              bg: 'bg-blue-500/10 border-blue-500/20',
+              icon: <Building2 className="h-4 w-4 text-blue-600 shrink-0" />,
+              bg: 'bg-blue-50 border-blue-200/80',
             },
             {
               label: 'Registered Candidates',
               value: stats?.totalCandidates ? `${stats.totalCandidates.toLocaleString()}+` : '12,500+',
-              icon: <Users className="h-4 w-4 text-emerald-400 shrink-0" />,
-              bg: 'bg-emerald-500/10 border-emerald-500/20',
+              icon: <Users className="h-4 w-4 text-emerald-600 shrink-0" />,
+              bg: 'bg-emerald-50 border-emerald-200/80',
             },
             {
               label: 'Successful Placements',
               value: stats?.totalPlacements ? `${stats.totalPlacements.toLocaleString()}+` : '2,800+',
-              icon: <Award className="h-4 w-4 text-amber-400 shrink-0" />,
-              bg: 'bg-amber-500/10 border-amber-500/20',
+              icon: <Award className="h-4 w-4 text-amber-600 shrink-0" />,
+              bg: 'bg-amber-50 border-amber-200/80',
             },
           ].map(({ label, value, icon, bg }) => (
             <div
               key={label}
-              className="bg-white/5 backdrop-blur-sm border border-white/10 hover:border-white/20 rounded-xl px-3 py-2 sm:px-4 sm:py-2.5 flex items-center gap-3 transition-all"
+              className="bg-white/95 backdrop-blur-md border border-blue-100 hover:border-blue-200 hover:shadow-md rounded-xl px-3 py-2.5 sm:px-4 sm:py-3 flex items-center gap-3 transition-all duration-200 group"
             >
-              <div className={`w-9 h-9 rounded-lg ${bg} border flex items-center justify-center shrink-0`}>
+              <div className={`w-9 h-9 rounded-lg ${bg} border flex items-center justify-center shrink-0 transition-transform group-hover:scale-105`}>
                 {icon}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-base sm:text-lg font-bold text-white leading-tight">
+                <div className="text-base sm:text-lg font-bold text-slate-900 leading-tight">
                   {value}
                 </div>
-                <div className="text-[11px] sm:text-xs text-gray-400 truncate leading-tight mt-0.5">
+                <div className="text-[11px] sm:text-xs text-slate-500 truncate leading-tight mt-0.5 font-medium">
                   {label}
                 </div>
               </div>

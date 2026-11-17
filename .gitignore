@@ -25,10 +25,10 @@ build
 *.sqlite3
 
 # Uploads & Temporary files
-uploads/resumes/
-uploads/resume_drafts/
-server/uploads/resumes/
-server/uploads/resume_drafts/
+uploads/*
+!uploads/.gitkeep
+server/uploads/*
+!server/uploads/.gitkeep
 client/uploads/*
 !client/uploads/.gitkeep
 
