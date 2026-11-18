@@ -49,243 +49,6 @@ import toast from 'react-hot-toast'
 import CoolPlacesToWork from '@/components/home/CoolPlacesToWork'
 
 
-// ─── Default Fallback Jobs for immediate rich preview ───────────────────────
-
-const FALLBACK_JOBS: Job[] = [
-  {
-    _id: 'mock-1',
-    id: 'mock-1',
-    title: 'Senior Full-Stack React & Node Developer',
-    slug: 'senior-full-stack-react-node-developer',
-    company: {
-      _id: 'comp-1',
-      id: 'comp-1',
-      name: 'TechBrahma Solutions',
-      logo: '',
-      isVerified: true,
-      city: 'Guwahati',
-      state: 'Assam',
-    },
-    location: 'Guwahati, Assam',
-    jobType: 'FULL_TIME',
-    workMode: 'hybrid',
-    minSalary: 800000,
-    maxSalary: 1400000,
-    currency: 'INR',
-    showSalary: true,
-    experienceLevel: 'MID_LEVEL',
-    isFeatured: true,
-    isUrgent: true,
-    skills: ['React', 'TypeScript', 'Node.js', 'PostgreSQL', 'TailwindCSS'],
-    description: 'Lead engineering projects for high-growth enterprises in Guwahati and across Northeast India.',
-    createdAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    status: 'ACTIVE',
-  } as unknown as Job,
-  {
-    _id: 'mock-2',
-    id: 'mock-2',
-    title: 'Medical Officer / Resident Physician',
-    slug: 'medical-officer-resident-physician',
-    company: {
-      _id: 'comp-2',
-      id: 'comp-2',
-      name: 'Brahmaputra Valley Super Speciality Hospital',
-      logo: '',
-      isVerified: true,
-      city: 'Guwahati',
-      state: 'Assam',
-    },
-    location: 'Guwahati, Assam',
-    jobType: 'FULL_TIME',
-    workMode: 'on-site',
-    minSalary: 950000,
-    maxSalary: 1600000,
-    currency: 'INR',
-    showSalary: true,
-    experienceLevel: 'SENIOR_LEVEL',
-    isFeatured: true,
-    isUrgent: true,
-    skills: ['Emergency Care', 'MBBS', 'Patient Management', 'ICU'],
-    description: 'Join Northeast India’s premier healthcare institute providing world-class tertiary patient care.',
-    createdAt: new Date(Date.now() - 5 * 3600 * 1000).toISOString(),
-    status: 'ACTIVE',
-  } as unknown as Job,
-  {
-    _id: 'mock-3',
-    id: 'mock-3',
-    title: 'Area Sales & Distribution Manager - FMCG',
-    slug: 'area-sales-distribution-manager-fmcg',
-    company: {
-      _id: 'comp-3',
-      id: 'comp-3',
-      name: 'Assam Consumer Brands Ltd.',
-      logo: '',
-      isVerified: true,
-      city: 'Dibrugarh',
-      state: 'Assam',
-    },
-    location: 'Dibrugarh, Assam',
-    jobType: 'FULL_TIME',
-    workMode: 'on-site',
-    minSalary: 550000,
-    maxSalary: 850000,
-    currency: 'INR',
-    showSalary: true,
-    experienceLevel: 'MID_LEVEL',
-    isFeatured: true,
-    isUrgent: false,
-    skills: ['FMCG Sales', 'Channel Distribution', 'Team Management', 'B2B'],
-    description: 'Expand FMCG distribution and manage retail network partners across Upper Assam regions.',
-    createdAt: new Date(Date.now() - 10 * 3600 * 1000).toISOString(),
-    status: 'ACTIVE',
-  } as unknown as Job,
-  {
-    _id: 'mock-4',
-    id: 'mock-4',
-    title: 'Chartered Accountant / Senior Financial Analyst',
-    slug: 'chartered-accountant-senior-financial-analyst',
-    company: {
-      _id: 'comp-4',
-      id: 'comp-4',
-      name: 'Peak Northeast Capital & Advisory',
-      logo: '',
-      isVerified: true,
-      city: 'Shillong',
-      state: 'Meghalaya',
-    },
-    location: 'Shillong, Meghalaya',
-    jobType: 'FULL_TIME',
-    workMode: 'hybrid',
-    minSalary: 700000,
-    maxSalary: 1100000,
-    currency: 'INR',
-    showSalary: true,
-    experienceLevel: 'MID_LEVEL',
-    isFeatured: true,
-    isUrgent: false,
-    skills: ['GST Audit', 'Corporate Finance', 'Taxation', 'Tally Prime'],
-    description: 'Handle taxation, quarterly audits, and corporate financial advisory for top regional clients.',
-    createdAt: new Date(Date.now() - 18 * 3600 * 1000).toISOString(),
-    status: 'ACTIVE',
-  } as unknown as Job,
-  {
-    _id: 'mock-5',
-    id: 'mock-5',
-    title: 'Assistant Professor in Computer Science',
-    slug: 'assistant-professor-computer-science',
-    company: {
-      _id: 'comp-5',
-      id: 'comp-5',
-      name: 'Northeast Institute of Science & Technology',
-      logo: '',
-      isVerified: true,
-      city: 'Silchar',
-      state: 'Assam',
-    },
-    location: 'Silchar, Assam',
-    jobType: 'FULL_TIME',
-    workMode: 'on-site',
-    minSalary: 600000,
-    maxSalary: 900000,
-    currency: 'INR',
-    showSalary: true,
-    experienceLevel: 'MID_LEVEL',
-    isFeatured: false,
-    isUrgent: false,
-    skills: ['Machine Learning', 'Data Structures', 'Python', 'Teaching'],
-    description: 'Teach undergraduate and postgraduate courses and guide research publications.',
-    createdAt: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
-    status: 'ACTIVE',
-  } as unknown as Job,
-  {
-    _id: 'mock-6',
-    id: 'mock-6',
-    title: 'Civil Site Engineer (Infrastructure & Bridges)',
-    slug: 'civil-site-engineer-infrastructure-bridges',
-    company: {
-      _id: 'comp-6',
-      id: 'comp-6',
-      name: 'Pragjyotish Infra Projects',
-      logo: '',
-      isVerified: true,
-      city: 'Guwahati',
-      state: 'Assam',
-    },
-    location: 'Guwahati, Assam',
-    jobType: 'FULL_TIME',
-    workMode: 'on-site',
-    minSalary: 450000,
-    maxSalary: 720000,
-    currency: 'INR',
-    showSalary: true,
-    experienceLevel: 'MID_LEVEL',
-    isFeatured: false,
-    isUrgent: true,
-    skills: ['Site Supervision', 'AutoCAD', 'Billing & Estimation', 'Quality Control'],
-    description: 'Manage major highway and bridge infrastructure construction packages in Assam.',
-    createdAt: new Date(Date.now() - 28 * 3600 * 1000).toISOString(),
-    status: 'ACTIVE',
-  } as unknown as Job,
-  {
-    _id: 'mock-7',
-    id: 'mock-7',
-    title: 'Digital Marketing & Content Strategist',
-    slug: 'digital-marketing-content-strategist',
-    company: {
-      _id: 'comp-7',
-      id: 'comp-7',
-      name: 'Kaziranga Media & Communications',
-      logo: '',
-      isVerified: true,
-      city: 'Guwahati',
-      state: 'Assam',
-    },
-    location: 'Guwahati, Assam',
-    jobType: 'FULL_TIME',
-    workMode: 'remote',
-    minSalary: 400000,
-    maxSalary: 650000,
-    currency: 'INR',
-    showSalary: true,
-    experienceLevel: 'ENTRY_LEVEL',
-    isFeatured: true,
-    isUrgent: false,
-    skills: ['SEO', 'Meta Ads', 'Copywriting', 'Google Analytics', 'Canva'],
-    description: 'Drive high-converting digital campaigns and creative brand storytelling across the region.',
-    createdAt: new Date(Date.now() - 32 * 3600 * 1000).toISOString(),
-    status: 'ACTIVE',
-  } as unknown as Job,
-  {
-    _id: 'mock-8',
-    id: 'mock-8',
-    title: 'Hospitality Operations & Guest Experience Lead',
-    slug: 'hospitality-operations-guest-experience-lead',
-    company: {
-      _id: 'comp-8',
-      id: 'comp-8',
-      name: 'Heritage Pine Resorts & Spas',
-      logo: '',
-      isVerified: true,
-      city: 'Gangtok',
-      state: 'Sikkim',
-    },
-    location: 'Gangtok, Sikkim',
-    jobType: 'FULL_TIME',
-    workMode: 'on-site',
-    minSalary: 500000,
-    maxSalary: 780000,
-    currency: 'INR',
-    showSalary: true,
-    experienceLevel: 'MID_LEVEL',
-    isFeatured: false,
-    isUrgent: false,
-    skills: ['Hotel Management', 'Front Desk Ops', 'Customer Service', 'F&B'],
-    description: 'Deliver exceptional 5-star hospitality and manage resort front-of-house operations in Sikkim.',
-    createdAt: new Date(Date.now() - 36 * 3600 * 1000).toISOString(),
-    status: 'ACTIVE',
-  } as unknown as Job,
-]
-
 // ─── Rich Category Definitions ──────────────────────────────────────────────
 
 const CURATED_CATEGORIES = [
@@ -352,59 +115,6 @@ const CURATED_CATEGORIES = [
     count: '110+ Jobs',
     popular: ['Warehouse Managers', 'Fleet Operations', 'Dispatch'],
     slug: 'logistics',
-  },
-]
-
-// ─── Top Companies Showcase ──────────────────────────────────────────────────
-
-const FEATURED_COMPANIES_FALLBACK = [
-  {
-    name: 'TechBrahma Solutions',
-    category: 'IT & Cloud Services',
-    location: 'Guwahati, Assam',
-    openings: '14 Open Jobs',
-    rating: '4.8',
-    badge: 'Top Tech Employer',
-  },
-  {
-    name: 'Brahmaputra Healthcare Group',
-    category: 'Hospital & Healthcare',
-    location: 'Guwahati & Dibrugarh',
-    openings: '22 Open Jobs',
-    rating: '4.9',
-    badge: 'Healthcare Leader',
-  },
-  {
-    name: 'Assam Tea & Agro Corporation',
-    category: 'FMCG & Agriculture',
-    location: 'Jorhat & Tezpur',
-    openings: '9 Open Jobs',
-    rating: '4.7',
-    badge: 'Historic Brand',
-  },
-  {
-    name: 'Peak Northeast Advisory',
-    category: 'Finance & Taxation',
-    location: 'Shillong & Guwahati',
-    openings: '8 Open Jobs',
-    rating: '4.6',
-    badge: 'Fast Growth',
-  },
-  {
-    name: 'Pragjyotish Infra Projects',
-    category: 'Civil Infrastructure',
-    location: 'Assam & Nagaland',
-    openings: '16 Open Jobs',
-    rating: '4.7',
-    badge: 'Govt Contractor',
-  },
-  {
-    name: 'Heritage Pine Hospitality',
-    category: 'Resorts & Tourism',
-    location: 'Gangtok & Shillong',
-    openings: '11 Open Jobs',
-    rating: '4.8',
-    badge: 'Premium Tourism',
   },
 ]
 
@@ -653,13 +363,7 @@ function FeaturedJobs() {
     queryFn: () => jobsAPI.getFeatured(),
   })
   const serverJobs: Job[] = data?.data?.data || []
-  const combinedJobs: Job[] = [
-    ...serverJobs,
-    ...FALLBACK_JOBS.filter(
-      (fb) => !serverJobs.some((sj) => sj.slug === fb.slug || sj.title?.toLowerCase() === fb.title?.toLowerCase())
-    ),
-  ]
-  const jobsToDisplay = combinedJobs.slice(0, 8)
+  const jobsToDisplay = serverJobs
 
   // Tab Filtering
   const filteredJobs = jobsToDisplay.filter((job) => {
@@ -722,9 +426,31 @@ function FeaturedJobs() {
 
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[...Array(8)].map((_, i) => (
+            {[...Array(4)].map((_, i) => (
               <JobCardSkeleton key={i} />
             ))}
+          </div>
+        ) : filteredJobs.length === 0 ? (
+          <div className="text-center py-14 px-4 rounded-2xl bg-slate-50/80 border border-slate-100 max-w-xl mx-auto shadow-xs">
+            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-3 shadow-xs">
+              <Briefcase className="h-6 w-6" />
+            </div>
+            <h3 className="text-base font-bold text-slate-800">No jobs posted yet in this category</h3>
+            <p className="text-xs text-slate-500 mt-1.5 max-w-sm mx-auto leading-relaxed">
+              New job opportunities will appear here as soon as verified recruiters and employers publish them.
+            </p>
+            <div className="mt-5 flex items-center justify-center gap-3">
+              <Link to="/jobs">
+                <Button variant="outline" size="sm" className="rounded-xl text-xs font-semibold">
+                  Browse All Jobs
+                </Button>
+              </Link>
+              <Link to="/employer/jobs/post">
+                <Button variant="primary" size="sm" className="rounded-xl text-xs font-semibold bg-orange-500 hover:bg-orange-600 text-white shadow-xs">
+                  Post a Job
+                </Button>
+              </Link>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -734,13 +460,15 @@ function FeaturedJobs() {
           </div>
         )}
 
-        <div className="mt-10 text-center">
-          <Link to="/jobs">
-            <button className="border border-gray-300 text-gray-700 hover:border-blue-600 hover:text-blue-600 font-semibold text-sm px-8 py-3 rounded-xl transition-colors">
-              Explore All {jobsToDisplay.length}+ Jobs in Northeast →
-            </button>
-          </Link>
-        </div>
+        {jobsToDisplay.length > 0 && (
+          <div className="mt-10 text-center">
+            <Link to="/jobs">
+              <button className="border border-gray-300 text-gray-700 hover:border-blue-600 hover:text-blue-600 font-semibold text-sm px-8 py-3 rounded-xl transition-colors">
+                Explore All {jobsToDisplay.length}+ Jobs in Northeast →
+              </button>
+            </Link>
+          </div>
+        )}
       </div>
     </section>
   )
@@ -992,51 +720,77 @@ function TopCompanies() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {FEATURED_COMPANIES_FALLBACK.map((comp) => (
-            <div
-              key={comp.name}
-              className="bg-white rounded-2xl p-5 border border-gray-200 hover:border-blue-300 hover:shadow-xl transition-all duration-300 flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-bold text-lg flex items-center justify-center shadow-sm">
-                    {comp.name.charAt(0)}
-                  </div>
-                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full flex items-center gap-1">
-                    <ShieldCheck className="h-3.5 w-3.5" /> Verified
-                  </span>
-                </div>
-
-                <h3 className="font-display font-bold text-base text-gray-900">{comp.name}</h3>
-                <p className="text-xs text-gray-500 font-medium mt-0.5">{comp.category}</p>
-
-                <div className="flex items-center gap-3 mt-3 text-xs text-gray-500">
-                  <span className="flex items-center gap-1">
-                    <MapPin className="h-3.5 w-3.5 text-gray-400" />
-                    {comp.location}
-                  </span>
-                  <span className="flex items-center gap-1 text-amber-600 font-semibold">
-                    <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                    {comp.rating}
-                  </span>
-                </div>
-              </div>
-
-              <div className="mt-5 pt-3 border-t border-gray-100 flex items-center justify-between">
-                <span className="text-xs font-bold text-accent-600 bg-accent-50 px-2.5 py-1 rounded-md">
-                  {comp.openings}
-                </span>
-                <Link
-                  to={`/jobs?keyword=${encodeURIComponent(comp.name)}`}
-                  className="text-xs font-bold text-primary-900 hover:text-accent-600 flex items-center gap-1 transition-colors"
-                >
-                  View Openings <ChevronRight className="h-3.5 w-3.5" />
-                </Link>
-              </div>
+        {companies.length === 0 ? (
+          <div className="text-center py-12 px-4 rounded-2xl bg-white border border-gray-200/80 max-w-lg mx-auto shadow-xs">
+            <Building2 className="h-10 w-10 text-slate-300 mx-auto mb-2.5" />
+            <h3 className="text-base font-semibold text-slate-800">Verified Companies</h3>
+            <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+              Are you an organization looking to hire talent in Northeast India? Register today to post vacancies.
+            </p>
+            <div className="mt-4">
+              <Link to="/register">
+                <Button variant="primary" size="sm" className="rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-700">
+                  Register as Employer
+                </Button>
+              </Link>
             </div>
-          ))}
-        </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {companies.map((comp) => {
+              const initial = comp.name?.charAt(0) || 'C'
+              const location = comp.headquarters || 'Northeast India'
+              const openJobs = comp._count?.jobs ? `${comp._count.jobs} Open Jobs` : 'Hiring'
+
+              return (
+                <div
+                  key={comp.id || comp._id || comp.slug || comp.name}
+                  className="bg-white rounded-2xl p-5 border border-gray-200 hover:border-blue-300 hover:shadow-xl transition-all duration-300 flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      {comp.logo ? (
+                        <img src={comp.logo} alt={comp.name} className="h-12 w-12 rounded-xl object-contain border border-gray-100 p-1" />
+                      ) : (
+                        <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-bold text-lg flex items-center justify-center shadow-sm">
+                          {initial}
+                        </div>
+                      )}
+                      {comp.isVerified && (
+                        <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full flex items-center gap-1">
+                          <ShieldCheck className="h-3.5 w-3.5" /> Verified
+                        </span>
+                      )}
+                    </div>
+
+                    <h3 className="font-display font-bold text-base text-gray-900">{comp.name}</h3>
+                    <p className="text-xs text-gray-500 font-medium mt-0.5">{comp.industry || 'Corporate Partner'}</p>
+
+                    <div className="flex items-center gap-3 mt-3 text-xs text-gray-500">
+                      <span className="flex items-center gap-1">
+                        <MapPin className="h-3.5 w-3.5 text-gray-400" />
+                        {location}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 pt-3 border-t border-gray-100 flex items-center justify-between">
+                    <span className="text-xs font-bold text-accent-600 bg-accent-50 px-2.5 py-1 rounded-md">
+                      {openJobs}
+                    </span>
+                    <Link
+                      to={`/jobs?keyword=${encodeURIComponent(comp.name)}`}
+                      className="text-xs font-bold text-primary-900 hover:text-accent-600 flex items-center gap-1 transition-colors"
+                    >
+                      <span>Explore</span>
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </Link>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
     </section>
   )
