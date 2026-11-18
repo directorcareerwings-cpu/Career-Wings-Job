@@ -201,7 +201,7 @@ const ensureDatabaseAndAdmin = async () => {
     catch (err) {
         console.warn('⚡ Database tables missing or error querying. Running prisma db push...', err);
         try {
-            (0, child_process_1.execSync)('npx prisma db push --accept-data-loss', {
+            (0, child_process_1.execSync)('npx prisma db push', {
                 cwd: path_1.default.resolve(__dirname, '..'),
                 stdio: 'inherit',
             });

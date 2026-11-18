@@ -1,4 +1,4 @@
-﻿# Dependencies
+# Dependencies
 node_modules
 .pnpm-store
 
@@ -14,13 +14,22 @@ build
 !.env.example
 
 # Database & SQLite
-# Allow seeded production SQLite databases
+# Persistent live database & rolling backups (NEVER touched or overwritten by git)
+persistent_data/*
+!persistent_data/.gitkeep
+!persistent_data/backups/
+persistent_data/backups/*
+!persistent_data/backups/.gitkeep
+
+# Legacy fallback SQLite paths
 !prisma/dev.db
 !server/prisma/dev.db
 !server/prisma/prisma/dev.db
 !server/dev.db
 !dev.db
 *.db-journal
+*.db-wal
+*.db-shm
 *.sqlite
 *.sqlite3
 
