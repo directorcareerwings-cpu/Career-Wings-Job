@@ -13,25 +13,20 @@ build
 .env.*.local
 !.env.example
 
-# Database & SQLite
-# Persistent live database & rolling backups (NEVER touched or overwritten by git)
-persistent_data/*
-!persistent_data/.gitkeep
-!persistent_data/backups/
-persistent_data/backups/*
-!persistent_data/backups/.gitkeep
-
-# Legacy fallback SQLite paths
-!prisma/dev.db
-!server/prisma/dev.db
-!server/prisma/prisma/dev.db
-!server/dev.db
-!dev.db
+# Database & SQLite — STRICTLY IGNORED by Git (NEVER commit or overwrite production data)
+*.db
 *.db-journal
 *.db-wal
 *.db-shm
 *.sqlite
 *.sqlite3
+
+# Persistent production database & rolling backups directory
+persistent_data/*
+!persistent_data/.gitkeep
+!persistent_data/backups/
+persistent_data/backups/*
+!persistent_data/backups/.gitkeep
 
 # Uploads & Temporary files
 uploads/*

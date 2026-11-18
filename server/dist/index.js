@@ -11,7 +11,6 @@ const morgan_1 = __importDefault(require("morgan"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
-const child_process_1 = require("child_process");
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
@@ -183,19 +182,7 @@ const ensureDatabaseAndAdmin = async () => {
             console.log('✔ Default admin created: admin@careerwings.in / Admin@123456');
         }
         else {
-            const isMatch = await bcryptjs_1.default.compare('Admin@123456', admin.passwordHash);
-            if (!isMatch) {
-                console.log('⚡ Updating admin password to default Admin@123456...');
-                const adminPassword = await bcryptjs_1.default.hash('Admin@123456', 12);
-                await prisma_1.prisma.user.update({
-                    where: { id: admin.id },
-                    data: { passwordHash: adminPassword, isActive: true, isVerified: true },
-                });
-                console.log('✔ Admin password updated.');
-            }
-            else {
-                console.log('✔ Admin user verified in database.');
-            }
+            console.log('✔ Admin user verified in database.');
         }
         // Ensure default SMTP configuration for Hostinger & no-reply@careerwings.in
         const defaultSmtpSettings = [
@@ -224,29 +211,7 @@ const ensureDatabaseAndAdmin = async () => {
         }
     }
     catch (err) {
-        console.warn('⚡ Database tables missing or error querying. Running prisma db push...', err);
-        try {
-            (0, child_process_1.execSync)('npx prisma db push', {
-                cwd: path_1.default.resolve(__dirname, '..'),
-                stdio: 'inherit',
-            });
-            const adminPassword = await bcryptjs_1.default.hash('Admin@123456', 12);
-            await prisma_1.prisma.user.upsert({
-                where: { email: 'admin@careerwings.in' },
-                update: {},
-                create: {
-                    email: 'admin@careerwings.in',
-                    passwordHash: adminPassword,
-                    role: 'ADMIN',
-                    isActive: true,
-                    isVerified: true,
-                },
-            });
-            console.log('✔ Database pushed and admin created successfully.');
-        }
-        catch (pushError) {
-            console.error('❌ Failed to auto-initialize database:', pushError);
-        }
+        console.error('⚠️ [Database Notice during initialization]:', err);
     }
 };
 // 8. Server Initialization

@@ -11,6 +11,9 @@
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:seed": "tsx src/prisma/seed.ts",
+    "db:audit": "tsx src/lib/database-safety.ts audit",
+    "db:backup": "tsx src/lib/database-safety.ts backup",
+    "db:restore": "tsx src/lib/database-safety.ts restore",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate"
   },

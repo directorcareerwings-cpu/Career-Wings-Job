@@ -227,6 +227,11 @@ const COMPANIES = [
 ]
 
 async function seed100Candidates() {
+  if (process.env.NODE_ENV === 'production' && !process.env.FORCE_PRODUCTION_SEED) {
+    console.error('⛔ [CRITICAL SAFETY GUARD] Seeding is DISABLED in PRODUCTION environment to protect live data!');
+    process.exit(0);
+  }
+
   console.log('🚀 Starting generation of 100 demo job seeker profiles...')
 
   const defaultPasswordHash = await bcrypt.hash('Candidate@123', 10)

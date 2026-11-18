@@ -6,6 +6,11 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function addMoreJobs() {
+  if (process.env.NODE_ENV === 'production' && !process.env.FORCE_PRODUCTION_SEED) {
+    console.error('⛔ [CRITICAL SAFETY GUARD] Seeding is DISABLED in PRODUCTION environment to protect live data!');
+    process.exit(0);
+  }
+
   console.log('Seeding 5 more jobs to reach 8+ published vacancies...');
 
   const employer = await prisma.employer.findFirst();

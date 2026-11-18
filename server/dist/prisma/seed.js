@@ -7,6 +7,11 @@ const client_1 = require("@prisma/client");
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const prisma = new client_1.PrismaClient();
 async function main() {
+    if (process.env.NODE_ENV === 'production' && !process.env.FORCE_PRODUCTION_SEED) {
+        console.error('⛔ [CRITICAL SAFETY GUARD] Seeding is DISABLED in PRODUCTION environment to protect live data!');
+        console.error('   Existing job posts, candidates, and employers cannot be modified by seed scripts.');
+        process.exit(0);
+    }
     console.log('🌱 Starting Career Wings database seeding...');
     // 1. Admin User
     const adminPassword = await bcryptjs_1.default.hash('Admin@123456', 12);

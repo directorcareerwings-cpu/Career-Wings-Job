@@ -1,75 +1,169 @@
 import { PrismaClient } from '@prisma/client';
 import path from 'path';
 import fs from 'fs';
+import { execSync } from 'child_process';
 
+/**
+ * Career Wings Production Database Safety & Persistence Manager
+ * Guarantees that production data is NEVER overwritten, reset, or deleted by any deployment.
+ */
+
+export interface DatabaseAuditMetrics {
+  timestamp: string;
+  environment: string;
+  databasePath: string;
+  sizeBytes: number;
+  integrityOk: boolean;
+  counts?: {
+    users: number;
+    candidates: number;
+    employers: number;
+    companies: number;
+    jobs: number;
+    publishedJobs: number;
+    applications: number;
+    adminSettings: number;
+  };
+}
+
+/**
+ * Locate the true project root directory regardless of current working directory
+ */
+export function findProjectRoot(): string {
+  // Check process.cwd() first
+  let cur = process.cwd();
+  for (let i = 0; i < 5; i++) {
+    if (fs.existsSync(path.join(cur, 'package.json')) && fs.existsSync(path.join(cur, 'server'))) {
+      return cur;
+    }
+    const parent = path.dirname(cur);
+    if (parent === cur) break;
+    cur = parent;
+  }
+
+  // Fallback to __dirname
+  cur = __dirname;
+  for (let i = 0; i < 5; i++) {
+    if (fs.existsSync(path.join(cur, 'package.json')) && fs.existsSync(path.join(cur, 'server'))) {
+      return cur;
+    }
+    const parent = path.dirname(cur);
+    if (parent === cur) break;
+    cur = parent;
+  }
+
+  return process.cwd();
+}
+
+/**
+ * Create a verified backup of the database with retention policy
+ */
+export function createSafetyBackup(dbPath: string, backupsDir: string, label = 'auto'): string | null {
+  try {
+    if (!fs.existsSync(dbPath) || fs.statSync(dbPath).size < 1000) {
+      return null;
+    }
+
+    if (!fs.existsSync(backupsDir)) {
+      fs.mkdirSync(backupsDir, { recursive: true });
+    }
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const backupName = `backup_${label}_${timestamp}.db`;
+    const backupPath = path.join(backupsDir, backupName);
+
+    // Copy database safely
+    fs.copyFileSync(dbPath, backupPath);
+
+    // Verify backup exists and has identical size
+    const origSize = fs.statSync(dbPath).size;
+    const backupSize = fs.statSync(backupPath).size;
+
+    if (backupSize !== origSize) {
+      console.error(`❌ [BACKUP INTEGRITY ERROR] Size mismatch: original=${origSize}, backup=${backupSize}`);
+      return null;
+    }
+
+    // Verify SQLite file header
+    const fd = fs.openSync(backupPath, 'r');
+    const buffer = Buffer.alloc(16);
+    fs.readSync(fd, buffer, 0, 16, 0);
+    fs.closeSync(fd);
+    const header = buffer.toString('utf-8');
+
+    if (!header.startsWith('SQLite format 3')) {
+      console.error('❌ [BACKUP CORRUPTION ERROR] Backup file is not a valid SQLite database!');
+      return null;
+    }
+
+    console.log(`🛡️ [BACKUP SUCCESS] Verified database backup created: ${backupName} (${(backupSize / 1024).toFixed(1)} KB)`);
+
+    // Retention policy: Keep the 15 most recent backups
+    const allBackups = fs.readdirSync(backupsDir)
+      .filter((f) => f.endsWith('.db'))
+      .map((f) => path.join(backupsDir, f))
+      .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+
+    for (let i = 15; i < allBackups.length; i++) {
+      try {
+        fs.unlinkSync(allBackups[i]);
+      } catch {}
+    }
+
+    return backupPath;
+  } catch (err) {
+    console.warn('⚠️ [BACKUP WARNING] Failed to create safety backup:', err);
+    return null;
+  }
+}
+
+/**
+ * Resolve the dedicated persistent database URL
+ */
 function resolveDatabaseUrl(): string {
-  // If explicitly configured with postgres / mysql, keep as is
+  // If explicitly configured with postgresql / mysql, respect environment variable directly
   const envUrl = process.env.DATABASE_URL;
   if (envUrl && !envUrl.startsWith('file:') && (envUrl.startsWith('postgresql://') || envUrl.startsWith('mysql://'))) {
+    console.log('🔌 [Prisma] Connected to external production database:', envUrl.replace(/:[^:@]+@/, ':***@'));
     return envUrl;
   }
 
-  // 1. Persistent Data Directory (Outside git tracking, NEVER deleted by git pull/redeploy)
-  const persistentDir = path.resolve(process.cwd(), 'persistent_data');
+  const projectRoot = findProjectRoot();
+  const persistentDir = path.join(projectRoot, 'persistent_data');
   const backupsDir = path.join(persistentDir, 'backups');
+
   if (!fs.existsSync(persistentDir)) fs.mkdirSync(persistentDir, { recursive: true });
   if (!fs.existsSync(backupsDir)) fs.mkdirSync(backupsDir, { recursive: true });
 
-  const primaryPersistentDb = path.join(persistentDir, 'careerwings_production.db');
+  const isProduction = process.env.NODE_ENV === 'production';
+  const targetDbName = isProduction ? 'careerwings_production.db' : 'careerwings_production.db';
+  const primaryDbPath = path.join(persistentDir, targetDbName);
 
-  // Candidate locations where existing live or seeded database files might be found
-  const candidateLocations: string[] = [
-    primaryPersistentDb,
-    path.resolve(process.cwd(), 'server/prisma/prisma/dev.db'),
-    path.resolve(process.cwd(), 'server/prisma/dev.db'),
-    path.resolve(process.cwd(), 'prisma/dev.db'),
-    path.resolve(process.cwd(), 'server/dev.db'),
-    path.resolve(process.cwd(), 'dev.db'),
-    path.resolve(__dirname, '../../server/prisma/dev.db'),
-    path.resolve(__dirname, '../prisma/dev.db'),
-    path.resolve(__dirname, '../prisma/prisma/dev.db'),
-    path.resolve(__dirname, '../../prisma/dev.db'),
-    path.resolve(__dirname, '../dev.db'),
-  ];
-
-  if (envUrl && envUrl.startsWith('file:')) {
-    const rawPath = envUrl.replace(/^file:/, '').trim();
-    if (path.isAbsolute(rawPath)) {
-      candidateLocations.unshift(rawPath);
-    } else {
-      candidateLocations.unshift(path.resolve(process.cwd(), 'server/prisma', rawPath));
-      candidateLocations.unshift(path.resolve(process.cwd(), 'server', rawPath));
-      candidateLocations.unshift(path.resolve(process.cwd(), rawPath));
-    }
-  }
-
-  // Check if primary persistent DB exists and has valid data (> 10KB)
-  let targetDb = primaryPersistentDb;
-  const primaryExists = fs.existsSync(primaryPersistentDb) && fs.statSync(primaryPersistentDb).size > 10000;
+  // Check if primary persistent database already exists
+  const primaryExists = fs.existsSync(primaryDbPath) && fs.statSync(primaryDbPath).size > 10000;
 
   if (primaryExists) {
-    // Automatically create a safety backup before server boot (keep last 5 backups)
-    try {
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const backupPath = path.join(backupsDir, `backup_${timestamp}.db`);
-      fs.copyFileSync(primaryPersistentDb, backupPath);
-
-      // Clean old backups keeping last 5
-      const allBackups = fs.readdirSync(backupsDir)
-        .filter((f) => f.endsWith('.db'))
-        .map((f) => path.join(backupsDir, f))
-        .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
-
-      for (let i = 5; i < allBackups.length; i++) {
-        try { fs.unlinkSync(allBackups[i]); } catch {}
-      }
-    } catch (err) {
-      console.warn('⚠️ Could not create automatic DB backup:', err);
-    }
+    // ALWAYS take an automatic safety backup before booting
+    createSafetyBackup(primaryDbPath, backupsDir, isProduction ? 'prod_boot' : 'dev_boot');
   } else {
-    // Primary persistent DB does not exist yet. Migrate the best available existing database.
-    const existingDbs = candidateLocations
-      .filter((p) => p !== primaryPersistentDb)
+    // First-time production setup: look for the best existing database to migrate ONCE
+    console.log(`ℹ️ [Database Setup] ${targetDbName} not found in persistent_data. Checking existing databases to migrate...`);
+
+    const candidateLocations: string[] = [
+      path.join(projectRoot, 'server/prisma/prisma/dev.db'),
+      path.join(projectRoot, 'server/prisma/dev.db'),
+      path.join(projectRoot, 'prisma/dev.db'),
+      path.join(projectRoot, 'server/dev.db'),
+      path.join(projectRoot, 'dev.db'),
+    ];
+
+    if (envUrl && envUrl.startsWith('file:')) {
+      const rawPath = envUrl.replace(/^file:/, '').trim();
+      candidateLocations.unshift(path.isAbsolute(rawPath) ? rawPath : path.resolve(projectRoot, rawPath));
+    }
+
+    const viableDbs = candidateLocations
+      .filter((p) => p !== primaryDbPath)
       .filter((p) => {
         try {
           return fs.existsSync(p) && fs.statSync(p).size > 10000;
@@ -84,45 +178,27 @@ function resolveDatabaseUrl(): string {
       }))
       .sort((a, b) => b.size - a.size || b.mtime - a.mtime);
 
-    if (existingDbs.length > 0) {
-      const bestDb = existingDbs[0].path;
-      console.log(`📦 [Prisma] Migrating existing database (${bestDb}) to persistent storage: ${primaryPersistentDb}`);
+    if (viableDbs.length > 0) {
+      const sourceDb = viableDbs[0].path;
+      console.log(`📦 [Database Migration] Migrating existing database from ${sourceDb} to persistent storage: ${primaryDbPath}`);
       try {
-        fs.copyFileSync(bestDb, primaryPersistentDb);
-        const initBackup = path.join(backupsDir, 'initial_migrated_backup.db');
-        fs.copyFileSync(bestDb, initBackup);
-      } catch (err) {
-        console.error('❌ Failed to copy to persistent DB, using bestDb directly:', err);
-        targetDb = bestDb;
+        fs.copyFileSync(sourceDb, primaryDbPath);
+        createSafetyBackup(primaryDbPath, backupsDir, 'initial_migrated');
+      } catch (copyErr) {
+        console.error('❌ Failed to copy to persistent DB:', copyErr);
       }
     } else {
-      console.log(`ℹ️ [Prisma] Initializing fresh persistent database at: ${primaryPersistentDb}`);
+      console.log(`✨ [Database Init] Initializing fresh persistent database at: ${primaryDbPath}`);
     }
   }
 
-  // Also maintain synced copies in legacy locations so any relative paths stay safe
-  const syncLocations = [
-    path.resolve(process.cwd(), 'server/prisma/dev.db'),
-    path.resolve(process.cwd(), 'server/prisma/prisma/dev.db'),
-    path.resolve(process.cwd(), 'prisma/dev.db'),
-    path.resolve(process.cwd(), 'server/dev.db'),
-    path.resolve(process.cwd(), 'dev.db'),
-  ];
-
-  for (const syncTarget of syncLocations) {
-    try {
-      const dir = path.dirname(syncTarget);
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      if (fs.existsSync(targetDb) && (!fs.existsSync(syncTarget) || fs.statSync(syncTarget).size === 0)) {
-        fs.copyFileSync(targetDb, syncTarget);
-      }
-    } catch {}
-  }
-
-  const normalized = targetDb.replace(/\\/g, '/');
+  const normalized = primaryDbPath.replace(/\\/g, '/');
   const finalUrl = `file:${normalized}`;
   process.env.DATABASE_URL = finalUrl;
-  console.log(`🔌 [Prisma] Connected to persistent database: ${targetDb}`);
+
+  console.log(`🔒 [Prisma] CONNECTED TO PERSISTENT DATABASE: ${primaryDbPath}`);
+  console.log(`   (Database file is protected from git pulls and future deployments)`);
+
   return finalUrl;
 }
 
@@ -140,7 +216,7 @@ export const prisma =
         url: resolvedDbUrl,
       },
     },
-    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+    log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
   });
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;

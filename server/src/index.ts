@@ -199,18 +199,7 @@ const ensureDatabaseAndAdmin = async () => {
       });
       console.log('✔ Default admin created: admin@careerwings.in / Admin@123456');
     } else {
-      const isMatch = await bcrypt.compare('Admin@123456', admin.passwordHash);
-      if (!isMatch) {
-        console.log('⚡ Updating admin password to default Admin@123456...');
-        const adminPassword = await bcrypt.hash('Admin@123456', 12);
-        await prisma.user.update({
-          where: { id: admin.id },
-          data: { passwordHash: adminPassword, isActive: true, isVerified: true },
-        });
-        console.log('✔ Admin password updated.');
-      } else {
-        console.log('✔ Admin user verified in database.');
-      }
+      console.log('✔ Admin user verified in database.');
     }
 
     // Ensure default SMTP configuration for Hostinger & no-reply@careerwings.in
@@ -241,28 +230,7 @@ const ensureDatabaseAndAdmin = async () => {
       });
     }
   } catch (err) {
-    console.warn('⚡ Database tables missing or error querying. Running prisma db push...', err);
-    try {
-      execSync('npx prisma db push', {
-        cwd: path.resolve(__dirname, '..'),
-        stdio: 'inherit',
-      });
-      const adminPassword = await bcrypt.hash('Admin@123456', 12);
-      await prisma.user.upsert({
-        where: { email: 'admin@careerwings.in' },
-        update: {},
-        create: {
-          email: 'admin@careerwings.in',
-          passwordHash: adminPassword,
-          role: 'ADMIN',
-          isActive: true,
-          isVerified: true,
-        },
-      });
-      console.log('✔ Database pushed and admin created successfully.');
-    } catch (pushError) {
-      console.error('❌ Failed to auto-initialize database:', pushError);
-    }
+    console.error('⚠️ [Database Notice during initialization]:', err);
   }
 };
 

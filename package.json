@@ -19,6 +19,9 @@
     "start": "node server/dist/index.js",
     "db:push": "pnpm --filter career-wings-server db:push",
     "db:seed": "pnpm --filter career-wings-server db:seed",
+    "db:audit": "pnpm --filter career-wings-server db:audit",
+    "db:backup": "pnpm --filter career-wings-server db:backup",
+    "db:restore": "pnpm --filter career-wings-server db:restore",
     "db:studio": "pnpm --filter career-wings-server db:studio"
   },
   "devDependencies": {
