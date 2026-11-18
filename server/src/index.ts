@@ -182,12 +182,34 @@ app.use(errorHandler);
 // Database initialization helper
 const ensureDatabaseAndAdmin = async () => {
   try {
+    // 1. Verify database tables exist
+    let hasUserTable = false;
+    try {
+      const tableCheck: any = await prisma.$queryRawUnsafe(`SELECT name FROM sqlite_master WHERE type='table' AND name='User'`);
+      hasUserTable = Array.isArray(tableCheck) && tableCheck.length > 0;
+    } catch {
+      hasUserTable = false;
+    }
+
+    if (!hasUserTable) {
+      console.log('⚡ Empty database or missing tables detected. Auto-initializing schema via prisma db push...');
+      const schemaDir = path.resolve(__dirname, '..');
+      execSync('npx prisma db push --skip-generate', {
+        cwd: schemaDir,
+        env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
+        stdio: 'inherit',
+      });
+      console.log('✔ Schema initialized successfully.');
+    }
+
+    // 2. Ensure default admin user exists
     const admin = await prisma.user.findUnique({
       where: { email: 'admin@careerwings.in' },
     });
+    const adminPassword = await bcrypt.hash('Admin@123456', 12);
+
     if (!admin) {
       console.log('⚡ Admin user not found. Creating default admin...');
-      const adminPassword = await bcrypt.hash('Admin@123456', 12);
       await prisma.user.create({
         data: {
           email: 'admin@careerwings.in',
@@ -199,7 +221,17 @@ const ensureDatabaseAndAdmin = async () => {
       });
       console.log('✔ Default admin created: admin@careerwings.in / Admin@123456');
     } else {
-      console.log('✔ Admin user verified in database.');
+      const isMatch = await bcrypt.compare('Admin@123456', admin.passwordHash);
+      if (!isMatch) {
+        console.log('⚡ Syncing admin password to default Admin@123456...');
+        await prisma.user.update({
+          where: { id: admin.id },
+          data: { passwordHash: adminPassword, isActive: true, isVerified: true },
+        });
+        console.log('✔ Admin password synchronized.');
+      } else {
+        console.log('✔ Admin user verified in database.');
+      }
     }
 
     // Ensure default SMTP configuration for Hostinger & no-reply@careerwings.in

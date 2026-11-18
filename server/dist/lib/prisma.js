@@ -119,6 +119,7 @@ function resolveDatabaseUrl() {
         // First-time production setup: look for the best existing database to migrate ONCE
         console.log(`ℹ️ [Database Setup] ${targetDbName} not found in persistent_data. Checking existing databases to migrate...`);
         const candidateLocations = [
+            path_1.default.join(projectRoot, 'server/prisma/careerwings_template.db'),
             path_1.default.join(projectRoot, 'server/prisma/prisma/dev.db'),
             path_1.default.join(projectRoot, 'server/prisma/dev.db'),
             path_1.default.join(projectRoot, 'prisma/dev.db'),

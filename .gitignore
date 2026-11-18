@@ -21,6 +21,9 @@ build
 *.sqlite
 *.sqlite3
 
+# Bootstrap template database (read-only initial seed if persistent DB is missing)
+!server/prisma/careerwings_template.db
+
 # Persistent production database & rolling backups directory
 persistent_data/*
 !persistent_data/.gitkeep

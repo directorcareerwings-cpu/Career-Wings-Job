@@ -107,7 +107,7 @@ export function createSafetyBackup(dbPath: string, backupsDir: string, label = '
     for (let i = 15; i < allBackups.length; i++) {
       try {
         fs.unlinkSync(allBackups[i]);
-      } catch {}
+      } catch { }
     }
 
     return backupPath;
@@ -150,6 +150,7 @@ function resolveDatabaseUrl(): string {
     console.log(`ℹ️ [Database Setup] ${targetDbName} not found in persistent_data. Checking existing databases to migrate...`);
 
     const candidateLocations: string[] = [
+      path.join(projectRoot, 'server/prisma/careerwings_template.db'),
       path.join(projectRoot, 'server/prisma/prisma/dev.db'),
       path.join(projectRoot, 'server/prisma/dev.db'),
       path.join(projectRoot, 'prisma/dev.db'),
