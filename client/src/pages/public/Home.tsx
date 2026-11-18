@@ -709,11 +709,10 @@ function FeaturedJobs() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`px-3 py-1.5 rounded-lg transition-all ${
-                  activeTab === tab.id
-                    ? 'bg-blue-600 text-white font-semibold shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
+                className={`px-3 py-1.5 rounded-lg transition-all ${activeTab === tab.id
+                  ? 'bg-blue-600 text-white font-semibold shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+                  }`}
               >
                 {tab.label}
               </button>
@@ -893,21 +892,19 @@ function HowItWorks() {
           <div className="mt-6 inline-flex p-1.5 bg-gray-100 rounded-2xl border border-gray-200">
             <button
               onClick={() => setRole('candidate')}
-              className={`px-5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
-                role === 'candidate'
-                  ? 'bg-primary-900 text-white shadow-md'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
+              className={`px-5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${role === 'candidate'
+                ? 'bg-primary-900 text-white shadow-md'
+                : 'text-gray-600 hover:text-gray-900'
+                }`}
             >
               For Job Seekers
             </button>
             <button
               onClick={() => setRole('employer')}
-              className={`px-5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
-                role === 'employer'
-                  ? 'bg-primary-900 text-white shadow-md'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
+              className={`px-5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${role === 'employer'
+                ? 'bg-primary-900 text-white shadow-md'
+                : 'text-gray-600 hover:text-gray-900'
+                }`}
             >
               For Employers & HRs
             </button>
@@ -1168,9 +1165,8 @@ function Testimonials() {
               className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-200 flex flex-col justify-between relative overflow-hidden"
             >
               {/* Top color accent bar */}
-              <div className={`absolute top-0 left-0 right-0 h-1 ${
-                ['bg-blue-500', 'bg-emerald-500', 'bg-orange-500'][i % 3]
-              }`} />
+              <div className={`absolute top-0 left-0 right-0 h-1 ${['bg-blue-500', 'bg-emerald-500', 'bg-orange-500'][i % 3]
+                }`} />
 
               <div>
                 {/* Large decorative quote */}
@@ -1191,9 +1187,8 @@ function Testimonials() {
               </div>
 
               <div className="flex items-center gap-3 pt-4 border-t border-gray-100">
-                <div className={`h-10 w-10 rounded-full font-bold flex items-center justify-center text-sm shrink-0 text-white ${
-                  ['bg-blue-600', 'bg-emerald-600', 'bg-orange-500'][i % 3]
-                }`}>
+                <div className={`h-10 w-10 rounded-full font-bold flex items-center justify-center text-sm shrink-0 text-white ${['bg-blue-600', 'bg-emerald-600', 'bg-orange-500'][i % 3]
+                  }`}>
                   {t.avatar}
                 </div>
                 <div>

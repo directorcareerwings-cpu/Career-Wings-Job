@@ -137,36 +137,6 @@ export default function Login() {
               )}
             </button>
           </form>
-
-          {/* Quick Demo Logins Banner */}
-          <div className="mt-8 pt-6 border-t border-slate-100">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider text-center mb-3">
-              Quick Demo Accounts
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => { setError(null); setEmail('candidate@careerwings.in'); setPassword('Candidate@123') }}
-                className="px-2 py-1.5 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition"
-              >
-                Candidate
-              </button>
-              <button
-                type="button"
-                onClick={() => { setError(null); setEmail('recruiter@careerwings.in'); setPassword('Employer@123') }}
-                className="px-2 py-1.5 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition"
-              >
-                Recruiter
-              </button>
-              <button
-                type="button"
-                onClick={() => { setError(null); setEmail('admin@careerwings.in'); setPassword('Admin@123456') }}
-                className="px-2 py-1.5 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition"
-              >
-                Admin
-              </button>
-            </div>
-          </div>
         </div>
       </main>
 
