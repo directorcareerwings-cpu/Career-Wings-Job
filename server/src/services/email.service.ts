@@ -59,12 +59,12 @@ export const getSmtpConfig = async (): Promise<SmtpConfig> => {
 
     const map = new Map<string, string>(settings.map((s: { key: string; value: string }) => [s.key, s.value]));
 
-    const host = map.get('SMTP_HOST') || process.env.SMTP_HOST || '';
-    const port = parseInt(map.get('SMTP_PORT') || process.env.SMTP_PORT || '587', 10);
-    const secure = map.get('SMTP_SECURE') === 'true' || process.env.SMTP_SECURE === 'true';
-    const user = map.get('SMTP_USER') || process.env.SMTP_USER || '';
+    const host = map.get('SMTP_HOST') || process.env.SMTP_HOST || 'smtp.hostinger.com';
+    const port = parseInt(map.get('SMTP_PORT') || process.env.SMTP_PORT || '465', 10);
+    const secure = map.get('SMTP_SECURE') === 'true' || process.env.SMTP_SECURE === 'true' || port === 465;
+    const user = map.get('SMTP_USER') || process.env.SMTP_USER || 'no-reply@careerwings.in';
     const pass = map.get('SMTP_PASS') || process.env.SMTP_PASS || process.env.SMTP_PASSWORD || '';
-    const fromEmail = map.get('SMTP_FROM_EMAIL') || process.env.SMTP_FROM_EMAIL || 'noreply@careerwings.in';
+    const fromEmail = map.get('SMTP_FROM_EMAIL') || process.env.SMTP_FROM_EMAIL || 'no-reply@careerwings.in';
     const fromName = map.get('SMTP_FROM_NAME') || process.env.SMTP_FROM_NAME || 'Career Wings';
     const replyTo = map.get('SMTP_REPLY_TO') || process.env.SMTP_REPLY_TO || 'support@careerwings.in';
     const isEnabled = map.get('SMTP_IS_ENABLED') !== 'false';
@@ -85,12 +85,12 @@ export const getSmtpConfig = async (): Promise<SmtpConfig> => {
   } catch (err) {
     console.error('[EMAIL] Failed to read SMTP config from DB, using fallback env:', err);
     const fallbackConfig: SmtpConfig = {
-      host: process.env.SMTP_HOST || '',
-      port: parseInt(process.env.SMTP_PORT || '587', 10),
-      secure: process.env.SMTP_SECURE === 'true',
-      user: process.env.SMTP_USER || '',
+      host: process.env.SMTP_HOST || 'smtp.hostinger.com',
+      port: parseInt(process.env.SMTP_PORT || '465', 10),
+      secure: process.env.SMTP_SECURE === 'true' || process.env.SMTP_PORT === '465' || true,
+      user: process.env.SMTP_USER || 'no-reply@careerwings.in',
       pass: process.env.SMTP_PASS || process.env.SMTP_PASSWORD || '',
-      fromEmail: process.env.SMTP_FROM_EMAIL || 'noreply@careerwings.in',
+      fromEmail: process.env.SMTP_FROM_EMAIL || 'no-reply@careerwings.in',
       fromName: process.env.SMTP_FROM_NAME || 'Career Wings',
       replyTo: process.env.SMTP_REPLY_TO || 'support@careerwings.in',
       isEnabled: true,
@@ -108,8 +108,8 @@ export const getTransporter = async (): Promise<nodemailer.Transporter | null> =
 
   const config = await getSmtpConfig();
 
-  // If credentials are empty or default placeholder, return null to operate in sandbox log mode
-  if (!config.host || !config.user || config.user === 'your-email@gmail.com') {
+  // If credentials are empty, default placeholder, or password not set, return null
+  if (!config.host || !config.user || !config.pass || config.user === 'your-email@gmail.com') {
     return null;
   }
 
@@ -120,6 +120,9 @@ export const getTransporter = async (): Promise<nodemailer.Transporter | null> =
     auth: {
       user: config.user,
       pass: config.pass,
+    },
+    tls: {
+      rejectUnauthorized: false, // Prevents self-signed/proxy cert issues on shared hosts
     },
   });
 
@@ -379,18 +382,27 @@ const deliverEmail = async (payload: QueuedEmailPayload, emailLogId?: string): P
 
   const transporter = await getTransporter();
 
-  // If no SMTP credentials, run in verified Development Sandbox Mode
+  // If no SMTP credentials or password, run in Development Sandbox / Pending Config Mode
   if (!transporter) {
     const sandboxId = `sandbox-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-    console.log(`[EMAIL SANDBOX] Delivered to: ${payload.to} | Subject: "${payload.subject}" [ID: ${sandboxId}]`);
+    const reason = !config.pass
+      ? 'SMTP Password is not set. Please go to Admin Settings -> Email & Notifications (/admin/emails) to save password for no-reply@careerwings.in.'
+      : 'SMTP relay credentials not fully configured.';
+
+    console.warn(`[EMAIL NOTICE] Outbound mail to ${payload.to} via sandbox (${reason})`);
+    if (payload.emailType === 'OTP_VERIFICATION' || payload.emailType === 'PASSWORD_RESET_OTP') {
+      console.log(`[EMAIL OTP READY] Target: ${payload.to} | Subject: "${payload.subject}" [ID: ${sandboxId}]`);
+    }
 
     if (emailLogId) {
       await prisma.emailLog.update({
         where: { id: emailLogId },
         data: {
-          status: 'SENT',
+          status: config.pass ? 'SENT' : 'FAILED',
           providerMessageId: sandboxId,
-          sentAt: new Date(),
+          sentAt: config.pass ? new Date() : null,
+          failedAt: config.pass ? null : new Date(),
+          failureReason: config.pass ? null : reason,
         },
       }).catch(console.error);
     }

@@ -1362,7 +1362,7 @@ const updateAdminEmailConfigHandler = async (req, res, next) => {
             { key: 'SMTP_PORT', value: String(port || '587'), label: 'SMTP Port' },
             { key: 'SMTP_SECURE', value: String(Boolean(secure)), label: 'SMTP SSL/TLS' },
             { key: 'SMTP_USER', value: String(user || ''), label: 'SMTP Username' },
-            { key: 'SMTP_FROM_EMAIL', value: String(fromEmail || 'noreply@careerwings.in'), label: 'Default From Email' },
+            { key: 'SMTP_FROM_EMAIL', value: String(fromEmail || 'no-reply@careerwings.in'), label: 'Default From Email' },
             { key: 'SMTP_FROM_NAME', value: String(fromName || 'Career Wings'), label: 'Default From Name' },
             { key: 'SMTP_REPLY_TO', value: String(replyTo || 'support@careerwings.in'), label: 'Support Reply-To' },
             { key: 'SMTP_IS_ENABLED', value: String(isEnabled !== false), label: 'Email Dispatch Enabled' },

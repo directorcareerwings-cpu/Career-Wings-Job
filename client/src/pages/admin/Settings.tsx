@@ -129,7 +129,7 @@ export default function AdminSettings() {
             <div>
               <span className="font-semibold text-slate-700">Official Sender:</span>{' '}
               <code className="font-mono text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200 text-[11px]">
-                noreply@careerwings.in
+                no-reply@careerwings.in
               </code>
             </div>
             <div className="flex items-center gap-1 text-slate-500 text-[11px]">

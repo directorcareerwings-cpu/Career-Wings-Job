@@ -47,6 +47,13 @@ export const useAuthStore = create<AuthStore>()(
         set({ isLoading: true })
         try {
           const { data } = await authAPI.login(email.trim().toLowerCase(), password)
+          if (data?.data?.requiresVerification) {
+            set({ isLoading: false })
+            const err: any = new Error(data.message || 'Email verification required')
+            err.requiresVerification = true
+            err.email = email.trim().toLowerCase()
+            throw err
+          }
           const { user, accessToken } = data.data
           const formatted = formatUserData(user)
           set({

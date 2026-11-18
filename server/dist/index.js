@@ -197,6 +197,31 @@ const ensureDatabaseAndAdmin = async () => {
                 console.log('✔ Admin user verified in database.');
             }
         }
+        // Ensure default SMTP configuration for Hostinger & no-reply@careerwings.in
+        const defaultSmtpSettings = [
+            { key: 'SMTP_HOST', value: process.env.SMTP_HOST || 'smtp.hostinger.com', type: 'TEXT', group: 'EMAIL', label: 'SMTP Server Host' },
+            { key: 'SMTP_PORT', value: process.env.SMTP_PORT || '465', type: 'TEXT', group: 'EMAIL', label: 'SMTP Port' },
+            { key: 'SMTP_SECURE', value: process.env.SMTP_SECURE || 'true', type: 'TEXT', group: 'EMAIL', label: 'SMTP SSL/TLS' },
+            { key: 'SMTP_USER', value: process.env.SMTP_USER || 'no-reply@careerwings.in', type: 'TEXT', group: 'EMAIL', label: 'SMTP Username' },
+            { key: 'SMTP_FROM_EMAIL', value: process.env.SMTP_FROM_EMAIL || 'no-reply@careerwings.in', type: 'TEXT', group: 'EMAIL', label: 'Default From Email' },
+            { key: 'SMTP_FROM_NAME', value: process.env.SMTP_FROM_NAME || 'Career Wings', type: 'TEXT', group: 'EMAIL', label: 'Default From Name' },
+            { key: 'SMTP_REPLY_TO', value: process.env.SMTP_REPLY_TO || 'support@careerwings.in', type: 'TEXT', group: 'EMAIL', label: 'Support Reply-To' },
+            { key: 'SMTP_IS_ENABLED', value: 'true', type: 'TEXT', group: 'EMAIL', label: 'Email Dispatch Enabled' },
+        ];
+        for (const setting of defaultSmtpSettings) {
+            await prisma_1.prisma.adminSetting.upsert({
+                where: { key: setting.key },
+                update: {},
+                create: setting,
+            });
+        }
+        if (process.env.SMTP_PASS) {
+            await prisma_1.prisma.adminSetting.upsert({
+                where: { key: 'SMTP_PASS' },
+                update: { value: process.env.SMTP_PASS },
+                create: { key: 'SMTP_PASS', value: process.env.SMTP_PASS, type: 'TEXT', group: 'EMAIL', label: 'SMTP Password' },
+            });
+        }
     }
     catch (err) {
         console.warn('⚡ Database tables missing or error querying. Running prisma db push...', err);

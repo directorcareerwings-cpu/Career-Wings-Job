@@ -40,6 +40,11 @@ export default function Login() {
         navigate('/dashboard')
       }
     } catch (err: any) {
+      if (err.requiresVerification) {
+        toast.success('Please enter the 6-digit verification code sent to your email.')
+        navigate('/register', { state: { email: err.email || email, step: 'OTP' } })
+        return
+      }
       let message = 'Invalid email or password'
       if (err.response?.data?.message) {
         message = err.response.data.message

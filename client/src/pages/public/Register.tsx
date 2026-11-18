@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '@/stores/auth.store'
 import { authAPI } from '@/lib/api'
 import Header from '@/components/layout/Header'
@@ -10,6 +10,7 @@ import toast from 'react-hot-toast'
 
 export default function Register() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { setUser, setAccessToken } = useAuthStore()
 
   const [step, setStep] = useState<'FORM' | 'OTP'>('FORM')
@@ -29,6 +30,18 @@ export default function Register() {
   const [verifying, setVerifying] = useState(false)
   const [resending, setResending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Handle incoming redirect with OTP step
+  useEffect(() => {
+    const state = location.state as { email?: string; step?: string } | null
+    if (state?.email) {
+      setFormData((prev) => ({ ...prev, email: state.email! }))
+      if (state.step === 'OTP') {
+        setStep('OTP')
+        setResendCooldown(60)
+      }
+    }
+  }, [location.state])
 
   // Resend OTP countdown timer
   useEffect(() => {

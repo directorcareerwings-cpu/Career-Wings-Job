@@ -46,6 +46,47 @@ export const register = async (req: Request, res: Response, next: NextFunction):
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
     if (existingUser) {
+      if (!existingUser.isVerified) {
+        // User attempted registration earlier but has not verified email yet.
+        // Update credentials & profile and resend verification code without throwing 409
+        const passwordHash = await hashPassword(password);
+        await prisma.user.update({
+          where: { id: existingUser.id },
+          data: { passwordHash, role },
+        });
+
+        if (role === 'CANDIDATE') {
+          await prisma.candidate.upsert({
+            where: { userId: existingUser.id },
+            update: { firstName, lastName, phone: phone || null },
+            create: { userId: existingUser.id, firstName, lastName, phone: phone || null },
+          });
+        } else if (role === 'EMPLOYER') {
+          await prisma.employer.upsert({
+            where: { userId: existingUser.id },
+            update: { firstName, lastName, phone: phone || null, designation: designation || null },
+            create: { userId: existingUser.id, firstName, lastName, phone: phone || null, designation: designation || null },
+          });
+        }
+
+        const otp = await createOtpRecord(existingUser.email, 'REGISTRATION', existingUser.id);
+        sendOtpEmail(existingUser.email, firstName, otp, 'REGISTRATION', 10, existingUser.id).catch(console.error);
+
+        sendSuccess(
+          res,
+          {
+            requiresVerification: true,
+            userId: existingUser.id,
+            email: existingUser.email,
+            role: existingUser.role,
+            firstName,
+          },
+          'A 6-digit verification code has been dispatched to your email.',
+          200
+        );
+        return;
+      }
+
       throw new AppError('An account with this email already exists.', 409);
     }
 
@@ -231,6 +272,31 @@ export const login = async (req: Request, res: Response, next: NextFunction): Pr
 
     const isValid = await comparePassword(password, user.passwordHash);
     if (!isValid) throw new AppError('Invalid email or password.', 401);
+
+    // Require email verification for non-admin accounts
+    if (!user.isVerified && user.role !== 'ADMIN') {
+      let unverifiedProfile = null;
+      if (user.role === 'CANDIDATE') {
+        unverifiedProfile = await prisma.candidate.findUnique({ where: { userId: user.id } });
+      } else if (user.role === 'EMPLOYER') {
+        unverifiedProfile = await prisma.employer.findUnique({ where: { userId: user.id } });
+      }
+      const firstName = (unverifiedProfile as any)?.firstName || user.email.split('@')[0];
+      const otp = await createOtpRecord(user.email, 'REGISTRATION', user.id);
+      sendOtpEmail(user.email, firstName, otp, 'REGISTRATION', 10, user.id).catch(console.error);
+
+      sendSuccess(
+        res,
+        {
+          requiresVerification: true,
+          email: user.email,
+          role: user.role,
+          userId: user.id,
+        },
+        'Your email address is not verified yet. A 6-digit verification code has been dispatched to your email.'
+      );
+      return;
+    }
 
     await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
 

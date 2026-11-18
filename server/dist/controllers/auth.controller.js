@@ -61,6 +61,39 @@ const register = async (req, res, next) => {
         const { email, password, role, firstName, lastName, phone, companyName, designation } = req.body;
         const existingUser = await prisma_1.prisma.user.findUnique({ where: { email } });
         if (existingUser) {
+            if (!existingUser.isVerified) {
+                // User attempted registration earlier but has not verified email yet.
+                // Update credentials & profile and resend verification code without throwing 409
+                const passwordHash = await (0, auth_service_1.hashPassword)(password);
+                await prisma_1.prisma.user.update({
+                    where: { id: existingUser.id },
+                    data: { passwordHash, role },
+                });
+                if (role === 'CANDIDATE') {
+                    await prisma_1.prisma.candidate.upsert({
+                        where: { userId: existingUser.id },
+                        update: { firstName, lastName, phone: phone || null },
+                        create: { userId: existingUser.id, firstName, lastName, phone: phone || null },
+                    });
+                }
+                else if (role === 'EMPLOYER') {
+                    await prisma_1.prisma.employer.upsert({
+                        where: { userId: existingUser.id },
+                        update: { firstName, lastName, phone: phone || null, designation: designation || null },
+                        create: { userId: existingUser.id, firstName, lastName, phone: phone || null, designation: designation || null },
+                    });
+                }
+                const otp = await (0, otp_service_1.createOtpRecord)(existingUser.email, 'REGISTRATION', existingUser.id);
+                (0, email_service_1.sendOtpEmail)(existingUser.email, firstName, otp, 'REGISTRATION', 10, existingUser.id).catch(console.error);
+                (0, response_1.sendSuccess)(res, {
+                    requiresVerification: true,
+                    userId: existingUser.id,
+                    email: existingUser.email,
+                    role: existingUser.role,
+                    firstName,
+                }, 'A 6-digit verification code has been dispatched to your email.', 200);
+                return;
+            }
             throw new errors_1.AppError('An account with this email already exists.', 409);
         }
         const passwordHash = await (0, auth_service_1.hashPassword)(password);
@@ -221,6 +254,26 @@ const login = async (req, res, next) => {
         const isValid = await (0, auth_service_1.comparePassword)(password, user.passwordHash);
         if (!isValid)
             throw new errors_1.AppError('Invalid email or password.', 401);
+        // Require email verification for non-admin accounts
+        if (!user.isVerified && user.role !== 'ADMIN') {
+            let unverifiedProfile = null;
+            if (user.role === 'CANDIDATE') {
+                unverifiedProfile = await prisma_1.prisma.candidate.findUnique({ where: { userId: user.id } });
+            }
+            else if (user.role === 'EMPLOYER') {
+                unverifiedProfile = await prisma_1.prisma.employer.findUnique({ where: { userId: user.id } });
+            }
+            const firstName = unverifiedProfile?.firstName || user.email.split('@')[0];
+            const otp = await (0, otp_service_1.createOtpRecord)(user.email, 'REGISTRATION', user.id);
+            (0, email_service_1.sendOtpEmail)(user.email, firstName, otp, 'REGISTRATION', 10, user.id).catch(console.error);
+            (0, response_1.sendSuccess)(res, {
+                requiresVerification: true,
+                email: user.email,
+                role: user.role,
+                userId: user.id,
+            }, 'Your email address is not verified yet. A 6-digit verification code has been dispatched to your email.');
+            return;
+        }
         await prisma_1.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
         const accessToken = (0, auth_service_1.generateAccessToken)(user.id, user.role, user.email);
         const refreshToken = await (0, auth_service_1.generateRefreshToken)(user.id);

@@ -93,7 +93,7 @@ export default function EmailManagement() {
     pass: '',
     hasPassword: false,
     maskedPassword: '',
-    fromEmail: 'noreply@careerwings.in',
+    fromEmail: 'no-reply@careerwings.in',
     fromName: 'Career Wings',
     replyTo: 'support@careerwings.in',
     isEnabled: true,
@@ -425,7 +425,7 @@ export default function EmailManagement() {
                     type="text"
                     value={config.user}
                     onChange={(e) => setConfig({ ...config, user: e.target.value })}
-                    placeholder="noreply@careerwings.in"
+                    placeholder="no-reply@careerwings.in"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 text-slate-900"
                   />
                 </div>
@@ -453,7 +453,7 @@ export default function EmailManagement() {
                     required
                     value={config.fromEmail}
                     onChange={(e) => setConfig({ ...config, fromEmail: e.target.value })}
-                    placeholder="noreply@careerwings.in"
+                    placeholder="no-reply@careerwings.in"
                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 text-slate-900"
                   />
                 </div>
