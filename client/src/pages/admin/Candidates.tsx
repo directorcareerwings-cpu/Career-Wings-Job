@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { adminAPI } from '@/lib/api'
 import AdminLayout from '@/components/layout/AdminLayout'
 import { SEOMeta } from '@/components/seo/SEOMeta'
-import { Search, Eye, ShieldAlert, ShieldCheck, Zap, Clock } from 'lucide-react'
+import { Search, Eye, ShieldAlert, ShieldCheck, Zap, Clock, Sparkles } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Candidate } from '@/types'
 import AssignPackageModal from '@/components/admin/AssignPackageModal'
@@ -73,6 +73,14 @@ export default function AdminCandidates() {
           </div>
 
           <div className="flex items-center gap-3 w-full sm:w-auto">
+            <Link
+              to="/admin/smart-import"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl shadow-sm hover:shadow transition whitespace-nowrap"
+            >
+              <Sparkles className="w-4 h-4 text-white" />
+              AI Smart Import
+            </Link>
+
             <button
               type="button"
               onClick={() => {

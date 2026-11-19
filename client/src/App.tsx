@@ -82,6 +82,7 @@ const AdminSettings = lazy(() => import('@/pages/admin/Settings'))
 const AdminCoolPlaces = lazy(() => import('@/pages/admin/CoolPlaces'))
 const AdminSEO = lazy(() => import('@/pages/admin/SEO/AdminSEO'))
 const AdminEmails = lazy(() => import('@/pages/admin/EmailManagement'))
+const AdminSmartImport = lazy(() => import('@/pages/admin/SmartImport'))
 
 // Checkout
 const Checkout = lazy(() => import('@/pages/Checkout'))
@@ -176,6 +177,7 @@ export default function App() {
 
         {/* Admin */}
         <Route path="/admin/dashboard" element={<ProtectedRoute role="admin"><AdminDashboard /></ProtectedRoute>} />
+        <Route path="/admin/smart-import" element={<ProtectedRoute role="admin"><AdminSmartImport /></ProtectedRoute>} />
         <Route path="/admin/candidates" element={<ProtectedRoute role="admin"><AdminCandidates /></ProtectedRoute>} />
         <Route path="/admin/candidates/:id" element={<ProtectedRoute role="admin"><AdminCandidateDetail /></ProtectedRoute>} />
         <Route path="/admin/employers" element={<ProtectedRoute role="admin"><AdminEmployers /></ProtectedRoute>} />

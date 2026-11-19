@@ -67,7 +67,18 @@ import { authenticateToken, requireRole } from '../middleware/auth';
 import { prisma } from '../lib/prisma';
 import { sendSuccess, sendPaginated } from '../lib/response';
 import { AppError } from '../lib/errors';
-import { imageUpload, heroImageUpload, companyLogoUpload } from '../middleware/upload';
+import { imageUpload, heroImageUpload, companyLogoUpload, spreadsheetUpload } from '../middleware/upload';
+import {
+  getTargetFieldsHandler,
+  downloadTemplateHandler,
+  uploadAndPreviewHandler,
+  parseSheetHandler,
+  executeImportHandler,
+  getJobProgressHandler,
+  getImportHistoryHandler,
+  downloadReportHandler,
+  downloadOriginalFileHandler,
+} from '../controllers/adminImport.controller';
 import slugify from 'slugify';
 import { hashPassword } from '../services/auth.service';
 
@@ -76,6 +87,17 @@ router.use(authenticateToken, requireRole('ADMIN'));
 
 // Dashboard
 router.get('/dashboard', getDashboard);
+
+// AI Smart Candidate Database Import
+router.get('/smart-import/target-fields', getTargetFieldsHandler);
+router.get('/smart-import/download-template', downloadTemplateHandler);
+router.post('/smart-import/upload', spreadsheetUpload, uploadAndPreviewHandler);
+router.post('/smart-import/parse-sheet', parseSheetHandler);
+router.post('/smart-import/execute', executeImportHandler);
+router.get('/smart-import/job/:id', getJobProgressHandler);
+router.get('/smart-import/history', getImportHistoryHandler);
+router.get('/smart-import/report/:id', downloadReportHandler);
+router.get('/smart-import/original/:id', downloadOriginalFileHandler);
 
 // Candidates
 router.get('/candidates', getAdminCandidates);

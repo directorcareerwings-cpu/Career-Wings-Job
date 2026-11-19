@@ -10,12 +10,23 @@ const prisma_1 = require("../lib/prisma");
 const response_1 = require("../lib/response");
 const errors_1 = require("../lib/errors");
 const upload_1 = require("../middleware/upload");
+const adminImport_controller_1 = require("../controllers/adminImport.controller");
 const slugify_1 = __importDefault(require("slugify"));
 const auth_service_1 = require("../services/auth.service");
 const router = (0, express_1.Router)();
 router.use(auth_1.authenticateToken, (0, auth_1.requireRole)('ADMIN'));
 // Dashboard
 router.get('/dashboard', admin_controller_1.getDashboard);
+// AI Smart Candidate Database Import
+router.get('/smart-import/target-fields', adminImport_controller_1.getTargetFieldsHandler);
+router.get('/smart-import/download-template', adminImport_controller_1.downloadTemplateHandler);
+router.post('/smart-import/upload', upload_1.spreadsheetUpload, adminImport_controller_1.uploadAndPreviewHandler);
+router.post('/smart-import/parse-sheet', adminImport_controller_1.parseSheetHandler);
+router.post('/smart-import/execute', adminImport_controller_1.executeImportHandler);
+router.get('/smart-import/job/:id', adminImport_controller_1.getJobProgressHandler);
+router.get('/smart-import/history', adminImport_controller_1.getImportHistoryHandler);
+router.get('/smart-import/report/:id', adminImport_controller_1.downloadReportHandler);
+router.get('/smart-import/original/:id', adminImport_controller_1.downloadOriginalFileHandler);
 // Candidates
 router.get('/candidates', admin_controller_1.getAdminCandidates);
 router.get('/candidates/:id', async (req, res, next) => {

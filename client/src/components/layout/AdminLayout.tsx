@@ -45,6 +45,7 @@ const navSections: NavSection[] = [
     label: 'Users',
     items: [
       { to: '/admin/candidates', icon: Users, label: 'Candidates' },
+      { to: '/admin/smart-import', icon: Sparkles, label: 'AI Database Import' },
       { to: '/admin/employers', icon: Building2, label: 'Employers' },
       { to: '/admin/applications', icon: FileText, label: 'Applications' },
     ],

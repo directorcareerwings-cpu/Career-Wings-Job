@@ -455,6 +455,30 @@ export const adminAPI = {
   retryEmail: (id: string) => api.post(`/admin/emails/logs/${id}/retry`),
   getEmailStats: () => api.get('/admin/emails/stats'),
   getEmailTemplates: () => api.get('/admin/emails/templates'),
+  // AI Smart Candidate Database Import
+  getTargetFields: () => api.get('/admin/smart-import/target-fields'),
+  downloadImportTemplate: () =>
+    api.get('/admin/smart-import/download-template', { responseType: 'blob' }),
+  uploadImportFile: (formData: FormData) =>
+    api.post('/admin/smart-import/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  parseImportSheet: (data: { tempFileId: string; sheetName: string }) =>
+    api.post('/admin/smart-import/parse-sheet', data),
+  executeImport: (data: {
+    tempFileId: string;
+    sheetName?: string;
+    mappings: Record<string, string>;
+    duplicateStrategy: 'SKIP' | 'UPDATE' | 'IMPORT_NEW';
+  }) => api.post('/admin/smart-import/execute', data),
+  getImportJobProgress: (id: string) =>
+    api.get(`/admin/smart-import/job/${id}`),
+  getImportHistory: (params?: { page?: number; limit?: number }) =>
+    api.get('/admin/smart-import/history', { params }),
+  downloadImportReport: (id: string) =>
+    api.get(`/admin/smart-import/report/${id}`, { responseType: 'blob' }),
+  downloadOriginalImportFile: (id: string) =>
+    api.get(`/admin/smart-import/original/${id}`, { responseType: 'blob' }),
 }
 
 // ─── Packages / Public API ───────────────────────────────────────────────────

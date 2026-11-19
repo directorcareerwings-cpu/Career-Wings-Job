@@ -167,22 +167,28 @@ const ensureDatabaseAndAdmin = async () => {
     try {
         // 1. Verify database tables exist
         let hasUserTable = false;
+        let hasImportJobTable = false;
         try {
-            const tableCheck = await prisma_1.prisma.$queryRawUnsafe(`SELECT name FROM sqlite_master WHERE type='table' AND name='User'`);
-            hasUserTable = Array.isArray(tableCheck) && tableCheck.length > 0;
+            const tableCheck = await prisma_1.prisma.$queryRawUnsafe(`SELECT name FROM sqlite_master WHERE type='table' AND name IN ('User', 'ImportJob')`);
+            if (Array.isArray(tableCheck)) {
+                const names = tableCheck.map((r) => r.name);
+                hasUserTable = names.includes('User');
+                hasImportJobTable = names.includes('ImportJob');
+            }
         }
         catch {
             hasUserTable = false;
+            hasImportJobTable = false;
         }
-        if (!hasUserTable) {
-            console.log('⚡ Empty database or missing tables detected. Auto-initializing schema via prisma db push...');
+        if (!hasUserTable || !hasImportJobTable) {
+            console.log('⚡ Missing tables detected (User or ImportJob). Auto-syncing schema additively via prisma db push...');
             const schemaDir = path_1.default.resolve(__dirname, '..');
             (0, child_process_1.execSync)('npx prisma db push --skip-generate', {
                 cwd: schemaDir,
                 env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
                 stdio: 'inherit',
             });
-            console.log('✔ Schema initialized successfully.');
+            console.log('✔ Schema synced successfully.');
         }
         // 2. Ensure default admin user exists
         const admin = await prisma_1.prisma.user.findUnique({

@@ -98,3 +98,37 @@ export const employerCompanyLogoUpload = multer({
   limits: { fileSize: 2 * 1024 * 1024 }, // 2MB max size strictly enforced
 }).any();
 
+// Spreadsheet storage for AI Smart Import
+const importDir = path.join(process.cwd(), uploadDir, 'imports');
+const reportDir = path.join(process.cwd(), uploadDir, 'reports');
+[importDir, reportDir].forEach((dir) => {
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+});
+
+const spreadsheetStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, importDir),
+  filename: (_req, file, cb) => {
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, `import-${uniqueSuffix}${ext}`);
+  },
+});
+
+const spreadsheetFilter = (_req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  const allowedExts = ['.xlsx', '.xls', '.csv', '.ods'];
+  const ext = path.extname(file.originalname).toLowerCase();
+
+  if (allowedExts.includes(ext)) {
+    cb(null, true);
+  } else {
+    cb(new AppError('Only .xlsx, .xls, .csv, and .ods files are supported for import.', 400) as unknown as null, false);
+  }
+};
+
+export const spreadsheetUpload = multer({
+  storage: spreadsheetStorage,
+  fileFilter: spreadsheetFilter,
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max file size
+}).single('file');
+
+
