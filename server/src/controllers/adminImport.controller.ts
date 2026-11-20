@@ -14,10 +14,11 @@ import {
   isInvalidOrJunkSkill,
   sanitizeCleanText,
 } from '../services/aiImport.service';
+import { getPersistentUploadsDir } from '../lib/prisma';
 
-const uploadDir = process.env.UPLOAD_DIR || 'uploads';
-const importsDir = path.join(process.cwd(), uploadDir, 'imports');
-const reportsDir = path.join(process.cwd(), uploadDir, 'reports');
+const persistentUploads = getPersistentUploadsDir();
+const importsDir = persistentUploads.imports;
+const reportsDir = persistentUploads.reports;
 
 // Ensure directories exist
 [importsDir, reportsDir].forEach((dir) => {

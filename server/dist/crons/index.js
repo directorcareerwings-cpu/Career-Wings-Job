@@ -168,6 +168,20 @@ const startCronJobs = () => {
             console.error('[CRON ERROR] Package expiry reminder check failed:', err);
         }
     });
+    // 5. Automated Daily Database Safety Backup at 02:00 AM
+    node_cron_1.default.schedule('0 2 * * *', async () => {
+        try {
+            console.log('[CRON] Executing scheduled daily database safety backup...');
+            const paths = (0, prisma_1.getPersistentStoragePaths)();
+            const backupResult = (0, prisma_1.createSafetyBackup)(paths.databasePath, paths.backupsDir, 'daily');
+            if (backupResult) {
+                console.log(`[CRON] Daily database backup completed successfully: ${backupResult}`);
+            }
+        }
+        catch (err) {
+            console.error('[CRON ERROR] Daily database backup failed:', err);
+        }
+    });
     console.log('✔ Background cron jobs initialized');
 };
 exports.startCronJobs = startCronJobs;

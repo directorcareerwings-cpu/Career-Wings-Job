@@ -92,6 +92,8 @@ app.use('/api', (req, res, next) => {
     next();
 });
 // 3. Static Files (Uploads) with 7-day browser caching
+const persistentUploads = (0, prisma_1.getPersistentUploadsDir)();
+app.use('/uploads', express_1.default.static(persistentUploads.root, { maxAge: '7d', etag: true }));
 const potentialUploadDirs = [
     path_1.default.join(process.cwd(), process.env.UPLOAD_DIR || 'uploads'),
     path_1.default.join(process.cwd(), 'server', 'uploads'),
@@ -100,7 +102,7 @@ const potentialUploadDirs = [
     path_1.default.resolve(__dirname, '../../server/uploads'),
 ];
 for (const dir of potentialUploadDirs) {
-    if (fs_1.default.existsSync(dir)) {
+    if (fs_1.default.existsSync(dir) && path_1.default.resolve(dir) !== path_1.default.resolve(persistentUploads.root)) {
         app.use('/uploads', express_1.default.static(dir, { maxAge: '7d', etag: true }));
     }
 }
@@ -108,11 +110,25 @@ const seo_routes_1 = require("./routes/seo.routes");
 // 4. Health Check
 app.get('/api/health', async (req, res) => {
     try {
-        const userCount = await prisma_1.prisma.user.count();
+        const storagePaths = (0, prisma_1.getPersistentStoragePaths)();
+        const [userCount, candidateCount, jobCount] = await Promise.all([
+            prisma_1.prisma.user.count(),
+            prisma_1.prisma.candidate.count(),
+            prisma_1.prisma.job.count({ where: { deletedAt: null } }),
+        ]);
         res.status(200).json({
             status: 'ok',
             db: 'connected',
-            users: userCount,
+            storage: {
+                dir: storagePaths.storageDir,
+                database: path_1.default.basename(storagePaths.databasePath),
+                isExternal: storagePaths.isExternalToRepo,
+            },
+            counts: {
+                users: userCount,
+                candidates: candidateCount,
+                jobs: jobCount,
+            },
             timestamp: new Date().toISOString(),
             service: 'Career Wings API',
         });
@@ -165,41 +181,71 @@ app.use(errors_1.errorHandler);
 // Database initialization helper
 const ensureDatabaseAndAdmin = async () => {
     try {
-        // 1. Verify database tables exist
-        let hasUserTable = false;
-        let hasImportJobTable = false;
+        // 1. Verify core database tables exist
+        const requiredTables = ['User', 'Candidate', 'Employer', 'Company', 'Job', 'Application', 'AdminSetting', 'ImportJob'];
+        let missingTables = [];
         try {
-            const tableCheck = await prisma_1.prisma.$queryRawUnsafe(`SELECT name FROM sqlite_master WHERE type='table' AND name IN ('User', 'ImportJob')`);
+            const tableCheck = await prisma_1.prisma.$queryRawUnsafe(`SELECT name FROM sqlite_master WHERE type='table'`);
             if (Array.isArray(tableCheck)) {
-                const names = tableCheck.map((r) => r.name);
-                hasUserTable = names.includes('User');
-                hasImportJobTable = names.includes('ImportJob');
+                const existingNames = new Set(tableCheck.map((r) => r.name));
+                missingTables = requiredTables.filter((t) => !existingNames.has(t));
+            }
+            else {
+                missingTables = requiredTables;
             }
         }
         catch {
-            hasUserTable = false;
-            hasImportJobTable = false;
+            missingTables = requiredTables;
         }
-        if (!hasUserTable || !hasImportJobTable) {
-            console.log('⚡ Missing tables detected (User or ImportJob). Auto-syncing schema additively via prisma db push...');
-            const schemaDir = path_1.default.resolve(__dirname, '..');
-            (0, child_process_1.execSync)('npx prisma db push --skip-generate', {
-                cwd: schemaDir,
-                env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
-                stdio: 'inherit',
-            });
-            console.log('✔ Schema synced successfully.');
+        if (missingTables.length > 0) {
+            console.log(`⚡ Missing tables detected (${missingTables.join(', ')}). Auto-syncing schema additively without data loss...`);
+            const serverDir = path_1.default.resolve(__dirname, '..');
+            const rootDir = path_1.default.resolve(__dirname, '../..');
+            const possiblePrismaBins = [
+                path_1.default.join(serverDir, 'node_modules', 'prisma', 'build', 'index.js'),
+                path_1.default.join(rootDir, 'node_modules', 'prisma', 'build', 'index.js'),
+                path_1.default.join(process.cwd(), 'node_modules', 'prisma', 'build', 'index.js'),
+            ];
+            const prismaBin = possiblePrismaBins.find((b) => fs_1.default.existsSync(b));
+            try {
+                if (prismaBin) {
+                    (0, child_process_1.execSync)(`node "${prismaBin}" db push --skip-generate --accept-data-loss=false`, {
+                        cwd: serverDir,
+                        env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
+                        stdio: 'inherit',
+                    });
+                }
+                else {
+                    (0, child_process_1.execSync)('npx prisma db push --skip-generate --accept-data-loss=false', {
+                        cwd: serverDir,
+                        env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
+                        stdio: 'inherit',
+                    });
+                }
+                console.log('✔ Schema synced successfully.');
+            }
+            catch (pushErr) {
+                console.error('❌ [Database Push Error] Could not auto-sync schema:', pushErr?.message || pushErr);
+            }
         }
-        // 2. Ensure default admin user exists
-        const admin = await prisma_1.prisma.user.findUnique({
-            where: { email: 'admin@careerwings.in' },
+        else {
+            console.log('✔ All core database tables verified in persistent database.');
+        }
+        // 2. Ensure admin account exists (Strictly preserve existing credentials!)
+        const existingAdmin = await prisma_1.prisma.user.findFirst({
+            where: {
+                OR: [
+                    { role: 'ADMIN' },
+                    { email: 'admin@careerwings.in' },
+                ],
+            },
         });
-        const adminPassword = await bcryptjs_1.default.hash('Admin@123456', 12);
-        if (!admin) {
-            console.log('⚡ Admin user not found. Creating default admin...');
+        if (!existingAdmin) {
+            console.log('⚡ No admin account detected. Provisioning initial admin: admin@careerwings.in...');
+            const adminPassword = await bcryptjs_1.default.hash(process.env.ADMIN_PASSWORD || 'Admin@123456', 12);
             await prisma_1.prisma.user.create({
                 data: {
-                    email: 'admin@careerwings.in',
+                    email: process.env.ADMIN_EMAIL || 'admin@careerwings.in',
                     passwordHash: adminPassword,
                     role: 'ADMIN',
                     isActive: true,
@@ -209,18 +255,7 @@ const ensureDatabaseAndAdmin = async () => {
             console.log('✔ Default admin created: admin@careerwings.in / Admin@123456');
         }
         else {
-            const isMatch = await bcryptjs_1.default.compare('Admin@123456', admin.passwordHash);
-            if (!isMatch) {
-                console.log('⚡ Syncing admin password to default Admin@123456...');
-                await prisma_1.prisma.user.update({
-                    where: { id: admin.id },
-                    data: { passwordHash: adminPassword, isActive: true, isVerified: true },
-                });
-                console.log('✔ Admin password synchronized.');
-            }
-            else {
-                console.log('✔ Admin user verified in database.');
-            }
+            console.log(`✔ Verified existing admin account (${existingAdmin.email}). Password and permissions preserved.`);
         }
         // 2.1 Automated Data Sanitization: Eradicate any competitor URLs (e.g. apna.co) or section headings from skills
         try {
@@ -270,7 +305,7 @@ const ensureDatabaseAndAdmin = async () => {
                 create: setting,
             });
         }
-        if (process.env.SMTP_PASS) {
+        if (process.env.SMTP_PASS && process.env.SMTP_PASS.trim() !== '') {
             await prisma_1.prisma.adminSetting.upsert({
                 where: { key: 'SMTP_PASS' },
                 update: { value: process.env.SMTP_PASS },

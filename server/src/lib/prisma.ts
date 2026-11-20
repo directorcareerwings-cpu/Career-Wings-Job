@@ -1,29 +1,18 @@
 import { PrismaClient } from '@prisma/client';
 import path from 'path';
 import fs from 'fs';
-import { execSync } from 'child_process';
 
 /**
  * Career Wings Production Database Safety & Persistence Manager
  * Guarantees that production data is NEVER overwritten, reset, or deleted by any deployment.
  */
 
-export interface DatabaseAuditMetrics {
-  timestamp: string;
-  environment: string;
+export interface PersistentStoragePaths {
+  storageDir: string;
   databasePath: string;
-  sizeBytes: number;
-  integrityOk: boolean;
-  counts?: {
-    users: number;
-    candidates: number;
-    employers: number;
-    companies: number;
-    jobs: number;
-    publishedJobs: number;
-    applications: number;
-    adminSettings: number;
-  };
+  backupsDir: string;
+  uploadsDir: string;
+  isExternalToRepo: boolean;
 }
 
 /**
@@ -33,7 +22,7 @@ export function findProjectRoot(): string {
   // Check process.cwd() first
   let cur = process.cwd();
   for (let i = 0; i < 5; i++) {
-    if (fs.existsSync(path.join(cur, 'package.json')) && fs.existsSync(path.join(cur, 'server'))) {
+    if (fs.existsSync(path.join(cur, 'package.json')) && (fs.existsSync(path.join(cur, 'server')) || fs.existsSync(path.join(cur, 'client')))) {
       return cur;
     }
     const parent = path.dirname(cur);
@@ -44,7 +33,7 @@ export function findProjectRoot(): string {
   // Fallback to __dirname
   cur = __dirname;
   for (let i = 0; i < 5; i++) {
-    if (fs.existsSync(path.join(cur, 'package.json')) && fs.existsSync(path.join(cur, 'server'))) {
+    if (fs.existsSync(path.join(cur, 'package.json')) && (fs.existsSync(path.join(cur, 'server')) || fs.existsSync(path.join(cur, 'client')))) {
       return cur;
     }
     const parent = path.dirname(cur);
@@ -53,6 +42,99 @@ export function findProjectRoot(): string {
   }
 
   return process.cwd();
+}
+
+/**
+ * Resolve persistent storage paths that survive git pulls, redeployments, and web root wipes.
+ *
+ * Priority order:
+ * 1. PERSISTENT_STORAGE_DIR / PERSISTENT_DATA_DIR environment variable
+ * 2. On Linux/Hostinger: `path.resolve(projectRoot, '..', 'careerwings_storage')` (sitting OUTSIDE public_html)
+ * 3. Fallback: `path.join(projectRoot, 'persistent_data')`
+ */
+export function getPersistentStoragePaths(): PersistentStoragePaths {
+  const projectRoot = findProjectRoot();
+  const explicitDir = process.env.PERSISTENT_STORAGE_DIR || process.env.PERSISTENT_DATA_DIR;
+
+  let storageDir = '';
+  let isExternal = false;
+
+  if (explicitDir && explicitDir.trim().length > 0) {
+    storageDir = path.isAbsolute(explicitDir.trim())
+      ? explicitDir.trim()
+      : path.resolve(projectRoot, explicitDir.trim());
+    isExternal = !storageDir.startsWith(projectRoot);
+  } else if (process.platform === 'linux' || process.env.NODE_ENV === 'production') {
+    // On Linux / Hostinger: Attempt to store outside the Git deployment repository root
+    // Typically on Hostinger, projectRoot is `/home/uXXXX/public_html` or `/home/uXXXX/domains/.../public_html`
+    const externalCandidate = path.resolve(projectRoot, '..', 'careerwings_storage');
+    try {
+      if (!fs.existsSync(externalCandidate)) {
+        fs.mkdirSync(externalCandidate, { recursive: true });
+      }
+      // Test writability
+      const testFile = path.join(externalCandidate, '.write_test');
+      fs.writeFileSync(testFile, 'test');
+      fs.unlinkSync(testFile);
+      storageDir = externalCandidate;
+      isExternal = true;
+    } catch {
+      // If external is not writable, fall back to persistent_data inside projectRoot
+      storageDir = path.join(projectRoot, 'persistent_data');
+      isExternal = false;
+    }
+  } else {
+    // Local development (Windows/macOS)
+    storageDir = path.join(projectRoot, 'persistent_data');
+    isExternal = false;
+  }
+
+  const backupsDir = path.join(storageDir, 'backups');
+  const uploadsDir = path.join(storageDir, 'uploads');
+  const databasePath = path.join(storageDir, 'careerwings_production.db');
+
+  // Ensure directories exist
+  [storageDir, backupsDir, uploadsDir].forEach((dir) => {
+    if (!fs.existsSync(dir)) {
+      try {
+        fs.mkdirSync(dir, { recursive: true });
+      } catch (e) {
+        console.warn(`[Storage Warning] Could not create directory ${dir}:`, e);
+      }
+    }
+  });
+
+  return {
+    storageDir,
+    databasePath,
+    backupsDir,
+    uploadsDir,
+    isExternalToRepo: isExternal,
+  };
+}
+
+/**
+ * Get dedicated uploads directories (resumes, images, imports, reports)
+ */
+export function getPersistentUploadsDir() {
+  const { uploadsDir } = getPersistentStoragePaths();
+  const dirs = {
+    root: uploadsDir,
+    resumes: path.join(uploadsDir, 'resumes'),
+    images: path.join(uploadsDir, 'images'),
+    imports: path.join(uploadsDir, 'imports'),
+    reports: path.join(uploadsDir, 'reports'),
+  };
+
+  Object.values(dirs).forEach((dir) => {
+    if (!fs.existsSync(dir)) {
+      try {
+        fs.mkdirSync(dir, { recursive: true });
+      } catch {}
+    }
+  });
+
+  return dirs;
 }
 
 /**
@@ -98,16 +180,16 @@ export function createSafetyBackup(dbPath: string, backupsDir: string, label = '
 
     console.log(`🛡️ [BACKUP SUCCESS] Verified database backup created: ${backupName} (${(backupSize / 1024).toFixed(1)} KB)`);
 
-    // Retention policy: Keep the 15 most recent backups
+    // Retention policy: Keep the 30 most recent backups
     const allBackups = fs.readdirSync(backupsDir)
       .filter((f) => f.endsWith('.db'))
       .map((f) => path.join(backupsDir, f))
       .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
 
-    for (let i = 15; i < allBackups.length; i++) {
+    for (let i = 30; i < allBackups.length; i++) {
       try {
         fs.unlinkSync(allBackups[i]);
-      } catch { }
+      } catch {}
     }
 
     return backupPath;
@@ -118,43 +200,67 @@ export function createSafetyBackup(dbPath: string, backupsDir: string, label = '
 }
 
 /**
+ * Verify SQLite header of a file
+ */
+export function verifySqliteHeader(filePath: string): boolean {
+  try {
+    if (!fs.existsSync(filePath) || fs.statSync(filePath).size < 100) return false;
+    const fd = fs.openSync(filePath, 'r');
+    const buf = Buffer.alloc(16);
+    fs.readSync(fd, buf, 0, 16, 0);
+    fs.closeSync(fd);
+    return buf.toString('utf-8').startsWith('SQLite format 3');
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Resolve the dedicated persistent database URL
  */
 function resolveDatabaseUrl(): string {
-  // If explicitly configured with postgresql / mysql, respect environment variable directly
   const envUrl = process.env.DATABASE_URL;
+
+  // 1. If explicitly configured with postgresql / mysql, respect environment variable directly
   if (envUrl && !envUrl.startsWith('file:') && (envUrl.startsWith('postgresql://') || envUrl.startsWith('mysql://'))) {
-    console.log('🔌 [Prisma] Connected to external production database:', envUrl.replace(/:[^:@]+@/, ':***@'));
+    console.log('🔌 [Prisma] Connected to external SQL database:', envUrl.replace(/:[^:@]+@/, ':***@'));
     return envUrl;
   }
 
+  // 2. If explicitly configured with an absolute SQLite file path that is NOT the default relative ./dev.db
+  if (envUrl && envUrl.startsWith('file:')) {
+    const rawPath = envUrl.replace(/^file:/, '').trim();
+    if (path.isAbsolute(rawPath) && rawPath.includes('careerwings')) {
+      console.log('🔒 [Prisma] Connected to explicit DATABASE_URL:', rawPath);
+      return envUrl;
+    }
+  }
+
+  const paths = getPersistentStoragePaths();
+  const primaryDbPath = paths.databasePath;
+  const backupsDir = paths.backupsDir;
   const projectRoot = findProjectRoot();
-  const persistentDir = path.join(projectRoot, 'persistent_data');
-  const backupsDir = path.join(persistentDir, 'backups');
 
-  if (!fs.existsSync(persistentDir)) fs.mkdirSync(persistentDir, { recursive: true });
-  if (!fs.existsSync(backupsDir)) fs.mkdirSync(backupsDir, { recursive: true });
-
-  const isProduction = process.env.NODE_ENV === 'production';
-  const targetDbName = isProduction ? 'careerwings_production.db' : 'careerwings_production.db';
-  const primaryDbPath = path.join(persistentDir, targetDbName);
-
-  // Check if primary persistent database already exists
-  const primaryExists = fs.existsSync(primaryDbPath) && fs.statSync(primaryDbPath).size > 10000;
+  // Check if primary persistent database already exists and has valid SQLite header
+  const primaryExists = fs.existsSync(primaryDbPath) && fs.statSync(primaryDbPath).size > 10000 && verifySqliteHeader(primaryDbPath);
 
   if (primaryExists) {
     // ALWAYS take an automatic safety backup before booting
-    createSafetyBackup(primaryDbPath, backupsDir, isProduction ? 'prod_boot' : 'dev_boot');
+    const label = process.env.NODE_ENV === 'production' ? 'prod_boot' : 'dev_boot';
+    createSafetyBackup(primaryDbPath, backupsDir, label);
   } else {
-    // First-time production setup: look for the best existing database to migrate ONCE
-    console.log(`ℹ️ [Database Setup] ${targetDbName} not found in persistent_data. Checking existing databases to migrate...`);
+    // First-time persistent setup: look for the best existing database to migrate ONCE
+    console.log(`ℹ️ [Database Setup] Production database not yet initialized at: ${primaryDbPath}`);
+    console.log(`   Scanning for existing database to migrate safely...`);
 
     const candidateLocations: string[] = [
-      path.join(projectRoot, 'server/prisma/careerwings_template.db'),
-      path.join(projectRoot, 'server/prisma/prisma/dev.db'),
-      path.join(projectRoot, 'server/prisma/dev.db'),
-      path.join(projectRoot, 'prisma/dev.db'),
-      path.join(projectRoot, 'server/dev.db'),
+      path.join(projectRoot, 'persistent_data', 'careerwings_production.db'),
+      path.join(projectRoot, 'server', 'prisma', 'careerwings_template.db'),
+      path.join(projectRoot, 'deploy_hostinger', 'api_server', 'prisma', 'dev.db'),
+      path.join(projectRoot, 'server', 'prisma', 'prisma', 'dev.db'),
+      path.join(projectRoot, 'server', 'prisma', 'dev.db'),
+      path.join(projectRoot, 'prisma', 'dev.db'),
+      path.join(projectRoot, 'server', 'dev.db'),
       path.join(projectRoot, 'dev.db'),
     ];
 
@@ -167,7 +273,7 @@ function resolveDatabaseUrl(): string {
       .filter((p) => p !== primaryDbPath)
       .filter((p) => {
         try {
-          return fs.existsSync(p) && fs.statSync(p).size > 10000;
+          return fs.existsSync(p) && fs.statSync(p).size > 10000 && verifySqliteHeader(p);
         } catch {
           return false;
         }
@@ -181,7 +287,7 @@ function resolveDatabaseUrl(): string {
 
     if (viableDbs.length > 0) {
       const sourceDb = viableDbs[0].path;
-      console.log(`📦 [Database Migration] Migrating existing database from ${sourceDb} to persistent storage: ${primaryDbPath}`);
+      console.log(`📦 [Database Migration] Migrating existing database from: ${sourceDb} -> ${primaryDbPath}`);
       try {
         fs.copyFileSync(sourceDb, primaryDbPath);
         createSafetyBackup(primaryDbPath, backupsDir, 'initial_migrated');
@@ -198,7 +304,12 @@ function resolveDatabaseUrl(): string {
   process.env.DATABASE_URL = finalUrl;
 
   console.log(`🔒 [Prisma] CONNECTED TO PERSISTENT DATABASE: ${primaryDbPath}`);
-  console.log(`   (Database file is protected from git pulls and future deployments)`);
+  if (paths.isExternalToRepo) {
+    console.log(`   🛡️ [PROTECTION ACTIVE] Database is stored OUTSIDE the Git repository (${paths.storageDir})`);
+    console.log(`   (Git pulls, redeployments, and web root wipes will NEVER touch this database)`);
+  } else {
+    console.log(`   🛡️ [PROTECTION ACTIVE] Persistent directory: ${paths.storageDir}`);
+  }
 
   return finalUrl;
 }

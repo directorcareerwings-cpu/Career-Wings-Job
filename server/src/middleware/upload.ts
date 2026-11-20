@@ -3,13 +3,14 @@ import path from 'path';
 import fs from 'fs';
 import { Request } from 'express';
 import { AppError } from '../lib/errors';
+import { getPersistentUploadsDir } from '../lib/prisma';
 
-const uploadDir = process.env.UPLOAD_DIR || 'uploads';
+const persistentUploads = getPersistentUploadsDir();
+const resumeDir = persistentUploads.resumes;
+const imageDir = persistentUploads.images;
 const maxFileSizeMB = parseInt(process.env.MAX_FILE_SIZE_MB || '5', 10);
 
 // Ensure upload directories exist
-const resumeDir = path.join(process.cwd(), uploadDir, 'resumes');
-const imageDir = path.join(process.cwd(), uploadDir, 'images');
 [resumeDir, imageDir].forEach((dir) => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
@@ -99,8 +100,8 @@ export const employerCompanyLogoUpload = multer({
 }).any();
 
 // Spreadsheet storage for AI Smart Import
-const importDir = path.join(process.cwd(), uploadDir, 'imports');
-const reportDir = path.join(process.cwd(), uploadDir, 'reports');
+const importDir = persistentUploads.imports;
+const reportDir = persistentUploads.reports;
 [importDir, reportDir].forEach((dir) => {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });

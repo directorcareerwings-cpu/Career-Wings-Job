@@ -1,5 +1,5 @@
 import cron from 'node-cron';
-import { prisma } from '../lib/prisma';
+import { prisma, getPersistentStoragePaths, createSafetyBackup } from '../lib/prisma';
 import { expireSubscriptions } from '../services/subscription.service';
 import { sendJobAlertEmail } from '../services/email.service';
 
@@ -148,6 +148,20 @@ export const startCronJobs = (): void => {
       }
     } catch (err) {
       console.error('[CRON ERROR] Package expiry reminder check failed:', err);
+    }
+  });
+
+  // 5. Automated Daily Database Safety Backup at 02:00 AM
+  cron.schedule('0 2 * * *', async () => {
+    try {
+      console.log('[CRON] Executing scheduled daily database safety backup...');
+      const paths = getPersistentStoragePaths();
+      const backupResult = createSafetyBackup(paths.databasePath, paths.backupsDir, 'daily');
+      if (backupResult) {
+        console.log(`[CRON] Daily database backup completed successfully: ${backupResult}`);
+      }
+    } catch (err) {
+      console.error('[CRON ERROR] Daily database backup failed:', err);
     }
   });
 

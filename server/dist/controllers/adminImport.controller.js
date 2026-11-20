@@ -12,9 +12,10 @@ const prisma_1 = require("../lib/prisma");
 const response_1 = require("../lib/response");
 const errors_1 = require("../lib/errors");
 const aiImport_service_1 = require("../services/aiImport.service");
-const uploadDir = process.env.UPLOAD_DIR || 'uploads';
-const importsDir = path_1.default.join(process.cwd(), uploadDir, 'imports');
-const reportsDir = path_1.default.join(process.cwd(), uploadDir, 'reports');
+const prisma_2 = require("../lib/prisma");
+const persistentUploads = (0, prisma_2.getPersistentUploadsDir)();
+const importsDir = persistentUploads.imports;
+const reportsDir = persistentUploads.reports;
 // Ensure directories exist
 [importsDir, reportsDir].forEach((dir) => {
     if (!fs_1.default.existsSync(dir))

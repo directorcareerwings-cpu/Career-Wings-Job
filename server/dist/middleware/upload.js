@@ -8,11 +8,12 @@ const multer_1 = __importDefault(require("multer"));
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const errors_1 = require("../lib/errors");
-const uploadDir = process.env.UPLOAD_DIR || 'uploads';
+const prisma_1 = require("../lib/prisma");
+const persistentUploads = (0, prisma_1.getPersistentUploadsDir)();
+const resumeDir = persistentUploads.resumes;
+const imageDir = persistentUploads.images;
 const maxFileSizeMB = parseInt(process.env.MAX_FILE_SIZE_MB || '5', 10);
 // Ensure upload directories exist
-const resumeDir = path_1.default.join(process.cwd(), uploadDir, 'resumes');
-const imageDir = path_1.default.join(process.cwd(), uploadDir, 'images');
 [resumeDir, imageDir].forEach((dir) => {
     if (!fs_1.default.existsSync(dir))
         fs_1.default.mkdirSync(dir, { recursive: true });
@@ -92,8 +93,8 @@ exports.employerCompanyLogoUpload = (0, multer_1.default)({
     limits: { fileSize: 2 * 1024 * 1024 }, // 2MB max size strictly enforced
 }).any();
 // Spreadsheet storage for AI Smart Import
-const importDir = path_1.default.join(process.cwd(), uploadDir, 'imports');
-const reportDir = path_1.default.join(process.cwd(), uploadDir, 'reports');
+const importDir = persistentUploads.imports;
+const reportDir = persistentUploads.reports;
 [importDir, reportDir].forEach((dir) => {
     if (!fs_1.default.existsSync(dir))
         fs_1.default.mkdirSync(dir, { recursive: true });
