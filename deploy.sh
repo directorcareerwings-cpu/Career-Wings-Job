@@ -33,6 +33,15 @@ mkdir -p "${STORAGE_DIR}/uploads/imports"
 mkdir -p "${STORAGE_DIR}/uploads/reports"
 
 PRIMARY_DB="${STORAGE_DIR}/careerwings_production.db"
+export DATABASE_URL="file:${PRIMARY_DB}"
+
+# Pre-populate persistent database from repository snapshot if not yet present
+if [ ! -f "${PRIMARY_DB}" ] || [ $(wc -c < "${PRIMARY_DB}") -lt 1000 ]; then
+  if [ -f "${PROJECT_ROOT}/persistent_data/careerwings_production.db" ]; then
+    echo "📦 Initializing persistent storage database from repository snapshot..."
+    cp "${PROJECT_ROOT}/persistent_data/careerwings_production.db" "${PRIMARY_DB}"
+  fi
+fi
 
 # 3. Create Pre-Deployment Verified Backup (If Database Exists)
 if [ -f "${PRIMARY_DB}" ] && [ $(wc -c < "${PRIMARY_DB}") -gt 1000 ]; then
@@ -71,6 +80,7 @@ fi
 
 # 6. Run Safe Additive Schema Synchronization
 echo "🔍 Running safe database migration verification (zero data loss)..."
+export DATABASE_URL="file:${PRIMARY_DB}"
 if command -v pnpm &> /dev/null; then
   pnpm --filter career-wings-server db:migrate:safe || true
 elif [ -f "server/dist/lib/database-safety.js" ]; then

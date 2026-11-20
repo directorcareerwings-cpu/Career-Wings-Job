@@ -232,26 +232,31 @@ const ensureDatabaseAndAdmin = async () => {
         }
         if (missingTables.length > 0) {
             console.log(`⚡ Missing tables detected (${missingTables.join(', ')}). Auto-syncing schema additively without data loss...`);
-            const serverDir = path_1.default.resolve(__dirname, '..');
-            const rootDir = path_1.default.resolve(__dirname, '../..');
+            const projectRoot = (0, prisma_1.findProjectRoot)();
+            const serverDir = fs_1.default.existsSync(path_1.default.join(projectRoot, 'server', 'prisma', 'schema.prisma'))
+                ? path_1.default.join(projectRoot, 'server')
+                : projectRoot;
+            const schemaPath = path_1.default.join(serverDir, 'prisma', 'schema.prisma');
+            const paths = (0, prisma_1.getPersistentStoragePaths)();
+            const normalizedDbUrl = `file:${paths.databasePath.replace(/\\/g, '/')}`;
             const possiblePrismaBins = [
                 path_1.default.join(serverDir, 'node_modules', 'prisma', 'build', 'index.js'),
-                path_1.default.join(rootDir, 'node_modules', 'prisma', 'build', 'index.js'),
+                path_1.default.join(projectRoot, 'node_modules', 'prisma', 'build', 'index.js'),
                 path_1.default.join(process.cwd(), 'node_modules', 'prisma', 'build', 'index.js'),
             ];
             const prismaBin = possiblePrismaBins.find((b) => fs_1.default.existsSync(b));
             try {
                 if (prismaBin) {
-                    (0, child_process_1.execSync)(`node "${prismaBin}" db push --skip-generate --accept-data-loss=false`, {
+                    (0, child_process_1.execSync)(`node "${prismaBin}" db push --schema="${schemaPath}" --skip-generate --accept-data-loss=false`, {
                         cwd: serverDir,
-                        env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
+                        env: { ...process.env, DATABASE_URL: normalizedDbUrl },
                         stdio: 'inherit',
                     });
                 }
                 else {
-                    (0, child_process_1.execSync)('npx prisma db push --skip-generate --accept-data-loss=false', {
+                    (0, child_process_1.execSync)(`npx prisma db push --schema="${schemaPath}" --skip-generate --accept-data-loss=false`, {
                         cwd: serverDir,
-                        env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
+                        env: { ...process.env, DATABASE_URL: normalizedDbUrl },
                         stdio: 'inherit',
                     });
                 }

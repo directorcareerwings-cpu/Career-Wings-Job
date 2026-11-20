@@ -221,25 +221,27 @@ export function verifySqliteHeader(filePath: string): boolean {
 function resolveDatabaseUrl(): string {
   const envUrl = process.env.DATABASE_URL;
 
-  // 1. If explicitly configured with postgresql / mysql, respect environment variable directly
+  // Schema declares provider = "sqlite", which strictly requires a file: protocol URL.
+  // If an external database URL (mysql:// or postgresql://) is provided in the environment,
+  // warn and force the persistent SQLite database URL to prevent engine startup crashes.
   if (envUrl && !envUrl.startsWith('file:') && (envUrl.startsWith('postgresql://') || envUrl.startsWith('mysql://'))) {
-    console.log('🔌 [Prisma] Connected to external SQL database:', envUrl.replace(/:[^:@]+@/, ':***@'));
-    return envUrl;
-  }
-
-  // 2. If explicitly configured with an absolute SQLite file path that is NOT the default relative ./dev.db
-  if (envUrl && envUrl.startsWith('file:')) {
-    const rawPath = envUrl.replace(/^file:/, '').trim();
-    if (path.isAbsolute(rawPath) && rawPath.includes('careerwings')) {
-      console.log('🔒 [Prisma] Connected to explicit DATABASE_URL:', rawPath);
-      return envUrl;
-    }
+    console.warn(`⚠️ [Database URL Warning] Detected external DATABASE_URL (${envUrl.replace(/:[^:@]+@/, ':***@')}), but schema.prisma declares provider = 'sqlite'.`);
+    console.warn(`   Overriding DATABASE_URL with persistent SQLite storage path to ensure stability and prevent runtime crashes.`);
   }
 
   const paths = getPersistentStoragePaths();
   const primaryDbPath = paths.databasePath;
   const backupsDir = paths.backupsDir;
   const projectRoot = findProjectRoot();
+
+  // If explicitly configured with an absolute SQLite file path that is NOT the default relative ./dev.db
+  if (envUrl && envUrl.startsWith('file:')) {
+    const rawPath = envUrl.replace(/^file:/, '').trim();
+    if (path.isAbsolute(rawPath) && rawPath.includes('careerwings') && fs.existsSync(rawPath)) {
+      console.log('🔒 [Prisma] Connected to explicit DATABASE_URL:', rawPath);
+      return envUrl;
+    }
+  }
 
   // Check if primary persistent database already exists and has valid SQLite header
   const primaryExists = fs.existsSync(primaryDbPath) && fs.statSync(primaryDbPath).size > 10000 && verifySqliteHeader(primaryDbPath);

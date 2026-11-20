@@ -1,4 +1,4 @@
-import { prisma, getPersistentStoragePaths, createSafetyBackup, verifySqliteHeader } from './prisma';
+import { prisma, getPersistentStoragePaths, createSafetyBackup, verifySqliteHeader, findProjectRoot } from './prisma';
 import path from 'path';
 import fs from 'fs';
 import { execSync } from 'child_process';
@@ -92,18 +92,62 @@ export async function auditDatabase(): Promise<DatabaseAuditReport> {
 export async function safeMigrate(): Promise<{ success: boolean; message: string }> {
   const paths = getPersistentStoragePaths();
   const dbPath = paths.databasePath;
+  const backupsDir = paths.backupsDir;
+
+  const projectRoot = findProjectRoot();
+  const serverDir = fs.existsSync(path.join(projectRoot, 'server', 'prisma', 'schema.prisma'))
+    ? path.join(projectRoot, 'server')
+    : projectRoot;
+  const schemaPath = path.join(serverDir, 'prisma', 'schema.prisma');
+
+  // Strictly enforce persistent SQLite file URL for Prisma
+  const normalizedDbUrl = `file:${dbPath.replace(/\\/g, '/')}`;
+  process.env.DATABASE_URL = normalizedDbUrl;
 
   console.log('🔍 [Safe Migration] Starting safe schema verification...');
   console.log(`   Database Target: ${dbPath}`);
+  console.log(`   Prisma Schema:   ${schemaPath}`);
+
+  // Check if primary database exists; if not, attempt to bootstrap from available snapshots
+  if (!fs.existsSync(dbPath) || fs.statSync(dbPath).size < 1000) {
+    const candidateSnapshots = [
+      path.join(projectRoot, 'persistent_data', 'careerwings_production.db'),
+      path.join(serverDir, 'prisma', 'careerwings_template.db'),
+      path.join(projectRoot, 'dev.db'),
+      path.join(serverDir, 'dev.db'),
+    ];
+
+    for (const snap of candidateSnapshots) {
+      if (fs.existsSync(snap) && fs.statSync(snap).size > 10000 && verifySqliteHeader(snap)) {
+        console.log(`📦 [Safe Migration] Pre-populating persistent database from repository snapshot: ${snap}`);
+        try {
+          fs.copyFileSync(snap, dbPath);
+          break;
+        } catch (copyErr) {
+          console.warn('Could not copy snapshot:', copyErr);
+        }
+      }
+    }
+  }
+
+  const dbExistsWithData = fs.existsSync(dbPath) && fs.statSync(dbPath).size > 1000;
 
   // 1. Audit before migration
-  const beforeAudit = await auditDatabase();
-  console.log(`   Pre-migration counts: Users=${beforeAudit.counts.users}, Candidates=${beforeAudit.counts.candidates}, Jobs=${beforeAudit.counts.jobsTotal}, Applications=${beforeAudit.counts.applications}`);
+  let beforeAudit: DatabaseAuditReport | null = null;
+  if (dbExistsWithData) {
+    beforeAudit = await auditDatabase();
+    console.log(`   Pre-migration counts: Users=${beforeAudit.counts.users}, Candidates=${beforeAudit.counts.candidates}, Jobs=${beforeAudit.counts.jobsTotal}, Applications=${beforeAudit.counts.applications}`);
+  } else {
+    console.log('   Pre-migration status: Initializing brand-new persistent database.');
+  }
 
-  // 2. Pre-migration immutable safety backup
-  const backup = createSafetyBackup(dbPath, paths.backupsDir, 'pre_migration');
-  if (!backup) {
-    throw new Error('❌ [MIGRATION ABORTED] Could not create pre-migration safety backup. Migration halted to protect data.');
+  // 2. Pre-migration immutable safety backup (only required if database already has existing data)
+  let backup: string | null = null;
+  if (dbExistsWithData) {
+    backup = createSafetyBackup(dbPath, backupsDir, 'pre_migration');
+    if (!backup) {
+      throw new Error('❌ [MIGRATION ABORTED] Could not create pre-migration safety backup. Migration halted to protect data.');
+    }
   }
 
   // 2.1 Direct SQL additive verification for ImportJob table
@@ -140,41 +184,45 @@ export async function safeMigrate(): Promise<{ success: boolean; message: string
   }
 
   // 3. Find bundled Prisma binary
-  const serverDir = path.resolve(__dirname, '..');
-  const rootDir = path.resolve(__dirname, '../..');
   const possiblePrismaBins = [
     path.join(serverDir, 'node_modules', 'prisma', 'build', 'index.js'),
-    path.join(rootDir, 'node_modules', 'prisma', 'build', 'index.js'),
+    path.join(projectRoot, 'node_modules', 'prisma', 'build', 'index.js'),
     path.join(process.cwd(), 'node_modules', 'prisma', 'build', 'index.js'),
   ];
   const prismaBin = possiblePrismaBins.find((b) => fs.existsSync(b));
 
   const migrateCmd = prismaBin
-    ? `node "${prismaBin}" db push --skip-generate --accept-data-loss=false`
-    : 'npx prisma db push --skip-generate --accept-data-loss=false';
+    ? `node "${prismaBin}" db push --schema="${schemaPath}" --skip-generate --accept-data-loss=false`
+    : `npx prisma db push --schema="${schemaPath}" --skip-generate --accept-data-loss=false`;
 
   console.log('⚡ [Safe Migration] Applying additive schema changes (strictly disallowing data loss)...');
   try {
     execSync(migrateCmd, {
       cwd: serverDir,
-      env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
+      env: { ...process.env, DATABASE_URL: normalizedDbUrl },
       stdio: 'inherit',
     });
   } catch (err: any) {
     console.error('❌ [Safe Migration Error] Prisma db push detected potential data loss or failed:', err?.message || err);
-    console.error(`🛡️ [Protection Active] Database unchanged. Pre-migration backup is safe at: ${backup}`);
+    if (backup) {
+      console.error(`🛡️ [Protection Active] Database unchanged. Pre-migration backup is safe at: ${backup}`);
+    }
     throw err;
   }
 
   // 4. Audit after migration and verify zero records were lost
-  const afterAudit = await auditDatabase();
-  console.log(`   Post-migration counts: Users=${afterAudit.counts.users}, Candidates=${afterAudit.counts.candidates}, Jobs=${afterAudit.counts.jobsTotal}, Applications=${afterAudit.counts.applications}`);
+  if (beforeAudit) {
+    const afterAudit = await auditDatabase();
+    console.log(`   Post-migration counts: Users=${afterAudit.counts.users}, Candidates=${afterAudit.counts.candidates}, Jobs=${afterAudit.counts.jobsTotal}, Applications=${afterAudit.counts.applications}`);
 
-  if (afterAudit.counts.users < beforeAudit.counts.users || afterAudit.counts.jobsTotal < beforeAudit.counts.jobsTotal) {
-    console.error('❌ [CRITICAL MIGRATION ANOMALY] Post-migration record count is less than pre-migration!');
-    console.error(`   Restoring immediately from safety backup: ${backup}`);
-    await restoreDatabaseFromBackup(backup);
-    throw new Error('Migration caused record loss and was rolled back automatically.');
+    if (afterAudit.counts.users < beforeAudit.counts.users || afterAudit.counts.jobsTotal < beforeAudit.counts.jobsTotal) {
+      console.error('❌ [CRITICAL MIGRATION ANOMALY] Post-migration record count is less than pre-migration!');
+      if (backup) {
+        console.error(`   Restoring immediately from safety backup: ${backup}`);
+        await restoreDatabaseFromBackup(backup);
+      }
+      throw new Error('Migration caused record loss and was rolled back automatically.');
+    }
   }
 
   console.log('✅ [Safe Migration] Migration completed successfully with zero record loss verified.');

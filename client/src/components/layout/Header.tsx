@@ -258,6 +258,7 @@ function DropdownItem({
 
 export default function Header() {
   const { isAuthenticated, isCandidate, isEmployer, isAdmin } = useAuth()
+  const navigate = useNavigate()
   const [isScrolled, setIsScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -288,19 +289,39 @@ export default function Header() {
 
           {/* Right side */}
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* "Post Job For Free" High-Converting CTA Button — Available for All Employers & Visitors */}
+            <Link
+              to={
+                isAuthenticated
+                  ? isEmployer || isAdmin
+                    ? '/employer/jobs/post'
+                    : '/login?redirect=/employer/jobs/post'
+                  : '/register?role=EMPLOYER&redirect=/employer/jobs/post'
+              }
+              onClick={(e) => {
+                if (isAuthenticated && isCandidate) {
+                  e.preventDefault()
+                  toast('Please sign in with an Employer account to post vacancies.', { icon: '🏢' })
+                  navigate('/login?redirect=/employer/jobs/post')
+                }
+              }}
+              className="hidden sm:inline-flex items-center gap-2 px-3.5 py-2 text-xs sm:text-sm font-bold text-blue-900 bg-gradient-to-r from-blue-50 to-indigo-50/90 hover:from-blue-100 hover:to-indigo-100 border border-blue-200/90 hover:border-blue-300 rounded-xl transition-all shadow-2xs hover:shadow-xs active:scale-[0.98] cursor-pointer group"
+              title="Post a job opening for free across Northeast India"
+            >
+              <div className="w-5 h-5 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-110 transition-transform">
+                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+              </div>
+              <span>Post Job For Free</span>
+              <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded-md bg-amber-400 text-blue-950 font-mono tracking-wider shadow-2xs">
+                Free
+              </span>
+            </Link>
+
+            {/* Subtle Divider (Desktop) */}
+            <div className="hidden sm:block h-6 w-px bg-slate-200/80 mx-0.5" />
+
             {isAuthenticated ? (
               <>
-                {isEmployer && (
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    leftIcon={<Plus className="h-4 w-4" />}
-                    className="hidden sm:inline-flex bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 font-semibold shadow-xs rounded-xl"
-                    onClick={() => (window.location.href = '/employer/jobs/post')}
-                  >
-                    Post Job
-                  </Button>
-                )}
                 {isAdmin && (
                   <Link to="/admin/dashboard">
                     <Button variant="secondary" size="sm" leftIcon={<Shield className="h-4 w-4" />}>
@@ -352,6 +373,44 @@ export default function Header() {
       {/* Mobile Nav */}
       {mobileOpen && (
         <div className="lg:hidden border-t border-gray-100 bg-white px-4 py-4 space-y-1 animate-slide-up">
+          {/* Mobile "Post Job For Free" Banner */}
+          <div className="pb-3">
+            <Link
+              to={
+                isAuthenticated
+                  ? isEmployer || isAdmin
+                    ? '/employer/jobs/post'
+                    : '/login?redirect=/employer/jobs/post'
+                  : '/register?role=EMPLOYER&redirect=/employer/jobs/post'
+              }
+              onClick={(e) => {
+                setMobileOpen(false)
+                if (isAuthenticated && isCandidate) {
+                  e.preventDefault()
+                  toast('Please sign in with an Employer account to post vacancies.', { icon: '🏢' })
+                  navigate('/login?redirect=/employer/jobs/post')
+                }
+              }}
+              className="flex items-center justify-between p-3 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white font-bold text-sm shadow-md shadow-blue-600/20 active:scale-[0.98] transition"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="p-1.5 bg-white/20 backdrop-blur-xs rounded-xl text-white">
+                  <Plus className="w-4 h-4 stroke-[2.5]" />
+                </div>
+                <div className="text-left leading-tight">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold text-sm">Post Job For Free</span>
+                    <span className="bg-amber-400 text-blue-950 text-[10px] font-black uppercase px-1.5 py-0.5 rounded tracking-wide">
+                      100% Free
+                    </span>
+                  </div>
+                  <p className="text-[11px] font-normal text-blue-100 mt-0.5">Hire verified talent in Assam &amp; NE</p>
+                </div>
+              </div>
+              <ArrowRight className="w-4 h-4 text-white/80" />
+            </Link>
+          </div>
+
           {[
             { to: '/', label: 'Home' },
             { to: '/jobs', label: 'Jobs' },

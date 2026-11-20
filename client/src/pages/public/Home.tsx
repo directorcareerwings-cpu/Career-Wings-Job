@@ -34,7 +34,9 @@ import {
   Truck,
   Check,
   Flame,
+  Plus,
 } from 'lucide-react'
+import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import JobCard from '@/components/jobs/JobCard'
@@ -122,6 +124,7 @@ const CURATED_CATEGORIES = [
 
 function HeroSection() {
   const navigate = useNavigate()
+  const { isAuthenticated, isEmployer, isAdmin, isCandidate } = useAuth()
   const [keyword, setKeyword] = useState('')
   const [location, setLocation] = useState('')
   const [experience, setExperience] = useState('')
@@ -181,22 +184,51 @@ function HeroSection() {
           )}
         </div>
 
-        {/* Heading & Subtitle */}
-        <div className="mb-4 px-1">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">
-            {publicSettings?.HERO_TITLE || (
-              <>
-                Discover{' '}
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 via-orange-600 to-rose-600">
-                  15,000+ career
-                </span>{' '}
-                opportunities
-              </>
-            )}
-          </h2>
-          <p className="text-slate-600 text-sm sm:text-base mt-1.5 font-medium">
-            Northeast India's most trusted job portal — Assam, Meghalaya, Nagaland &amp; beyond.
-          </p>
+        {/* Heading & Subtitle with "Post Job For Free" CTA */}
+        <div className="mb-4 px-1 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+          <div>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight">
+              {publicSettings?.HERO_TITLE || (
+                <>
+                  Discover{' '}
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 via-orange-600 to-rose-600">
+                    15,000+ career
+                  </span>{' '}
+                  opportunities
+                </>
+              )}
+            </h2>
+            <p className="text-slate-600 text-sm sm:text-base mt-1.5 font-medium">
+              Northeast India's most trusted job portal — Assam, Meghalaya, Nagaland &amp; beyond.
+            </p>
+          </div>
+
+          {/* Prominent "Post Job For Free" Hero CTA */}
+          <Link
+            to={
+              isAuthenticated
+                ? isEmployer || isAdmin
+                  ? '/employer/jobs/post'
+                  : '/login?redirect=/employer/jobs/post'
+                : '/register?role=EMPLOYER&redirect=/employer/jobs/post'
+            }
+            onClick={(e) => {
+              if (isAuthenticated && isCandidate) {
+                e.preventDefault()
+                toast('Please sign in with an Employer account to post vacancies.', { icon: '🏢' })
+                navigate('/login?redirect=/employer/jobs/post')
+              }
+            }}
+            className="inline-flex items-center justify-center gap-2 px-4.5 py-2.5 rounded-xl font-bold text-xs sm:text-sm text-white bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-800 shadow-md shadow-blue-600/25 hover:shadow-lg hover:shadow-blue-600/35 active:scale-[0.98] transition cursor-pointer self-start sm:self-auto shrink-0 group"
+          >
+            <div className="w-5 h-5 rounded-lg bg-white/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+            </div>
+            <span>Post Job For Free</span>
+            <span className="bg-amber-400 text-blue-950 text-[10px] font-black uppercase px-1.5 py-0.5 rounded-md tracking-wider">
+              Free
+            </span>
+          </Link>
         </div>
 
         {/* Elevated Search Bar */}
@@ -1013,8 +1045,16 @@ function EmployerCTA() {
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <Link to="/register">
-                <Button variant="primary" size="lg" className="rounded-2xl px-6 font-bold shadow-lg shadow-orange-500/25">
+              <Link
+                to={
+                  isAuthenticated
+                    ? isEmployer || isAdmin
+                      ? '/employer/jobs/post'
+                      : '/login?redirect=/employer/jobs/post'
+                    : '/register?role=EMPLOYER&redirect=/employer/jobs/post'
+                }
+              >
+                <Button variant="primary" size="lg" className="rounded-2xl px-6 font-bold shadow-lg shadow-orange-500/25 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white border-0">
                   Post a Job Free
                 </Button>
               </Link>

@@ -12,9 +12,14 @@ export default function Register() {
   const navigate = useNavigate()
   const location = useLocation()
   const { setUser, setAccessToken } = useAuthStore()
+  const searchParams = new URLSearchParams(location.search)
+  const queryRole = searchParams.get('role')?.toUpperCase()
+  const redirect = searchParams.get('redirect')
 
   const [step, setStep] = useState<'FORM' | 'OTP'>('FORM')
-  const [role, setRole] = useState<'CANDIDATE' | 'EMPLOYER'>('CANDIDATE')
+  const [role, setRole] = useState<'CANDIDATE' | 'EMPLOYER'>(
+    queryRole === 'EMPLOYER' ? 'EMPLOYER' : 'CANDIDATE'
+  )
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -30,6 +35,17 @@ export default function Register() {
   const [verifying, setVerifying] = useState(false)
   const [resending, setResending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Sync role if query parameter changes
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const r = params.get('role')?.toUpperCase()
+    if (r === 'EMPLOYER') {
+      setRole('EMPLOYER')
+    } else if (r === 'CANDIDATE') {
+      setRole('CANDIDATE')
+    }
+  }, [location.search])
 
   // Handle incoming redirect with OTP step
   useEffect(() => {
@@ -80,7 +96,11 @@ export default function Register() {
         setUser(user)
         setAccessToken(accessToken)
         toast.success('Account created successfully! Welcome to Career Wings.')
-        navigate(user.role === 'EMPLOYER' ? '/employer/dashboard' : '/dashboard')
+        if (redirect) {
+          navigate(redirect)
+        } else {
+          navigate(user.role === 'EMPLOYER' ? '/employer/dashboard' : '/dashboard')
+        }
       }
     } catch (err: any) {
       const errList = err.response?.data?.errors
@@ -119,7 +139,9 @@ export default function Register() {
       setAccessToken(accessToken)
       toast.success('Account verified successfully! Welcome to Career Wings.')
 
-      if (user.role === 'EMPLOYER') {
+      if (redirect) {
+        navigate(redirect)
+      } else if (user.role === 'EMPLOYER') {
         navigate('/employer/dashboard')
       } else {
         navigate('/dashboard')
@@ -250,7 +272,7 @@ export default function Register() {
                 <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Create your Career Wings account</h1>
                 <p className="text-sm text-slate-500 mt-2">
                   Already have an account?{' '}
-                  <Link to="/login" className="font-semibold text-orange-600 hover:text-orange-700">
+                  <Link to={redirect ? `/login?redirect=${encodeURIComponent(redirect)}` : '/login'} className="font-semibold text-orange-600 hover:text-orange-700">
                     Log in
                   </Link>
                 </p>

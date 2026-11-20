@@ -16,7 +16,7 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 import { errorHandler, notFoundHandler } from './lib/errors';
-import { prisma, getPersistentStoragePaths, getPersistentUploadsDir } from './lib/prisma';
+import { prisma, getPersistentStoragePaths, getPersistentUploadsDir, findProjectRoot } from './lib/prisma';
 import { startCronJobs } from './crons';
 
 // Routers
@@ -252,26 +252,32 @@ const ensureDatabaseAndAdmin = async () => {
     if (missingTables.length > 0) {
       console.log(`⚡ Missing tables detected (${missingTables.join(', ')}). Auto-syncing schema additively without data loss...`);
       
-      const serverDir = path.resolve(__dirname, '..');
-      const rootDir = path.resolve(__dirname, '../..');
+      const projectRoot = findProjectRoot();
+      const serverDir = fs.existsSync(path.join(projectRoot, 'server', 'prisma', 'schema.prisma'))
+        ? path.join(projectRoot, 'server')
+        : projectRoot;
+      const schemaPath = path.join(serverDir, 'prisma', 'schema.prisma');
+      const paths = getPersistentStoragePaths();
+      const normalizedDbUrl = `file:${paths.databasePath.replace(/\\/g, '/')}`;
+
       const possiblePrismaBins = [
         path.join(serverDir, 'node_modules', 'prisma', 'build', 'index.js'),
-        path.join(rootDir, 'node_modules', 'prisma', 'build', 'index.js'),
+        path.join(projectRoot, 'node_modules', 'prisma', 'build', 'index.js'),
         path.join(process.cwd(), 'node_modules', 'prisma', 'build', 'index.js'),
       ];
       const prismaBin = possiblePrismaBins.find((b) => fs.existsSync(b));
 
       try {
         if (prismaBin) {
-          execSync(`node "${prismaBin}" db push --skip-generate --accept-data-loss=false`, {
+          execSync(`node "${prismaBin}" db push --schema="${schemaPath}" --skip-generate --accept-data-loss=false`, {
             cwd: serverDir,
-            env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
+            env: { ...process.env, DATABASE_URL: normalizedDbUrl },
             stdio: 'inherit',
           });
         } else {
-          execSync('npx prisma db push --skip-generate --accept-data-loss=false', {
+          execSync(`npx prisma db push --schema="${schemaPath}" --skip-generate --accept-data-loss=false`, {
             cwd: serverDir,
-            env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
+            env: { ...process.env, DATABASE_URL: normalizedDbUrl },
             stdio: 'inherit',
           });
         }
