@@ -240,6 +240,37 @@ const ensureDatabaseAndAdmin = async () => {
       }
     }
 
+    // 2.1 Automated Data Sanitization: Eradicate any competitor URLs (e.g. apna.co) or section headings from skills
+    try {
+      const junkSkills = await prisma.skill.findMany({
+        where: {
+          OR: [
+            { name: { contains: 'apna' } },
+            { name: { contains: '4767' } },
+            { name: { contains: '1874' } },
+            { name: { contains: 'http' } },
+            { name: { contains: 'KEY SKILLS' } },
+            { name: { contains: 'COMPETENC' } },
+            { slug: { contains: 'apna' } },
+            { slug: { contains: '4767' } },
+            { slug: { contains: '1874' } },
+          ],
+        },
+      });
+
+      if (junkSkills.length > 0) {
+        console.log(`🧹 Cleaning ${junkSkills.length} junk skills from database...`);
+        for (const s of junkSkills) {
+          await prisma.candidateSkill.deleteMany({ where: { skillId: s.id } }).catch(() => {});
+          await prisma.jobSkill.deleteMany({ where: { skillId: s.id } }).catch(() => {});
+          await prisma.skill.delete({ where: { id: s.id } }).catch(() => {});
+        }
+        console.log('✔ Junk skills cleaned successfully.');
+      }
+    } catch {
+      // ignore
+    }
+
     // Ensure default SMTP configuration for Hostinger & no-reply@careerwings.in
     const defaultSmtpSettings = [
       { key: 'SMTP_HOST', value: process.env.SMTP_HOST || 'smtp.hostinger.com', type: 'TEXT', group: 'EMAIL', label: 'SMTP Server Host' },

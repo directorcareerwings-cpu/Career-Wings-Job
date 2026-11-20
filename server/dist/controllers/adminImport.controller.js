@@ -404,7 +404,7 @@ async function runBatchImport(jobId, rawRows, mappings, duplicateStrategy, origi
                 if (data.skills && Array.isArray(data.skills) && data.skills.length > 0) {
                     for (const skillName of data.skills.slice(0, 10)) {
                         const cleanSkill = skillName.trim();
-                        if (!cleanSkill)
+                        if (!cleanSkill || (0, aiImport_service_1.isInvalidOrJunkSkill)(cleanSkill))
                             continue;
                         const skillSlug = (0, slugify_1.default)(cleanSkill, { lower: true, strict: true }) || cleanSkill.toLowerCase();
                         const skill = await prisma_1.prisma.skill.upsert({

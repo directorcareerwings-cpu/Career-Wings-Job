@@ -142,11 +142,16 @@ export default function CandidateDetail() {
       y += 56
 
       // Skills
-      const skillsList = c.candidateSkills?.map((cs: any) => cs.skill?.name || cs.name) || ['Communication', 'Domain Knowledge', 'Workforce Readiness']
+      const skillsList = (c.candidateSkills?.map((cs: any) => cs.skill?.name || cs.name) || ['Communication', 'Domain Knowledge', 'Workforce Readiness'])
+        .filter((sk: string) => {
+          if (!sk) return false
+          const s = String(sk).toLowerCase().trim()
+          return !s.includes('apna') && !s.includes('4767') && !s.includes('1874') && !s.includes('http') && !s.includes('competenc') && !s.includes('key skills') && !/^\d+$/.test(s)
+        })
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(11)
       doc.setTextColor(15, 23, 42)
-      doc.text('KEY SKILLS & COMPETENCIES', margin, y)
+      doc.text('KEY SKILLS', margin, y)
       y += 3.5
 
       doc.setDrawColor(186, 26, 26)
@@ -405,14 +410,19 @@ export default function CandidateDetail() {
               <Award className="w-4 h-4 text-orange-500" /> Core Skills
             </h3>
             <div className="flex flex-wrap gap-2">
-              {candidate.candidateSkills?.map((cs: any) => (
-                <span
-                  key={cs.id || cs.skill?.name}
-                  className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-semibold"
-                >
-                  {cs.skill?.name || cs.name}
-                </span>
-              ))}
+              {candidate.candidateSkills
+                ?.filter((cs: any) => {
+                  const s = String(cs.skill?.name || cs.name || '').toLowerCase().trim()
+                  return !s.includes('apna') && !s.includes('4767') && !s.includes('1874') && !s.includes('http') && !s.includes('competenc') && !s.includes('key skills') && !/^\d+$/.test(s)
+                })
+                .map((cs: any) => (
+                  <span
+                    key={cs.id || cs.skill?.name}
+                    className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-semibold"
+                  >
+                    {cs.skill?.name || cs.name}
+                  </span>
+                ))}
             </div>
           </div>
 

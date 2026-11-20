@@ -997,11 +997,11 @@ export default function CandidateDatabase() {
 
     y += 56
 
-    // ─── Key Skills & Competencies ─────────────────────────────────────────
+    // ─── Key Skills ─────────────────────────────────────────
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(11)
     doc.setTextColor(15, 23, 42)
-    doc.text('KEY SKILLS & COMPETENCIES', margin, y)
+    doc.text('KEY SKILLS', margin, y)
     y += 3.5
 
     doc.setDrawColor(186, 26, 26)
@@ -1012,7 +1012,11 @@ export default function CandidateDatabase() {
     doc.line(margin + 25, y, pageW - margin, y)
     y += 7
 
-    const skillsList = cand.skills || ['Communication', 'Domain Knowledge', 'Workforce Readiness']
+    const skillsList = (cand.skills || ['Communication', 'Domain Knowledge', 'Workforce Readiness']).filter((sk) => {
+      if (!sk) return false
+      const s = sk.toLowerCase().trim()
+      return !s.includes('apna') && !s.includes('4767') && !s.includes('1874') && !s.includes('http') && !s.includes('competenc') && !s.includes('key skills') && !/^\d+$/.test(s)
+    })
     let skillX = margin
     skillsList.forEach((sk) => {
       const textW = doc.getStringUnitWidth(sk) * 8.5 * 0.352778 + 8
@@ -2214,20 +2218,34 @@ export default function CandidateDatabase() {
               </div>
             </div>
 
-            {/* ─── Box 2: Key Skills & Competencies ───────────────────────── */}
+            {/* ─── Box 2: Key Skills ───────────────────────── */}
             <div className="mt-5">
               <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2.5">
-                Key Skills & Competencies
+                Key Skills
               </h3>
               <div className="flex flex-wrap gap-2">
-                {selectedCandidate.skills.map((skill, idx) => (
-                  <span
-                    key={idx}
-                    className="px-3 py-1.5 rounded-full border border-slate-200 bg-white text-slate-700 text-xs font-medium shadow-2xs"
-                  >
-                    {skill}
-                  </span>
-                ))}
+                {selectedCandidate.skills
+                  ?.filter((skill) => {
+                    if (!skill) return false
+                    const s = skill.toLowerCase().trim()
+                    return (
+                      !s.includes('apna') &&
+                      !s.includes('4767') &&
+                      !s.includes('1874') &&
+                      !s.includes('http') &&
+                      !s.includes('competenc') &&
+                      !s.includes('key skills') &&
+                      !/^\d+$/.test(s)
+                    )
+                  })
+                  .map((skill, idx) => (
+                    <span
+                      key={idx}
+                      className="px-3 py-1.5 rounded-full border border-slate-200 bg-white text-slate-700 text-xs font-medium shadow-2xs"
+                    >
+                      {skill}
+                    </span>
+                  ))}
               </div>
             </div>
 

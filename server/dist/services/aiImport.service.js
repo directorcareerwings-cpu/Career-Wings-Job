@@ -39,6 +39,8 @@ exports.levenshteinDistance = levenshteinDistance;
 exports.stringSimilarity = stringSimilarity;
 exports.cleanPhoneNumber = cleanPhoneNumber;
 exports.cleanEmail = cleanEmail;
+exports.isInvalidOrJunkSkill = isInvalidOrJunkSkill;
+exports.sanitizeCleanText = sanitizeCleanText;
 exports.parseExperience = parseExperience;
 exports.parseSalary = parseSalary;
 exports.normalizeGender = normalizeGender;
@@ -279,6 +281,88 @@ function cleanEmail(raw) {
     const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
     const isValid = emailRegex.test(str);
     return { email: str, isValid };
+}
+// Check if a skill string is actually junk, URL, job link, or section heading
+function isInvalidOrJunkSkill(raw) {
+    if (!raw)
+        return true;
+    const s = String(raw).trim();
+    if (!s || s.length < 2 || s.length > 50)
+        return true;
+    const lower = s.toLowerCase();
+    // 1. URLs, web addresses, or competitor links
+    if (lower.includes('http:') ||
+        lower.includes('https:') ||
+        lower.includes('apna.co') ||
+        lower.includes('employer.apna.co') ||
+        lower.includes('naukri.com') ||
+        lower.includes('indeed.com') ||
+        lower.includes('linkedin.com') ||
+        lower.includes('workindia') ||
+        lower.includes('www.') ||
+        lower.includes('.com') ||
+        lower.includes('.in/') ||
+        lower.includes('.org') ||
+        lower.includes('jobs/') ||
+        lower.includes('job/') ||
+        /https?:\/\//i.test(s)) {
+        return true;
+    }
+    // 2. Numerical strings, tracking IDs, or URL fragments (e.g. "476774388", "1874907429")
+    if (/^\d+$/.test(s) || s.includes('476774388') || s.includes('1874907429')) {
+        return true;
+    }
+    // 3. Section headings, generic column headers, or labels
+    const blockedPhrases = [
+        'key skills & competencies',
+        'key skills and competencies',
+        'key skills & competency',
+        'key skills',
+        'competencies',
+        'core competencies',
+        'technical skills',
+        'it skills',
+        'skills & abilities',
+        'skills & knowledge',
+        'skills',
+        'skill',
+        'skillset',
+        'key competencies',
+        'job profile',
+        'job details',
+        'job description',
+        'job link',
+        'apna link',
+        'application link',
+        'candidate skills',
+        'all skills',
+        'responsibilities',
+        'work experience',
+        'qualification',
+    ];
+    if (blockedPhrases.includes(lower)) {
+        return true;
+    }
+    // 4. Must contain at least one letter
+    if (!/[a-zA-Z]/.test(s)) {
+        return true;
+    }
+    return false;
+}
+// Clean text by stripping competitor links, URLs, and junk headings
+function sanitizeCleanText(raw) {
+    if (!raw)
+        return null;
+    let str = String(raw).trim();
+    // Strip apna links, competitor URLs, tracking URLs
+    str = str.replace(/https?:\/\/[^\s]+/gi, '');
+    str = str.replace(/https?:\s*[^\s]+/gi, '');
+    str = str.replace(/employer\.apna\.co[^\s]*/gi, '');
+    str = str.replace(/apna\.co[^\s]*/gi, '');
+    str = str.replace(/476774388|1874907429/g, '');
+    str = str.replace(/key\s*skills\s*(&|and)?\s*competencies/gi, '');
+    str = str.replace(/\s{2,}/g, ' ').trim();
+    return str || null;
 }
 // Experience Parser
 function parseExperience(raw) {
@@ -647,25 +731,28 @@ class AIImportService {
         data.college = fieldValues.college ? String(fieldValues.college).trim() : null;
         data.passingYear = fieldValues.passingYear ? parseInt(String(fieldValues.passingYear).replace(/\D/g, ''), 10) || null : null;
         // 9. Current Role & Company
-        data.currentRole = fieldValues.currentRole ? String(fieldValues.currentRole).trim() : null;
-        data.currentCompany = fieldValues.currentCompany ? String(fieldValues.currentCompany).trim() : null;
+        data.currentRole = sanitizeCleanText(fieldValues.currentRole);
+        data.currentCompany = sanitizeCleanText(fieldValues.currentCompany);
         // 10. Location
-        data.currentLocation = fieldValues.currentLocation ? String(fieldValues.currentLocation).trim() : null;
+        data.currentLocation = sanitizeCleanText(fieldValues.currentLocation);
         data.city = data.currentLocation;
-        data.state = fieldValues.state ? String(fieldValues.state).trim() : null;
+        data.state = sanitizeCleanText(fieldValues.state);
         if (fieldValues.preferredLocations) {
             const prefLocs = String(fieldValues.preferredLocations)
                 .split(/[,;|/]/)
-                .map((s) => s.trim())
+                .map((s) => sanitizeCleanText(s))
                 .filter(Boolean);
             data.preferredLocations = JSON.stringify(prefLocs);
         }
-        // 11. Skills
+        // 11. Skills (Strip unwanted URLs, competitor links, and section headings)
         if (fieldValues.skills) {
-            const skillList = String(fieldValues.skills)
-                .split(/[,;|/]/)
+            let rawSkills = String(fieldValues.skills).trim();
+            // Strip section prefix e.g. "KEY SKILLS & COMPETENCIES: Java, SQL"
+            rawSkills = rawSkills.replace(/^(key\s*skills\s*(&|and)?\s*competencies|key\s*skills|competencies|technical\s*skills|skills)\s*[:\-\—\|]\s*/i, '');
+            const skillList = rawSkills
+                .split(/[,;|/\n]/)
                 .map((s) => s.trim())
-                .filter(Boolean);
+                .filter((s) => !isInvalidOrJunkSkill(s));
             data.skills = skillList;
         }
         else {
@@ -673,7 +760,7 @@ class AIImportService {
         }
         // 12. Notice Period & Summary
         data.noticePeriod = fieldValues.noticePeriod ? String(fieldValues.noticePeriod).trim() : null;
-        data.summary = fieldValues.summary ? String(fieldValues.summary).trim() : null;
+        data.summary = sanitizeCleanText(fieldValues.summary);
         data.resumeUrl = fieldValues.resumeUrl ? String(fieldValues.resumeUrl).trim() : null;
         data.source = fieldValues.source ? String(fieldValues.source).trim() : 'AI Excel Import';
         data.rowIndex = rowIndex;

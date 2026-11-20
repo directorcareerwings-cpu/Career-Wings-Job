@@ -11,6 +11,8 @@ import {
   TARGET_FIELDS,
   cleanPhoneNumber,
   cleanEmail,
+  isInvalidOrJunkSkill,
+  sanitizeCleanText,
 } from '../services/aiImport.service';
 
 const uploadDir = process.env.UPLOAD_DIR || 'uploads';
@@ -427,7 +429,7 @@ async function runBatchImport(
         if (data.skills && Array.isArray(data.skills) && data.skills.length > 0) {
           for (const skillName of data.skills.slice(0, 10)) {
             const cleanSkill = skillName.trim();
-            if (!cleanSkill) continue;
+            if (!cleanSkill || isInvalidOrJunkSkill(cleanSkill)) continue;
             const skillSlug = slugify(cleanSkill, { lower: true, strict: true }) || cleanSkill.toLowerCase();
             const skill = await prisma.skill.upsert({
               where: { slug: skillSlug },
