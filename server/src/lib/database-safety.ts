@@ -106,6 +106,39 @@ export async function safeMigrate(): Promise<{ success: boolean; message: string
     throw new Error('❌ [MIGRATION ABORTED] Could not create pre-migration safety backup. Migration halted to protect data.');
   }
 
+  // 2.1 Direct SQL additive verification for ImportJob table
+  try {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "ImportJob" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "fileName" TEXT NOT NULL,
+        "fileSize" INTEGER NOT NULL DEFAULT 0,
+        "mimeType" TEXT,
+        "filePath" TEXT,
+        "status" TEXT NOT NULL DEFAULT 'PENDING',
+        "totalRows" INTEGER NOT NULL DEFAULT 0,
+        "processedRows" INTEGER NOT NULL DEFAULT 0,
+        "successCount" INTEGER NOT NULL DEFAULT 0,
+        "updatedCount" INTEGER NOT NULL DEFAULT 0,
+        "skippedCount" INTEGER NOT NULL DEFAULT 0,
+        "invalidCount" INTEGER NOT NULL DEFAULT 0,
+        "failedCount" INTEGER NOT NULL DEFAULT 0,
+        "duplicateStrategy" TEXT NOT NULL DEFAULT 'SKIP',
+        "mappings" TEXT,
+        "reportPath" TEXT,
+        "errorLog" TEXT,
+        "summary" TEXT,
+        "createdBy" TEXT,
+        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ImportJob_status_idx" ON "ImportJob"("status");`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ImportJob_createdAt_idx" ON "ImportJob"("createdAt");`);
+  } catch (e) {
+    console.warn('ImportJob table migration notice:', e);
+  }
+
   // 3. Find bundled Prisma binary
   const serverDir = path.resolve(__dirname, '..');
   const rootDir = path.resolve(__dirname, '../..');

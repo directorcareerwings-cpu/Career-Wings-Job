@@ -25,6 +25,43 @@ const reportsDir = persistentUploads.reports;
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
+/**
+ * Ensure ImportJob table exists in SQLite database (zero-dependency fail-safe)
+ */
+export const ensureImportJobTable = async (): Promise<void> => {
+  try {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "ImportJob" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "fileName" TEXT NOT NULL,
+        "fileSize" INTEGER NOT NULL DEFAULT 0,
+        "mimeType" TEXT,
+        "filePath" TEXT,
+        "status" TEXT NOT NULL DEFAULT 'PENDING',
+        "totalRows" INTEGER NOT NULL DEFAULT 0,
+        "processedRows" INTEGER NOT NULL DEFAULT 0,
+        "successCount" INTEGER NOT NULL DEFAULT 0,
+        "updatedCount" INTEGER NOT NULL DEFAULT 0,
+        "skippedCount" INTEGER NOT NULL DEFAULT 0,
+        "invalidCount" INTEGER NOT NULL DEFAULT 0,
+        "failedCount" INTEGER NOT NULL DEFAULT 0,
+        "duplicateStrategy" TEXT NOT NULL DEFAULT 'SKIP',
+        "mappings" TEXT,
+        "reportPath" TEXT,
+        "errorLog" TEXT,
+        "summary" TEXT,
+        "createdBy" TEXT,
+        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ImportJob_status_idx" ON "ImportJob"("status");`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ImportJob_createdAt_idx" ON "ImportJob"("createdAt");`);
+  } catch (err) {
+    console.warn('[ImportJob Table Ensure Notice]:', err);
+  }
+};
+
 // GET /api/admin/smart-import/target-fields
 export const getTargetFieldsHandler = async (_req: Request, res: Response) => {
   return sendSuccess(res, { fields: TARGET_FIELDS });
@@ -202,6 +239,9 @@ export const executeImportHandler = async (req: Request, res: Response, next: Ne
     if (rawRows.length === 0) {
       throw new AppError('No data rows found in this sheet.', 400);
     }
+
+    // Ensure ImportJob table exists in current database before creating record
+    await ensureImportJobTable();
 
     // Create persistent ImportJob
     const job = await prisma.importJob.create({
@@ -564,6 +604,7 @@ async function runBatchImport(
 // GET /api/admin/smart-import/job/:id
 export const getJobProgressHandler = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    await ensureImportJobTable();
     const job = await prisma.importJob.findUnique({
       where: { id: req.params.id },
     });
@@ -579,6 +620,7 @@ export const getJobProgressHandler = async (req: Request, res: Response, next: N
 // GET /api/admin/smart-import/history
 export const getImportHistoryHandler = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    await ensureImportJobTable();
     const page = parseInt(req.query.page as string, 10) || 1;
     const limit = parseInt(req.query.limit as string, 10) || 10;
     const skip = (page - 1) * limit;

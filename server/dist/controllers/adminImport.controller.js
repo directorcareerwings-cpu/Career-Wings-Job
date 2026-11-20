@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.downloadOriginalFileHandler = exports.downloadReportHandler = exports.getImportHistoryHandler = exports.getJobProgressHandler = exports.executeImportHandler = exports.parseSheetHandler = exports.uploadAndPreviewHandler = exports.downloadTemplateHandler = exports.getTargetFieldsHandler = void 0;
+exports.downloadOriginalFileHandler = exports.downloadReportHandler = exports.getImportHistoryHandler = exports.getJobProgressHandler = exports.executeImportHandler = exports.parseSheetHandler = exports.uploadAndPreviewHandler = exports.downloadTemplateHandler = exports.getTargetFieldsHandler = exports.ensureImportJobTable = void 0;
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
@@ -21,6 +21,44 @@ const reportsDir = persistentUploads.reports;
     if (!fs_1.default.existsSync(dir))
         fs_1.default.mkdirSync(dir, { recursive: true });
 });
+/**
+ * Ensure ImportJob table exists in SQLite database (zero-dependency fail-safe)
+ */
+const ensureImportJobTable = async () => {
+    try {
+        await prisma_1.prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "ImportJob" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "fileName" TEXT NOT NULL,
+        "fileSize" INTEGER NOT NULL DEFAULT 0,
+        "mimeType" TEXT,
+        "filePath" TEXT,
+        "status" TEXT NOT NULL DEFAULT 'PENDING',
+        "totalRows" INTEGER NOT NULL DEFAULT 0,
+        "processedRows" INTEGER NOT NULL DEFAULT 0,
+        "successCount" INTEGER NOT NULL DEFAULT 0,
+        "updatedCount" INTEGER NOT NULL DEFAULT 0,
+        "skippedCount" INTEGER NOT NULL DEFAULT 0,
+        "invalidCount" INTEGER NOT NULL DEFAULT 0,
+        "failedCount" INTEGER NOT NULL DEFAULT 0,
+        "duplicateStrategy" TEXT NOT NULL DEFAULT 'SKIP',
+        "mappings" TEXT,
+        "reportPath" TEXT,
+        "errorLog" TEXT,
+        "summary" TEXT,
+        "createdBy" TEXT,
+        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+        await prisma_1.prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ImportJob_status_idx" ON "ImportJob"("status");`);
+        await prisma_1.prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ImportJob_createdAt_idx" ON "ImportJob"("createdAt");`);
+    }
+    catch (err) {
+        console.warn('[ImportJob Table Ensure Notice]:', err);
+    }
+};
+exports.ensureImportJobTable = ensureImportJobTable;
 // GET /api/admin/smart-import/target-fields
 const getTargetFieldsHandler = async (_req, res) => {
     return (0, response_1.sendSuccess)(res, { fields: aiImport_service_1.TARGET_FIELDS });
@@ -189,6 +227,8 @@ const executeImportHandler = async (req, res, next) => {
         if (rawRows.length === 0) {
             throw new errors_1.AppError('No data rows found in this sheet.', 400);
         }
+        // Ensure ImportJob table exists in current database before creating record
+        await (0, exports.ensureImportJobTable)();
         // Create persistent ImportJob
         const job = await prisma_1.prisma.importJob.create({
             data: {
@@ -527,6 +567,7 @@ async function runBatchImport(jobId, rawRows, mappings, duplicateStrategy, origi
 // GET /api/admin/smart-import/job/:id
 const getJobProgressHandler = async (req, res, next) => {
     try {
+        await (0, exports.ensureImportJobTable)();
         const job = await prisma_1.prisma.importJob.findUnique({
             where: { id: req.params.id },
         });
@@ -543,6 +584,7 @@ exports.getJobProgressHandler = getJobProgressHandler;
 // GET /api/admin/smart-import/history
 const getImportHistoryHandler = async (req, res, next) => {
     try {
+        await (0, exports.ensureImportJobTable)();
         const page = parseInt(req.query.page, 10) || 1;
         const limit = parseInt(req.query.limit, 10) || 10;
         const skip = (page - 1) * limit;
