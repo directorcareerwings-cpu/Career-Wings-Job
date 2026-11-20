@@ -993,6 +993,7 @@ function Testimonials() {
 // ─── Dual CTA Banner ────────────────────────────────────────────────────────
 
 function EmployerCTA() {
+  const { isAuthenticated, isEmployer, isAdmin } = useAuth()
   const [email, setEmail] = useState('')
 
   const handleSubscribe = (e: React.FormEvent) => {
