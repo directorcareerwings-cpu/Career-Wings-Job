@@ -3,7 +3,18 @@ import { Link } from 'react-router-dom'
 import { adminAPI } from '@/lib/api'
 import AdminLayout from '@/components/layout/AdminLayout'
 import { SEOMeta } from '@/components/seo/SEOMeta'
-import { Search, Eye, ShieldAlert, ShieldCheck, Zap, Clock, Sparkles } from 'lucide-react'
+import {
+  Search,
+  Eye,
+  ShieldAlert,
+  ShieldCheck,
+  Zap,
+  Clock,
+  Sparkles,
+  Trash2,
+  AlertTriangle,
+  RefreshCw,
+} from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Candidate } from '@/types'
 import AssignPackageModal from '@/components/admin/AssignPackageModal'
@@ -18,6 +29,12 @@ export default function AdminCandidates() {
   const [total, setTotal] = useState(0)
   const [assignModalOpen, setAssignModalOpen] = useState(false)
   const [selectedCandidateForPackage, setSelectedCandidateForPackage] = useState<any>(null)
+
+  // Selection & bulk delete state
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [candidateToDelete, setCandidateToDelete] = useState<any | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const fetchCandidates = async (p = page) => {
     setLoading(true)
@@ -56,6 +73,83 @@ export default function AdminCandidates() {
       fetchCandidates(page)
     } catch {
       toast.error('Failed to update status')
+    }
+  }
+
+  // Selection handlers
+  const candidateIdsOnPage = candidates
+    .map((c) => c.id || c._id)
+    .filter((id): id is string => Boolean(id))
+
+  const isAllOnPageSelected =
+    candidateIdsOnPage.length > 0 &&
+    candidateIdsOnPage.every((id) => selectedIds.includes(id))
+
+  const isSomeOnPageSelected = candidateIdsOnPage.some((id) =>
+    selectedIds.includes(id)
+  )
+
+  const toggleSelectAllOnPage = () => {
+    if (isAllOnPageSelected) {
+      // Deselect all on current page
+      const pageIdSet = new Set(candidateIdsOnPage)
+      setSelectedIds((prev) => prev.filter((id) => !pageIdSet.has(id)))
+    } else {
+      // Select all on current page
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...candidateIdsOnPage])))
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    )
+  }
+
+  const clearSelection = () => {
+    setSelectedIds([])
+  }
+
+  // Delete modal triggers
+  const openDeleteSingle = (c: any) => {
+    setCandidateToDelete(c)
+    setDeleteModalOpen(true)
+  }
+
+  const openBulkDelete = () => {
+    setCandidateToDelete(null)
+    setDeleteModalOpen(true)
+  }
+
+  const handleConfirmDelete = async () => {
+    setIsDeleting(true)
+    try {
+      if (candidateToDelete) {
+        await adminAPI.deleteCandidate(candidateToDelete.id)
+        toast.success('Candidate profile deleted successfully')
+        setSelectedIds((prev) => prev.filter((id) => id !== candidateToDelete.id))
+      } else if (selectedIds.length > 0) {
+        await adminAPI.bulkDeleteCandidates(selectedIds)
+        toast.success(`${selectedIds.length} candidate(s) deleted successfully`)
+        setSelectedIds([])
+      }
+      setDeleteModalOpen(false)
+      setCandidateToDelete(null)
+
+      // Check if page needs to decrement
+      const countDeleted = candidateToDelete ? 1 : selectedIds.length
+      const remainingOnPage = candidates.length - countDeleted
+      if (remainingOnPage <= 0 && page > 1) {
+        handlePageChange(page - 1)
+      } else {
+        fetchCandidates(page)
+      }
+    } catch (err: any) {
+      const msg =
+        err.response?.data?.message || err.message || 'Failed to delete candidate(s)'
+      toast.error(msg)
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -106,6 +200,43 @@ export default function AdminCandidates() {
           </div>
         </div>
 
+        {/* ─── BULK SELECTION ACTION BAR ──────────────────────────────── */}
+        {selectedIds.length > 0 && (
+          <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-sm transition-all animate-fadeIn">
+            <div className="flex items-center gap-3">
+              <span className="flex items-center justify-center w-7 h-7 rounded-full bg-orange-600 text-white text-xs font-bold">
+                {selectedIds.length}
+              </span>
+              <div>
+                <span className="text-sm font-semibold text-slate-900">
+                  {selectedIds.length} candidate{selectedIds.length > 1 ? 's' : ''} selected
+                </span>
+                <span className="text-xs text-slate-500 ml-2 hidden sm:inline">
+                  (Actions will apply to all selected profiles)
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={clearSelection}
+                className="px-3.5 py-1.5 text-xs font-medium text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-200 rounded-xl transition shadow-xs"
+              >
+                Clear Selection
+              </button>
+              <button
+                type="button"
+                onClick={openBulkDelete}
+                className="px-4 py-1.5 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl shadow-sm hover:shadow transition flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Bulk Delete ({selectedIds.length})
+              </button>
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <div className="bg-white rounded-2xl p-6 border border-slate-100 animate-pulse h-64" />
         ) : (
@@ -113,6 +244,20 @@ export default function AdminCandidates() {
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
                 <tr>
+                  <th className="py-3 px-4 w-12 text-center">
+                    <input
+                      type="checkbox"
+                      checked={isAllOnPageSelected}
+                      ref={(input) => {
+                        if (input) {
+                          input.indeterminate = !isAllOnPageSelected && isSomeOnPageSelected
+                        }
+                      }}
+                      onChange={toggleSelectAllOnPage}
+                      className="w-4 h-4 text-orange-600 border-slate-300 rounded focus:ring-orange-500 cursor-pointer"
+                      title="Select all on this page"
+                    />
+                  </th>
                   <th className="py-3 px-4 font-semibold">Candidate</th>
                   <th className="py-3 px-4 font-semibold">Email</th>
                   <th className="py-3 px-4 font-semibold">Location</th>
@@ -124,8 +269,24 @@ export default function AdminCandidates() {
               <tbody className="divide-y divide-slate-100">
                 {candidates.map((c: any) => {
                   const activeSub = c.user?.subscriptions?.[0]
+                  const isSelected = selectedIds.includes(c.id)
+
                   return (
-                    <tr key={c.id}>
+                    <tr
+                      key={c.id}
+                      className={`transition-colors ${
+                        isSelected ? 'bg-orange-50/50 hover:bg-orange-50/80' : 'hover:bg-slate-50/60'
+                      }`}
+                    >
+                      <td className="py-3.5 px-4 text-center">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelect(c.id)}
+                          className="w-4 h-4 text-orange-600 border-slate-300 rounded focus:ring-orange-500 cursor-pointer"
+                          aria-label={`Select candidate ${c.firstName} ${c.lastName}`}
+                        />
+                      </td>
                       <td className="py-3.5 px-4 font-bold text-slate-900">
                         {c.firstName} {c.lastName}
                       </td>
@@ -194,12 +355,20 @@ export default function AdminCandidates() {
                             onClick={() => handleToggleStatus(c.id)}
                             className={`p-1.5 rounded-lg text-xs font-semibold ${
                               c.user?.isActive
-                                ? 'text-red-500 hover:bg-red-50'
+                                ? 'text-amber-600 hover:bg-amber-50'
                                 : 'text-green-600 hover:bg-green-50'
                             }`}
                             title={c.user?.isActive ? 'Suspend' : 'Activate'}
                           >
                             {c.user?.isActive ? <ShieldAlert className="w-4 h-4" /> : <ShieldCheck className="w-4 h-4" />}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openDeleteSingle(c)}
+                            className="p-1.5 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition"
+                            title="Delete Candidate Profile"
+                          >
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -221,6 +390,79 @@ export default function AdminCandidates() {
                 />
               </div>
             )}
+          </div>
+        )}
+
+        {/* ─── DELETE CONFIRMATION MODAL ──────────────────────────────── */}
+        {deleteModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+            <div
+              className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="w-12 h-12 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center mx-auto">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+
+              <div className="text-center">
+                <h3 className="text-lg font-bold text-slate-900">
+                  {candidateToDelete
+                    ? 'Delete Candidate Profile?'
+                    : `Delete ${selectedIds.length} Candidate${selectedIds.length > 1 ? 's' : ''}?`}
+                </h3>
+
+                <p className="text-sm text-slate-500 mt-1">
+                  {candidateToDelete ? (
+                    <>
+                      Are you sure you want to permanently delete{' '}
+                      <strong className="text-slate-800">
+                        {candidateToDelete.firstName} {candidateToDelete.lastName}
+                      </strong>{' '}
+                      ({candidateToDelete.user?.email || 'No email'})?
+                    </>
+                  ) : (
+                    <>
+                      Are you sure you want to permanently delete{' '}
+                      <strong className="text-slate-800">
+                        {selectedIds.length} selected candidate profile{selectedIds.length > 1 ? 's' : ''}
+                      </strong>
+                      ?
+                    </>
+                  )}
+                </p>
+
+                <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-800 text-left">
+                  <p className="font-semibold mb-1">Permanent Action Warning:</p>
+                  This action will permanently remove the candidate profile, user credentials,
+                  resume files, job applications, and all associated history. This action cannot be undone.
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={() => {
+                    setDeleteModalOpen(false)
+                    setCandidateToDelete(null)
+                  }}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-xl transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={handleConfirmDelete}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-xl shadow-sm hover:shadow transition disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isDeleting && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                  {candidateToDelete
+                    ? 'Yes, Delete Candidate'
+                    : `Yes, Delete ${selectedIds.length} Candidates`}
+                </button>
+              </div>
+            </div>
           </div>
         )}
 

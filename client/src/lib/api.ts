@@ -308,6 +308,9 @@ export const adminAPI = {
   getCandidateDetail: (id: string) => api.get(`/admin/candidates/${id}`),
   updateCandidateStatus: (id: string, data: Record<string, unknown>) =>
     api.put(`/admin/candidates/${id}/status`, data),
+  deleteCandidate: (id: string) => api.delete(`/admin/candidates/${id}`),
+  bulkDeleteCandidates: (candidateIds: string[]) =>
+    api.post('/admin/candidates/bulk-delete', { candidateIds }),
   // Employers
   getEmployers: (params?: Record<string, unknown>) =>
     api.get('/admin/employers', { params }),
