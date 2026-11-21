@@ -4,6 +4,8 @@
  * Incorporates Top 100 High-Ranking Keywords for Google SEO.
  */
 
+import { generateAIImageUrl } from './blogAIImageGenerator'
+
 export interface GeneratedArticle {
   title: string
   slug: string
@@ -140,7 +142,7 @@ export function generateArticleWithAI(options: AIOptions): GeneratedArticle {
       category: 'Career Advice',
       excerpt:
         'Looking for the latest private jobs in Assam or Guwahati? Discover top vacancies, direct company hiring, walk-in interview tips, and how Career Wings connects jobseekers to verified employers.',
-      coverImage: 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1200&q=80',
+      coverImage: generateAIImageUrl({ topic: title, category: 'Career Advice' }).url,
       authorName: 'Career Wings Editorial Team',
       authorRole: 'Senior Recruitment Strategist',
       readTimeMin: 7,
@@ -210,7 +212,7 @@ export function generateArticleWithAI(options: AIOptions): GeneratedArticle {
       category: 'Career Advice',
       excerpt:
         'A comprehensive guide for freshers, 12th pass, and graduate jobseekers in Guwahati and Assam to land entry-level jobs with immediate joining and fair salaries.',
-      coverImage: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=1200&q=80',
+      coverImage: generateAIImageUrl({ topic: title, category: 'Career Advice', style: 'freshers_students' }).url,
       authorName: 'Vikram Baruah',
       authorRole: 'Career Wings Recruitment Advisor',
       readTimeMin: 5,
@@ -250,7 +252,7 @@ export function generateArticleWithAI(options: AIOptions): GeneratedArticle {
       category: 'Industry Insights',
       excerpt:
         'Explore commercial hotspots and top employment areas across Guwahati, from GS Road and Dispur to Beltola, Paltan Bazar, and Six Mile.',
-      coverImage: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80',
+      coverImage: generateAIImageUrl({ topic: title, category: 'Industry Insights', style: 'guwahati_business' }).url,
       authorName: 'Career Wings Editorial Team',
       authorRole: 'Regional Market Analyst',
       readTimeMin: 6,
@@ -281,7 +283,7 @@ export function generateArticleWithAI(options: AIOptions): GeneratedArticle {
     slug,
     category: options.category || 'Career Advice',
     excerpt: `Discover the latest private jobs in Assam and Guwahati for ${topic.toLowerCase()}. Learn about walk-in interviews, direct company vacancies, and career opportunities on Career Wings.`,
-    coverImage: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1200&q=80',
+    coverImage: generateAIImageUrl({ topic: title, category: options.category || 'Career Advice' }).url,
     authorName: 'Career Wings Editorial Team',
     authorRole: 'Senior Career Advisor',
     readTimeMin: 5,

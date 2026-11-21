@@ -541,6 +541,13 @@ export const blogAPI = {
   adminCreatePost: (data: Record<string, unknown>) => api.post('/admin/blog', data),
   adminUpdatePost: (id: string, data: Record<string, unknown>) => api.put(`/admin/blog/${id}`, data),
   adminDeletePost: (id: string) => api.delete(`/admin/blog/${id}`),
+  adminUploadBlogImage: (file: File) => {
+    const formData = new FormData()
+    formData.append('image', file)
+    return api.post('/admin/blog/upload-cover', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
 }
 
 

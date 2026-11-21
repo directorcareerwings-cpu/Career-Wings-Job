@@ -19,6 +19,9 @@ import {
   FileText,
   AlertTriangle,
   Wand2,
+  Shuffle,
+  UploadCloud,
+  Image as ImageIcon,
 } from 'lucide-react'
 import AdminLayout from '@/components/layout/AdminLayout'
 import { blogAPI } from '@/lib/api'
@@ -28,6 +31,12 @@ import { Skeleton } from '@/components/ui/Spinner'
 import type { BlogPost } from '@/types'
 import toast from 'react-hot-toast'
 import { generateArticleWithAI, AI_TOPIC_PRESETS } from '@/lib/blogAIGenerator'
+import {
+  AI_IMAGE_STYLES,
+  AIImageStyle,
+  generateAIImageUrl,
+  detectImageStyle,
+} from '@/lib/blogAIImageGenerator'
 
 const PRESET_CATEGORIES = [
   'Career Advice',
@@ -68,6 +77,14 @@ export default function AdminBlog() {
   const [aiTopic, setAiTopic] = useState('Top In-Demand IT Careers in Guwahati for 2026')
   const [aiAudience, setAiAudience] = useState<'All Jobseekers' | 'Freshers' | 'Experienced' | 'Career Switchers'>('All Jobseekers')
   const [isGeneratingAI, setIsGeneratingAI] = useState(false)
+
+  // AI Image Generator State
+  const [selectedImageStyle, setSelectedImageStyle] = useState<AIImageStyle>('it_tech')
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false)
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
+  const [customImagePrompt, setCustomImagePrompt] = useState('')
+  const [showCustomPrompt, setShowCustomPrompt] = useState(false)
+  const [imageSeed, setImageSeed] = useState(() => Math.floor(Math.random() * 900000) + 100000)
 
   // Fetch admin posts
   const { data, isLoading } = useQuery({
@@ -183,11 +200,64 @@ export default function AdminBlog() {
       setFormTags(generated.tags)
       setFormContent(generated.content)
 
-      toast.success('✨ Article generated with AI! Review and edit details below.')
+      // Sync detected image style
+      setSelectedImageStyle(detectImageStyle(generated.title, generated.category))
+
+      toast.success('✨ Article & AI Cover Image generated! Review details below.')
     } catch {
       toast.error('Failed to generate article.')
     } finally {
       setIsGeneratingAI(false)
+    }
+  }
+
+  const handleAutoGenerateImage = (styleOverride?: AIImageStyle, newSeed?: boolean) => {
+    const topic = formTitle.trim() || aiTopic.trim() || 'Career Wings Guide'
+    const styleToUse = styleOverride || selectedImageStyle || detectImageStyle(topic, formCategory)
+    setSelectedImageStyle(styleToUse)
+
+    const seedToUse = newSeed
+      ? Math.floor(Math.random() * 900000) + 100000
+      : imageSeed
+    if (newSeed) setImageSeed(seedToUse)
+
+    setIsGeneratingImage(true)
+    try {
+      const res = generateAIImageUrl({
+        topic,
+        category: formCategory,
+        style: styleToUse,
+        customPrompt: customImagePrompt.trim() || undefined,
+        seed: seedToUse,
+      })
+      setFormCoverImage(res.url)
+      toast.success(`✨ AI Cover Image generated (${res.preset.label})`)
+    } catch {
+      toast.error('Failed to generate AI image')
+    } finally {
+      setIsGeneratingImage(false)
+    }
+  }
+
+  const handleShuffleSeed = () => {
+    handleAutoGenerateImage(selectedImageStyle, true)
+  }
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setIsUploadingImage(true)
+    try {
+      const res = await blogAPI.adminUploadBlogImage(file)
+      if (res.data?.data?.url) {
+        setFormCoverImage(res.data.data.url)
+        toast.success('Cover image uploaded successfully')
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to upload image')
+    } finally {
+      setIsUploadingImage(false)
+      if (e.target) e.target.value = ''
     }
   }
 
@@ -349,11 +419,10 @@ export default function AdminBlog() {
                   setStatusFilter(status)
                   setPage(1)
                 }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                  statusFilter === status
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${statusFilter === status
                     ? 'bg-blue-900 text-white'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
+                  }`}
               >
                 {status}
               </button>
@@ -432,11 +501,10 @@ export default function AdminBlog() {
                       <td className="py-4 px-4">
                         <button
                           onClick={() => handleTogglePublish(post)}
-                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition cursor-pointer ${
-                            post.isPublished
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition cursor-pointer ${post.isPublished
                               ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
                               : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                          }`}
+                            }`}
                           title="Click to toggle status"
                         >
                           {post.isPublished ? (
@@ -550,7 +618,7 @@ export default function AdminBlog() {
                           </span>
                         </h4>
                         <p className="text-[11px] text-indigo-200/80">
-                          Type any topic or pick a popular Northeast career guide to instantly generate title, excerpt, and full formatted body.
+                          Type any topic or pick a popular Northeast career guide to instantly auto-write the article and generate a matching AI cover image.
                         </p>
                       </div>
                     </div>
@@ -675,18 +743,192 @@ export default function AdminBlog() {
                   />
                 </div>
 
-                {/* Cover Image URL */}
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Cover Image URL
-                  </label>
-                  <input
-                    type="text"
-                    value={formCoverImage}
-                    onChange={(e) => setFormCoverImage(e.target.value)}
-                    placeholder="/images/hero-banner.png or https://example.com/cover.jpg"
-                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-700 focus:outline-none focus:border-blue-900 font-mono"
-                  />
+                {/* ─── AI COVER IMAGE STUDIO ──────────────────────────────── */}
+                <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-indigo-50/70 via-slate-50 to-orange-50/40 border border-indigo-100 shadow-xs space-y-3.5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+                        <Sparkles className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-900 uppercase tracking-wider">
+                          Cover Image (Auto AI Generator)
+                        </label>
+                        <p className="text-[11px] text-slate-500">
+                          Auto-generate 1200×630 photorealistic AI visuals tailored for Assam &amp; Northeast careers
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <button
+                        type="button"
+                        disabled={isGeneratingImage}
+                        onClick={() => handleAutoGenerateImage()}
+                        className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-xs font-bold shadow-sm transition flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+                        title="Generate photorealistic AI image matching your article title"
+                      >
+                        <Sparkles className={`w-3.5 h-3.5 ${isGeneratingImage ? 'animate-spin' : ''}`} />
+                        <span>{isGeneratingImage ? 'Generating AI Image...' : 'Auto-Generate AI Image'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={isGeneratingImage}
+                        onClick={handleShuffleSeed}
+                        className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition flex items-center gap-1 cursor-pointer"
+                        title="Generate a new AI variation/seed"
+                      >
+                        <Shuffle className="w-3.5 h-3.5 text-indigo-600" />
+                        <span className="hidden sm:inline">Shuffle</span>
+                      </button>
+
+                      <label
+                        className="px-2.5 py-1.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-semibold shadow-xs transition flex items-center gap-1 cursor-pointer"
+                        title="Upload your own image from device"
+                      >
+                        <UploadCloud className="w-3.5 h-3.5 text-slate-500" />
+                        <span className="hidden sm:inline">{isUploadingImage ? 'Uploading...' : 'Upload'}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleFileUpload}
+                          className="hidden"
+                          disabled={isUploadingImage}
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* AI Style Presets Pills */}
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center justify-between">
+                      <span>Select AI Visual Style / Theme:</span>
+                      <button
+                        type="button"
+                        onClick={() => setShowCustomPrompt(!showCustomPrompt)}
+                        className="text-indigo-600 hover:text-indigo-800 text-[11px] font-semibold underline lowercase cursor-pointer"
+                      >
+                        {showCustomPrompt ? '- hide custom prompt' : '+ custom AI prompt'}
+                      </button>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5">
+                      {AI_IMAGE_STYLES.map((preset) => {
+                        const isSelected = selectedImageStyle === preset.id
+                        return (
+                          <button
+                            key={preset.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedImageStyle(preset.id)
+                              handleAutoGenerateImage(preset.id)
+                            }}
+                            className={`text-xs px-2.5 py-1 rounded-lg border font-medium transition cursor-pointer flex items-center gap-1 ${isSelected
+                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                                : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                              }`}
+                          >
+                            <span>{preset.label}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Custom AI Prompt Input (Optional toggle) */}
+                  {showCustomPrompt && (
+                    <div className="animate-fadeIn pt-1">
+                      <div className="text-[11px] font-semibold text-slate-600 mb-1">
+                        Custom AI Image Prompt:
+                      </div>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={customImagePrompt}
+                          onChange={(e) => setCustomImagePrompt(e.target.value)}
+                          placeholder="e.g., modern software development team in Guwahati IT park, bright sunrise, 8k photography..."
+                          className="flex-grow px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-800 focus:outline-none focus:border-indigo-600 font-sans"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleAutoGenerateImage()}
+                          className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 transition cursor-pointer shrink-0"
+                        >
+                          Apply Prompt
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Cover Image Input Field */}
+                  <div className="space-y-1">
+                    <input
+                      type="text"
+                      value={formCoverImage}
+                      onChange={(e) => setFormCoverImage(e.target.value)}
+                      placeholder="/images/hero-banner.png or https://example.com/cover.jpg"
+                      className="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:border-indigo-600 font-mono"
+                    />
+                  </div>
+
+                  {/* Live Image Preview */}
+                  {formCoverImage && (
+                    <div className="relative rounded-xl overflow-hidden border border-slate-200 bg-slate-900/5 group">
+                      <div className="aspect-[16/9] max-h-56 w-full overflow-hidden bg-slate-900 relative">
+                        <img
+                          src={formCoverImage}
+                          alt="Cover preview"
+                          className="w-full h-full object-cover transition duration-300 group-hover:scale-102"
+                          onError={(e) => {
+                            const fallback = AI_IMAGE_STYLES.find((p) => p.id === selectedImageStyle)?.curatedFallback
+                            if (fallback && e.currentTarget.src !== fallback) {
+                              e.currentTarget.src = fallback
+                            }
+                          }}
+                        />
+
+                        {/* Top Overlay Badge */}
+                        <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
+                          <span className="px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-wider border border-white/20">
+                            {formCoverImage.includes('pollinations') ? '✨ AI Generated Visual' : 'Cover Image'}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-md bg-indigo-600/90 text-white text-[10px] font-semibold">
+                            1200 × 630 HD
+                          </span>
+                        </div>
+
+                        {/* Action buttons overlay on hover */}
+                        <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                          <a
+                            href={formCoverImage}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-1.5 bg-white/90 hover:bg-white text-slate-900 text-xs font-bold rounded-lg shadow-md transition flex items-center gap-1"
+                          >
+                            <ExternalLink className="w-3.5 h-3.5" />
+                            View Full HD
+                          </a>
+                          <button
+                            type="button"
+                            onClick={handleShuffleSeed}
+                            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-md transition flex items-center gap-1 cursor-pointer"
+                          >
+                            <Shuffle className="w-3.5 h-3.5" />
+                            New Variant
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFormCoverImage('')}
+                            className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg shadow-md transition flex items-center gap-1 cursor-pointer"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Author Name, Role & Read Time */}
