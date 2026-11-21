@@ -18,6 +18,7 @@ import {
   X,
   FileText,
   AlertTriangle,
+  Wand2,
 } from 'lucide-react'
 import AdminLayout from '@/components/layout/AdminLayout'
 import { blogAPI } from '@/lib/api'
@@ -26,6 +27,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Skeleton } from '@/components/ui/Spinner'
 import type { BlogPost } from '@/types'
 import toast from 'react-hot-toast'
+import { generateArticleWithAI, AI_TOPIC_PRESETS } from '@/lib/blogAIGenerator'
 
 const PRESET_CATEGORIES = [
   'Career Advice',
@@ -52,6 +54,7 @@ export default function AdminBlog() {
   const [formSlug, setFormSlug] = useState('')
   const [formCategory, setFormCategory] = useState('Career Advice')
   const [formExcerpt, setFormExcerpt] = useState('')
+  const [formTags, setFormTags] = useState('Career Advice, Northeast Jobs, Guwahati')
   const [formContent, setFormContent] = useState('')
   const [formCoverImage, setFormCoverImage] = useState('')
   const [formAuthorName, setFormAuthorName] = useState('Career Wings Editorial Team')
@@ -59,6 +62,12 @@ export default function AdminBlog() {
   const [formReadTimeMin, setFormReadTimeMin] = useState(5)
   const [formIsFeatured, setFormIsFeatured] = useState(false)
   const [formIsPublished, setFormIsPublished] = useState(true)
+
+  // AI Generator State
+  const [showAIAssistant, setShowAIAssistant] = useState(true)
+  const [aiTopic, setAiTopic] = useState('Top In-Demand IT Careers in Guwahati for 2026')
+  const [aiAudience, setAiAudience] = useState<'All Jobseekers' | 'Freshers' | 'Experienced' | 'Career Switchers'>('All Jobseekers')
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false)
 
   // Fetch admin posts
   const { data, isLoading } = useQuery({
@@ -126,6 +135,7 @@ export default function AdminBlog() {
     setFormSlug('')
     setFormCategory('Career Advice')
     setFormExcerpt('')
+    setFormTags('Career Advice, Northeast Jobs, Guwahati')
     setFormContent(
       `<h2>Introduction</h2>\n<p>Write your article opening here...</p>\n\n<h3>Key Point 1</h3>\n<p>Explain your recommendation...</p>\n\n<blockquote>\n"Important insight or takeaway quote here"\n</blockquote>\n\n<h3>Summary & Actionable Steps</h3>\n<ul>\n  <li>Action step 1</li>\n  <li>Action step 2</li>\n</ul>`
     )
@@ -135,7 +145,50 @@ export default function AdminBlog() {
     setFormReadTimeMin(5)
     setFormIsFeatured(false)
     setFormIsPublished(true)
+    setShowAIAssistant(true)
     setIsModalOpen(true)
+  }
+
+  const openCreateModalWithAI = (initialTopic?: string) => {
+    openCreateModal()
+    setShowAIAssistant(true)
+    if (initialTopic) {
+      setAiTopic(initialTopic)
+      handleGenerateWithAI(initialTopic)
+    }
+  }
+
+  const handleGenerateWithAI = (customTopic?: string) => {
+    const topicToUse = customTopic || aiTopic.trim()
+    if (!topicToUse) {
+      toast.error('Please enter a topic for the AI to write about.')
+      return
+    }
+
+    setIsGeneratingAI(true)
+    try {
+      const generated = generateArticleWithAI({
+        topic: topicToUse,
+        audience: aiAudience,
+      })
+
+      setFormTitle(generated.title)
+      setFormSlug(generated.slug)
+      setFormCategory(generated.category)
+      setFormExcerpt(generated.excerpt)
+      setFormCoverImage(generated.coverImage)
+      setFormAuthorName(generated.authorName)
+      setFormAuthorRole(generated.authorRole)
+      setFormReadTimeMin(generated.readTimeMin)
+      setFormTags(generated.tags)
+      setFormContent(generated.content)
+
+      toast.success('✨ Article generated with AI! Review and edit details below.')
+    } catch {
+      toast.error('Failed to generate article.')
+    } finally {
+      setIsGeneratingAI(false)
+    }
   }
 
   const openEditModal = (post: BlogPost) => {
@@ -144,6 +197,7 @@ export default function AdminBlog() {
     setFormSlug(post.slug)
     setFormCategory(post.category)
     setFormExcerpt(post.excerpt)
+    setFormTags(post.tags || 'Career Advice, Northeast Jobs')
     setFormContent(post.content)
     setFormCoverImage(post.coverImage || '')
     setFormAuthorName(post.authorName)
@@ -151,6 +205,7 @@ export default function AdminBlog() {
     setFormReadTimeMin(post.readTimeMin)
     setFormIsFeatured(post.isFeatured)
     setFormIsPublished(post.isPublished)
+    setShowAIAssistant(false)
     setIsModalOpen(true)
   }
 
@@ -187,6 +242,7 @@ export default function AdminBlog() {
       authorName: formAuthorName.trim(),
       authorRole: formAuthorRole.trim(),
       readTimeMin: formReadTimeMin,
+      tags: formTags.trim() || undefined,
       isFeatured: formIsFeatured,
       isPublished: formIsPublished,
     }
@@ -220,7 +276,7 @@ export default function AdminBlog() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <a
               href="/blog"
               target="_blank"
@@ -231,11 +287,18 @@ export default function AdminBlog() {
               <span>View Public Blog</span>
             </a>
             <Button
+              onClick={() => openCreateModalWithAI()}
+              className="bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-900/20"
+            >
+              <Sparkles className="w-4 h-4 mr-1.5" />
+              <span>Write Article with AI</span>
+            </Button>
+            <Button
               onClick={openCreateModal}
               className="bg-blue-900 hover:bg-blue-800 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-900/20"
             >
               <Plus className="w-4 h-4 mr-1.5" />
-              <span>Write New Article</span>
+              <span>Write Manually</span>
             </Button>
           </div>
         </div>
@@ -471,6 +534,84 @@ export default function AdminBlog() {
                 </button>
               </div>
 
+              {/* AI Article Writer Assistant */}
+              {!editingPost && showAIAssistant && (
+                <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-indigo-950 to-blue-950 text-white shadow-xl border border-indigo-500/30">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300">
+                        <Sparkles className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-extrabold text-white flex items-center gap-2">
+                          <span>Write Article Using AI</span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-400/20">
+                            1-CLICK AUTO WRITE
+                          </span>
+                        </h4>
+                        <p className="text-[11px] text-indigo-200/80">
+                          Type any topic or pick a popular Northeast career guide to instantly generate title, excerpt, and full formatted body.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                      <input
+                        type="text"
+                        value={aiTopic}
+                        onChange={(e) => setAiTopic(e.target.value)}
+                        placeholder="e.g., Top In-Demand IT Careers in Guwahati for 2026"
+                        className="flex-grow px-3.5 py-2.5 rounded-xl bg-white/10 border border-white/15 text-white placeholder-slate-400 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 font-medium"
+                      />
+                      <select
+                        value={aiAudience}
+                        onChange={(e) => setAiAudience(e.target.value as any)}
+                        className="px-3 py-2.5 rounded-xl bg-slate-900 border border-white/20 text-indigo-100 text-xs font-semibold focus:outline-none"
+                      >
+                        <option value="All Jobseekers">All Jobseekers</option>
+                        <option value="Freshers">For Freshers</option>
+                        <option value="Experienced">For Experienced</option>
+                        <option value="Career Switchers">For Career Switchers</option>
+                      </select>
+                      <button
+                        type="button"
+                        disabled={isGeneratingAI}
+                        onClick={() => handleGenerateWithAI()}
+                        className="px-4 sm:px-5 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold text-xs shadow-md shadow-orange-900/30 flex items-center justify-center gap-1.5 transition shrink-0 cursor-pointer"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>{isGeneratingAI ? 'Generating...' : 'Generate with AI'}</span>
+                      </button>
+                    </div>
+
+                    {/* Quick topic buttons */}
+                    <div className="pt-1">
+                      <div className="text-[10px] uppercase tracking-wider font-bold text-indigo-300/70 mb-1.5">
+                        Popular Topics (Click to Auto-Write):
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {AI_TOPIC_PRESETS.slice(0, 4).map((preset) => (
+                          <button
+                            key={preset.topic}
+                            type="button"
+                            onClick={() => {
+                              setAiTopic(preset.topic)
+                              setAiAudience(preset.audience)
+                              handleGenerateWithAI(preset.topic)
+                            }}
+                            className="text-[11px] px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 text-indigo-100 hover:text-white transition cursor-pointer"
+                          >
+                            {preset.topic.length > 36 ? preset.topic.slice(0, 34) + '...' : preset.topic}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <form onSubmit={handleSave} className="space-y-5">
                 {/* Title */}
                 <div>
@@ -585,6 +726,20 @@ export default function AdminBlog() {
                       className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs font-medium"
                     />
                   </div>
+                </div>
+
+                {/* Keywords / Tags */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Keywords / Tags (Comma Separated)
+                  </label>
+                  <input
+                    type="text"
+                    value={formTags}
+                    onChange={(e) => setFormTags(e.target.value)}
+                    placeholder="e.g., IT Jobs, Guwahati, Software Engineering, Assam"
+                    className="w-full px-4 py-2 rounded-xl border border-slate-200 text-xs font-medium focus:outline-none focus:border-blue-900"
+                  />
                 </div>
 
                 {/* Content */}

@@ -1,4 +1,4 @@
-import { prisma, getPersistentStoragePaths, createSafetyBackup, verifySqliteHeader, findProjectRoot } from './prisma';
+import { prisma, getPersistentStoragePaths, createSafetyBackup, verifySqliteHeader } from './prisma';
 import path from 'path';
 import fs from 'fs';
 import { execSync } from 'child_process';
@@ -98,10 +98,8 @@ export async function safeMigrate(): Promise<{ success: boolean; message: string
   const dbPath = paths.databasePath;
   const backupsDir = paths.backupsDir;
 
-  const projectRoot = findProjectRoot();
-  const serverDir = fs.existsSync(path.join(projectRoot, 'server', 'prisma', 'schema.prisma'))
-    ? path.join(projectRoot, 'server')
-    : projectRoot;
+  const serverDir = path.resolve(__dirname, '..');
+  const rootDir = path.resolve(__dirname, '../..');
   const schemaPath = path.join(serverDir, 'prisma', 'schema.prisma');
 
   // Strictly enforce persistent SQLite file URL for Prisma
@@ -115,9 +113,9 @@ export async function safeMigrate(): Promise<{ success: boolean; message: string
   // Check if primary database exists; if not, attempt to bootstrap from available snapshots
   if (!fs.existsSync(dbPath) || fs.statSync(dbPath).size < 1000) {
     const candidateSnapshots = [
-      path.join(projectRoot, 'persistent_data', 'careerwings_production.db'),
+      path.join(rootDir, 'persistent_data', 'careerwings_production.db'),
       path.join(serverDir, 'prisma', 'careerwings_template.db'),
-      path.join(projectRoot, 'dev.db'),
+      path.join(rootDir, 'dev.db'),
       path.join(serverDir, 'dev.db'),
     ];
 
@@ -223,7 +221,7 @@ export async function safeMigrate(): Promise<{ success: boolean; message: string
   // 3. Find bundled Prisma binary
   const possiblePrismaBins = [
     path.join(serverDir, 'node_modules', 'prisma', 'build', 'index.js'),
-    path.join(projectRoot, 'node_modules', 'prisma', 'build', 'index.js'),
+    path.join(rootDir, 'node_modules', 'prisma', 'build', 'index.js'),
     path.join(process.cwd(), 'node_modules', 'prisma', 'build', 'index.js'),
   ];
   const prismaBin = possiblePrismaBins.find((b) => fs.existsSync(b));
