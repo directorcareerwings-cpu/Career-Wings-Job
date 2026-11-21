@@ -10,6 +10,12 @@ const prisma_1 = require("./prisma");
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const child_process_1 = require("child_process");
+// Strictly enforce SQLite DATABASE_URL override if environment provides a MySQL/PostgreSQL URL
+const initialPaths = (0, prisma_1.getPersistentStoragePaths)();
+const persistentSqliteUrl = `file:${initialPaths.databasePath.replace(/\\/g, '/')}`;
+if (!process.env.DATABASE_URL || !process.env.DATABASE_URL.startsWith('file:')) {
+    process.env.DATABASE_URL = persistentSqliteUrl;
+}
 /**
  * Collect database audit metrics
  */
@@ -62,10 +68,21 @@ async function safeMigrate() {
     const dbPath = paths.databasePath;
     const backupsDir = paths.backupsDir;
     const projectRoot = (0, prisma_1.findProjectRoot)();
-    const serverDir = fs_1.default.existsSync(path_1.default.join(projectRoot, 'server', 'prisma', 'schema.prisma'))
-        ? path_1.default.join(projectRoot, 'server')
-        : projectRoot;
-    const schemaPath = path_1.default.join(serverDir, 'prisma', 'schema.prisma');
+    // Resolve server directory: either process.cwd() (if already in server) or projectRoot/server
+    const serverDir = fs_1.default.existsSync(path_1.default.join(process.cwd(), 'prisma', 'schema.prisma'))
+        ? process.cwd()
+        : fs_1.default.existsSync(path_1.default.join(projectRoot, 'server', 'prisma', 'schema.prisma'))
+            ? path_1.default.join(projectRoot, 'server')
+            : path_1.default.resolve(__dirname, '../..');
+    const rootDir = projectRoot;
+    // Resolve schema path from prisma/schema.prisma relative to server directory
+    const possibleSchemaPaths = [
+        path_1.default.join(serverDir, 'prisma', 'schema.prisma'),
+        path_1.default.resolve(__dirname, '../../prisma/schema.prisma'),
+        path_1.default.join(projectRoot, 'server', 'prisma', 'schema.prisma'),
+        path_1.default.join(process.cwd(), 'prisma', 'schema.prisma'),
+    ];
+    const schemaPath = possibleSchemaPaths.find((p) => fs_1.default.existsSync(p)) || path_1.default.join(serverDir, 'prisma', 'schema.prisma');
     // Strictly enforce persistent SQLite file URL for Prisma
     const normalizedDbUrl = `file:${dbPath.replace(/\\/g, '/')}`;
     process.env.DATABASE_URL = normalizedDbUrl;
@@ -75,9 +92,9 @@ async function safeMigrate() {
     // Check if primary database exists; if not, attempt to bootstrap from available snapshots
     if (!fs_1.default.existsSync(dbPath) || fs_1.default.statSync(dbPath).size < 1000) {
         const candidateSnapshots = [
-            path_1.default.join(projectRoot, 'persistent_data', 'careerwings_production.db'),
+            path_1.default.join(rootDir, 'persistent_data', 'careerwings_production.db'),
             path_1.default.join(serverDir, 'prisma', 'careerwings_template.db'),
-            path_1.default.join(projectRoot, 'dev.db'),
+            path_1.default.join(rootDir, 'dev.db'),
             path_1.default.join(serverDir, 'dev.db'),
         ];
         for (const snap of candidateSnapshots) {
@@ -180,7 +197,7 @@ async function safeMigrate() {
     // 3. Find bundled Prisma binary
     const possiblePrismaBins = [
         path_1.default.join(serverDir, 'node_modules', 'prisma', 'build', 'index.js'),
-        path_1.default.join(projectRoot, 'node_modules', 'prisma', 'build', 'index.js'),
+        path_1.default.join(rootDir, 'node_modules', 'prisma', 'build', 'index.js'),
         path_1.default.join(process.cwd(), 'node_modules', 'prisma', 'build', 'index.js'),
     ];
     const prismaBin = possiblePrismaBins.find((b) => fs_1.default.existsSync(b));

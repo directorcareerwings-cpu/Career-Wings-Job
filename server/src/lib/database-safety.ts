@@ -1,7 +1,14 @@
-import { prisma, getPersistentStoragePaths, createSafetyBackup, verifySqliteHeader } from './prisma';
+import { prisma, getPersistentStoragePaths, createSafetyBackup, verifySqliteHeader, findProjectRoot } from './prisma';
 import path from 'path';
 import fs from 'fs';
 import { execSync } from 'child_process';
+
+// Strictly enforce SQLite DATABASE_URL override if environment provides a MySQL/PostgreSQL URL
+const initialPaths = getPersistentStoragePaths();
+const persistentSqliteUrl = `file:${initialPaths.databasePath.replace(/\\/g, '/')}`;
+if (!process.env.DATABASE_URL || !process.env.DATABASE_URL.startsWith('file:')) {
+  process.env.DATABASE_URL = persistentSqliteUrl;
+}
 
 /**
  * Career Wings Database Safety, Audit & Migration Runner
@@ -98,9 +105,23 @@ export async function safeMigrate(): Promise<{ success: boolean; message: string
   const dbPath = paths.databasePath;
   const backupsDir = paths.backupsDir;
 
-  const serverDir = path.resolve(__dirname, '..');
-  const rootDir = path.resolve(__dirname, '../..');
-  const schemaPath = path.join(serverDir, 'prisma', 'schema.prisma');
+  const projectRoot = findProjectRoot();
+  // Resolve server directory: either process.cwd() (if already in server) or projectRoot/server
+  const serverDir = fs.existsSync(path.join(process.cwd(), 'prisma', 'schema.prisma'))
+    ? process.cwd()
+    : fs.existsSync(path.join(projectRoot, 'server', 'prisma', 'schema.prisma'))
+    ? path.join(projectRoot, 'server')
+    : path.resolve(__dirname, '../..');
+  const rootDir = projectRoot;
+
+  // Resolve schema path from prisma/schema.prisma relative to server directory
+  const possibleSchemaPaths = [
+    path.join(serverDir, 'prisma', 'schema.prisma'),
+    path.resolve(__dirname, '../../prisma/schema.prisma'),
+    path.join(projectRoot, 'server', 'prisma', 'schema.prisma'),
+    path.join(process.cwd(), 'prisma', 'schema.prisma'),
+  ];
+  const schemaPath = possibleSchemaPaths.find((p) => fs.existsSync(p)) || path.join(serverDir, 'prisma', 'schema.prisma');
 
   // Strictly enforce persistent SQLite file URL for Prisma
   const normalizedDbUrl = `file:${dbPath.replace(/\\/g, '/')}`;
