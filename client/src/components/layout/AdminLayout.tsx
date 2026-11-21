@@ -21,6 +21,7 @@ import {
   Sparkles,
   Image as ImageIcon,
   Mail,
+  BookOpen,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
@@ -55,6 +56,7 @@ const navSections: NavSection[] = [
     items: [
       { to: '/admin/companies', icon: Building2, label: 'Companies' },
       { to: '/admin/jobs', icon: Briefcase, label: 'Jobs' },
+      { to: '/admin/blog', icon: BookOpen, label: 'Blog & Articles' },
       { to: '/admin/categories', icon: Layers, label: 'Categories' },
       { to: '/admin/locations', icon: MapPin, label: 'Locations' },
       { to: '/admin/skills', icon: Zap, label: 'Skills' },

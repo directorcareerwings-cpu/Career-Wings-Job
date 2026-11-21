@@ -528,3 +528,16 @@ export const seoAPI = {
   validateSchema: (schema: Record<string, unknown>) => api.post('/admin/seo/schema/validate', { schema }),
 }
 
+// ─── Blog & Editorial API ────────────────────────────────────────────────────
+export const blogAPI = {
+  getPosts: (params?: Record<string, unknown>) => api.get('/blog', { params }),
+  getPostBySlug: (slug: string) => api.get(`/blog/${slug}`),
+  getCategories: () => api.get('/blog/categories'),
+  getFeatured: () => api.get('/blog/featured'),
+  adminGetPosts: (params?: Record<string, unknown>) => api.get('/admin/blog', { params }),
+  adminCreatePost: (data: Record<string, unknown>) => api.post('/admin/blog', data),
+  adminUpdatePost: (id: string, data: Record<string, unknown>) => api.put(`/admin/blog/${id}`, data),
+  adminDeletePost: (id: string) => api.delete(`/admin/blog/${id}`),
+}
+
+

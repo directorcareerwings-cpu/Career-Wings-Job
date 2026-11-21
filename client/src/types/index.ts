@@ -513,3 +513,26 @@ export interface ApiResponse<T = any> {
     hasPrev: boolean
   }
 }
+
+// ─── Blog & Articles ─────────────────────────────────────────────────────────
+
+export interface BlogPost {
+  id: string
+  title: string
+  slug: string
+  excerpt: string
+  content: string
+  coverImage?: string | null
+  category: string
+  tags?: string | null
+  authorName: string
+  authorRole?: string | null
+  authorAvatar?: string | null
+  readTimeMin: number
+  isFeatured: boolean
+  isPublished: boolean
+  publishedAt?: string | null
+  views: number
+  createdAt: string
+  updatedAt: string
+}

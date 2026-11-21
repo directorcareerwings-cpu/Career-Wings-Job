@@ -285,6 +285,7 @@ export default function Header() {
             <NavItem to="/jobs">Jobs</NavItem>
             <NavItem to="/companies">Companies</NavItem>
             <NavItem to="/pricing">Pricing</NavItem>
+            <NavItem to="/blog">Blog</NavItem>
           </nav>
 
           {/* Right side */}
@@ -416,6 +417,7 @@ export default function Header() {
             { to: '/jobs', label: 'Jobs' },
             { to: '/companies', label: 'Companies' },
             { to: '/pricing', label: 'Pricing' },
+            { to: '/blog', label: 'Blog' },
           ].map(({ to, label }) => (
             <Link
               key={to}

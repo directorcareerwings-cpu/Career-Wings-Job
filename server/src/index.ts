@@ -28,6 +28,8 @@ import adminRoutes from './routes/admin.routes';
 import paymentRoutes from './routes/payment.routes';
 import publicRoutes from './routes/public.routes';
 import chatRoutes from './routes/chat.routes';
+import blogRoutes, { adminBlogRouter } from './routes/blog.routes';
+import { ensureBlogPostTable, seedDefaultBlogPostsIfEmpty } from './controllers/blog.controller';
 
 const app: Express = express();
 const PORT = process.env.PORT || 5000;
@@ -165,9 +167,11 @@ app.use('/api/candidate', candidateRoutes);
 app.use('/api/employer', employerRoutes);
 app.use('/api/jobs', jobsRoutes);
 app.use('/api/admin/seo', seoAdminRoutes);
+app.use('/api/admin/blog', adminBlogRouter);
 app.use('/api/admin', adminRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/blog', blogRoutes);
 app.use('/api', publicRoutes);
 
 // 6.1 Serve Frontend Static Client (React SPA)
@@ -233,8 +237,16 @@ const ensureDatabaseAndAdmin = async () => {
       console.warn('ImportJob table setup notice:', e);
     }
 
+    // 0.1 Ensure BlogPost table exists and initial career guides are seeded
+    try {
+      await ensureBlogPostTable();
+      await seedDefaultBlogPostsIfEmpty();
+    } catch (e) {
+      console.warn('BlogPost table setup notice:', e);
+    }
+
     // 1. Verify core database tables exist
-    const requiredTables = ['User', 'Candidate', 'Employer', 'Company', 'Job', 'Application', 'AdminSetting', 'ImportJob'];
+    const requiredTables = ['User', 'Candidate', 'Employer', 'Company', 'Job', 'Application', 'AdminSetting', 'ImportJob', 'BlogPost'];
     let missingTables: string[] = [];
     
     try {

@@ -18,7 +18,7 @@ async function auditDatabase() {
     const dbPath = paths.databasePath;
     const size = fs_1.default.existsSync(dbPath) ? fs_1.default.statSync(dbPath).size : 0;
     const headerOk = (0, prisma_1.verifySqliteHeader)(dbPath);
-    const [users, candidates, employers, companies, jobsTotal, jobsPublished, jobsDraft, jobsPending, applications, adminSettings,] = await Promise.all([
+    const [users, candidates, employers, companies, jobsTotal, jobsPublished, jobsDraft, jobsPending, applications, adminSettings, blogPosts,] = await Promise.all([
         prisma_1.prisma.user.count().catch(() => 0),
         prisma_1.prisma.candidate.count().catch(() => 0),
         prisma_1.prisma.employer.count().catch(() => 0),
@@ -29,6 +29,7 @@ async function auditDatabase() {
         prisma_1.prisma.job.count({ where: { status: 'PENDING', deletedAt: null } }).catch(() => 0),
         prisma_1.prisma.application.count().catch(() => 0),
         prisma_1.prisma.adminSetting.count().catch(() => 0),
+        prisma_1.prisma.blogPost.count().catch(() => 0),
     ]);
     const report = {
         timestamp: new Date().toISOString(),
@@ -48,6 +49,7 @@ async function auditDatabase() {
             jobsPending,
             applications,
             adminSettings,
+            blogPosts,
         },
     };
     return report;
@@ -142,6 +144,39 @@ async function safeMigrate() {
     catch (e) {
         console.warn('ImportJob table migration notice:', e);
     }
+    // 2.2 Direct SQL additive verification for BlogPost table
+    try {
+        await prisma_1.prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "BlogPost" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "title" TEXT NOT NULL,
+        "slug" TEXT NOT NULL UNIQUE,
+        "excerpt" TEXT NOT NULL,
+        "content" TEXT NOT NULL,
+        "coverImage" TEXT,
+        "category" TEXT NOT NULL DEFAULT 'Career Advice',
+        "tags" TEXT,
+        "authorName" TEXT NOT NULL DEFAULT 'Career Wings Editorial Team',
+        "authorRole" TEXT DEFAULT 'Career Advisor',
+        "authorAvatar" TEXT,
+        "readTimeMin" INTEGER NOT NULL DEFAULT 5,
+        "isFeatured" BOOLEAN NOT NULL DEFAULT 0,
+        "isPublished" BOOLEAN NOT NULL DEFAULT 1,
+        "publishedAt" DATETIME DEFAULT CURRENT_TIMESTAMP,
+        "views" INTEGER NOT NULL DEFAULT 0,
+        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+        await prisma_1.prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "BlogPost_slug_key" ON "BlogPost"("slug");`);
+        await prisma_1.prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "BlogPost_category_idx" ON "BlogPost"("category");`);
+        await prisma_1.prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "BlogPost_isPublished_idx" ON "BlogPost"("isPublished");`);
+        await prisma_1.prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "BlogPost_isFeatured_idx" ON "BlogPost"("isFeatured");`);
+        await prisma_1.prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "BlogPost_createdAt_idx" ON "BlogPost"("createdAt");`);
+    }
+    catch (e) {
+        console.warn('BlogPost table migration notice:', e);
+    }
     // 3. Find bundled Prisma binary
     const possiblePrismaBins = [
         path_1.default.join(serverDir, 'node_modules', 'prisma', 'build', 'index.js'),
@@ -235,6 +270,7 @@ if (require.main === module) {
                 console.log(`   - Pending Jobs:      ${report.counts.jobsPending}`);
                 console.log(`📝 Total Applications:  ${report.counts.applications}`);
                 console.log(`⚙️ Admin Settings:      ${report.counts.adminSettings}`);
+                console.log(`📰 Blog Articles:      ${report.counts.blogPosts}`);
                 console.log('========================================\n');
             }
             else if (action === 'backup') {

@@ -26,6 +26,7 @@ export interface DatabaseAuditReport {
     jobsPending: number;
     applications: number;
     adminSettings: number;
+    blogPosts: number;
   };
 }
 
@@ -49,6 +50,7 @@ export async function auditDatabase(): Promise<DatabaseAuditReport> {
     jobsPending,
     applications,
     adminSettings,
+    blogPosts,
   ] = await Promise.all([
     prisma.user.count().catch(() => 0),
     prisma.candidate.count().catch(() => 0),
@@ -60,6 +62,7 @@ export async function auditDatabase(): Promise<DatabaseAuditReport> {
     prisma.job.count({ where: { status: 'PENDING', deletedAt: null } }).catch(() => 0),
     prisma.application.count().catch(() => 0),
     prisma.adminSetting.count().catch(() => 0),
+    prisma.blogPost.count().catch(() => 0),
   ]);
 
   const report: DatabaseAuditReport = {
@@ -80,6 +83,7 @@ export async function auditDatabase(): Promise<DatabaseAuditReport> {
       jobsPending,
       applications,
       adminSettings,
+      blogPosts,
     },
   };
 
@@ -181,6 +185,39 @@ export async function safeMigrate(): Promise<{ success: boolean; message: string
     await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ImportJob_createdAt_idx" ON "ImportJob"("createdAt");`);
   } catch (e) {
     console.warn('ImportJob table migration notice:', e);
+  }
+
+  // 2.2 Direct SQL additive verification for BlogPost table
+  try {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS "BlogPost" (
+        "id" TEXT NOT NULL PRIMARY KEY,
+        "title" TEXT NOT NULL,
+        "slug" TEXT NOT NULL UNIQUE,
+        "excerpt" TEXT NOT NULL,
+        "content" TEXT NOT NULL,
+        "coverImage" TEXT,
+        "category" TEXT NOT NULL DEFAULT 'Career Advice',
+        "tags" TEXT,
+        "authorName" TEXT NOT NULL DEFAULT 'Career Wings Editorial Team',
+        "authorRole" TEXT DEFAULT 'Career Advisor',
+        "authorAvatar" TEXT,
+        "readTimeMin" INTEGER NOT NULL DEFAULT 5,
+        "isFeatured" BOOLEAN NOT NULL DEFAULT 0,
+        "isPublished" BOOLEAN NOT NULL DEFAULT 1,
+        "publishedAt" DATETIME DEFAULT CURRENT_TIMESTAMP,
+        "views" INTEGER NOT NULL DEFAULT 0,
+        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "BlogPost_slug_key" ON "BlogPost"("slug");`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "BlogPost_category_idx" ON "BlogPost"("category");`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "BlogPost_isPublished_idx" ON "BlogPost"("isPublished");`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "BlogPost_isFeatured_idx" ON "BlogPost"("isFeatured");`);
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "BlogPost_createdAt_idx" ON "BlogPost"("createdAt");`);
+  } catch (e) {
+    console.warn('BlogPost table migration notice:', e);
   }
 
   // 3. Find bundled Prisma binary
@@ -288,6 +325,7 @@ if (require.main === module) {
         console.log(`   - Pending Jobs:      ${report.counts.jobsPending}`);
         console.log(`📝 Total Applications:  ${report.counts.applications}`);
         console.log(`⚙️ Admin Settings:      ${report.counts.adminSettings}`);
+        console.log(`📰 Blog Articles:      ${report.counts.blogPosts}`);
         console.log('========================================\n');
       } else if (action === 'backup') {
         const paths = getPersistentStoragePaths();

@@ -1039,3 +1039,34 @@ model ImportJob {
   @@index([createdAt])
 }
 
+// ========================================
+// BLOG & EDITORIAL SYSTEM
+// ========================================
+
+model BlogPost {
+  id            String    @id @default(cuid())
+  title         String
+  slug          String    @unique
+  excerpt       String
+  content       String    // Rich text / Markdown / HTML
+  coverImage    String?
+  category      String    @default("Career Advice")
+  tags          String?   // JSON array string or comma-separated tags
+  authorName    String    @default("Career Wings Editorial Team")
+  authorRole    String?   @default("Career Advisor")
+  authorAvatar  String?
+  readTimeMin   Int       @default(5)
+  isFeatured    Boolean   @default(false)
+  isPublished   Boolean   @default(true)
+  publishedAt   DateTime? @default(now())
+  views         Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([slug])
+  @@index([category])
+  @@index([isPublished])
+  @@index([isFeatured])
+  @@index([createdAt])
+}
+

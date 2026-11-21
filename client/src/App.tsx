@@ -27,6 +27,9 @@ const ResetPassword = lazy(() => import('@/pages/public/ResetPassword'))
 const PrivacyPolicy = lazy(() => import('@/pages/public/PrivacyPolicy'))
 const TermsOfService = lazy(() => import('@/pages/public/TermsOfService'))
 const RefundPolicy = lazy(() => import('@/pages/public/RefundPolicy'))
+const Blog = lazy(() => import('@/pages/public/Blog'))
+const BlogDetail = lazy(() => import('@/pages/public/BlogDetail'))
+const AdminBlog = lazy(() => import('@/pages/admin/Blog'))
 
 // Candidate
 const CandidateDashboard = lazy(() => import('@/pages/candidate/Dashboard'))
@@ -133,6 +136,8 @@ export default function App() {
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
         <Route path="/terms-of-service" element={<TermsOfService />} />
         <Route path="/refund-policy" element={<RefundPolicy />} />
+        <Route path="/blog" element={<Blog />} />
+        <Route path="/blog/:slug" element={<BlogDetail />} />
         <Route path="/checkout" element={<Checkout />} />
 
         {/* Candidate Public / Shared Profile */}
@@ -196,6 +201,7 @@ export default function App() {
         <Route path="/admin/skills" element={<ProtectedRoute role="admin"><AdminSkills /></ProtectedRoute>} />
         <Route path="/admin/notifications" element={<ProtectedRoute role="admin"><AdminNotifications /></ProtectedRoute>} />
         <Route path="/admin/reports" element={<ProtectedRoute role="admin"><AdminReports /></ProtectedRoute>} />
+        <Route path="/admin/blog" element={<ProtectedRoute role="admin"><AdminBlog /></ProtectedRoute>} />
         <Route path="/admin/cms" element={<ProtectedRoute role="admin"><AdminCMS /></ProtectedRoute>} />
         <Route path="/admin/settings" element={<ProtectedRoute role="admin"><AdminSettings /></ProtectedRoute>} />
         <Route path="/admin/emails" element={<ProtectedRoute role="admin"><AdminEmails /></ProtectedRoute>} />

@@ -1,4 +1,37 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -30,6 +63,8 @@ const admin_routes_1 = __importDefault(require("./routes/admin.routes"));
 const payment_routes_1 = __importDefault(require("./routes/payment.routes"));
 const public_routes_1 = __importDefault(require("./routes/public.routes"));
 const chat_routes_1 = __importDefault(require("./routes/chat.routes"));
+const blog_routes_1 = __importStar(require("./routes/blog.routes"));
+const blog_controller_1 = require("./controllers/blog.controller");
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 5000;
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
@@ -152,9 +187,11 @@ app.use('/api/candidate', candidate_routes_1.default);
 app.use('/api/employer', employer_routes_1.default);
 app.use('/api/jobs', jobs_routes_1.default);
 app.use('/api/admin/seo', seo_routes_1.seoAdminRoutes);
+app.use('/api/admin/blog', blog_routes_1.adminBlogRouter);
 app.use('/api/admin', admin_routes_1.default);
 app.use('/api/payments', payment_routes_1.default);
 app.use('/api/chat', chat_routes_1.default);
+app.use('/api/blog', blog_routes_1.default);
 app.use('/api', public_routes_1.default);
 // 6.1 Serve Frontend Static Client (React SPA)
 const potentialClientDirs = [
@@ -214,8 +251,16 @@ const ensureDatabaseAndAdmin = async () => {
         catch (e) {
             console.warn('ImportJob table setup notice:', e);
         }
+        // 0.1 Ensure BlogPost table exists and initial career guides are seeded
+        try {
+            await (0, blog_controller_1.ensureBlogPostTable)();
+            await (0, blog_controller_1.seedDefaultBlogPostsIfEmpty)();
+        }
+        catch (e) {
+            console.warn('BlogPost table setup notice:', e);
+        }
         // 1. Verify core database tables exist
-        const requiredTables = ['User', 'Candidate', 'Employer', 'Company', 'Job', 'Application', 'AdminSetting', 'ImportJob'];
+        const requiredTables = ['User', 'Candidate', 'Employer', 'Company', 'Job', 'Application', 'AdminSetting', 'ImportJob', 'BlogPost'];
         let missingTables = [];
         try {
             const tableCheck = await prisma_1.prisma.$queryRawUnsafe(`SELECT name FROM sqlite_master WHERE type='table'`);
