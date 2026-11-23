@@ -36,9 +36,61 @@ const PORT = process.env.PORT || 5000;
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
 // 1. Security & Optimizations
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: 'cross-origin' },
-}));
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: [
+          "'self'",
+          "'unsafe-inline'",
+          "'unsafe-eval'",
+          'https://checkout.razorpay.com',
+          'https://*.razorpay.com',
+        ],
+        scriptSrcElem: [
+          "'self'",
+          "'unsafe-inline'",
+          'https://checkout.razorpay.com',
+          'https://*.razorpay.com',
+        ],
+        frameSrc: [
+          "'self'",
+          'https://checkout.razorpay.com',
+          'https://*.razorpay.com',
+          'https://api.razorpay.com',
+        ],
+        connectSrc: [
+          "'self'",
+          'https://api.razorpay.com',
+          'https://*.razorpay.com',
+          'https://lumberjack.razorpay.com',
+          'https://lumberjack-cx.razorpay.com',
+        ],
+        imgSrc: [
+          "'self'",
+          'data:',
+          'blob:',
+          'https:',
+          'https://*.razorpay.com',
+        ],
+        styleSrc: [
+          "'self'",
+          "'unsafe-inline'",
+          'https://fonts.googleapis.com',
+        ],
+        fontSrc: [
+          "'self'",
+          'https://fonts.gstatic.com',
+          'data:',
+        ],
+        objectSrc: ["'none'"],
+        upgradeInsecureRequests: [],
+      },
+    },
+  })
+);
 const allowedOrigins = [
   CLIENT_URL,
   'http://localhost:5173',
@@ -186,13 +238,28 @@ const clientDistDir = potentialClientDirs.find((dir) => fs.existsSync(path.join(
 
 if (clientDistDir) {
   console.log(`📦 Serving frontend static assets from: ${clientDistDir}`);
-  app.use(express.static(clientDistDir, { maxAge: '1d', etag: true }));
+  app.use(
+    express.static(clientDistDir, {
+      maxAge: '1d',
+      etag: true,
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.html')) {
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
+        }
+      },
+    })
+  );
 
   // Catch-all route to serve React index.html for client-side routing
   app.get('*', (req: Request, res: Response, next: NextFunction) => {
     if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
       return next();
     }
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.sendFile(path.join(clientDistDir, 'index.html'));
   });
 }
