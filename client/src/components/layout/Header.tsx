@@ -17,7 +17,6 @@ import {
   Plus,
   Shield,
   Package,
-  Moon,
   ArrowRight,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
@@ -74,14 +73,21 @@ function NavItem({ to, children, end }: { to: string; children: React.ReactNode;
       end={end}
       className={({ isActive }) =>
         cn(
-          'text-sm font-semibold px-4 py-1.5 rounded-full transition-all duration-150',
+          'text-sm font-semibold transition-colors duration-150 py-1 px-1 relative',
           isActive
-            ? 'bg-slate-900 text-white shadow-xs'
-            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+            ? 'text-orange-600 font-bold'
+            : 'text-slate-600 hover:text-slate-950'
         )
       }
     >
-      {children}
+      {({ isActive }) => (
+        <>
+          {children}
+          {isActive && (
+            <span className="absolute -bottom-1 left-0 right-0 h-0.5 bg-orange-600 rounded-full" />
+          )}
+        </>
+      )}
     </NavLink>
   )
 }
@@ -280,7 +286,7 @@ export default function Header() {
           <Logo />
 
           {/* Desktop Nav */}
-          <nav className="hidden lg:flex items-center gap-1.5 bg-slate-50 p-1.5 rounded-full border border-slate-200/70">
+          <nav className="hidden md:flex items-center gap-7">
             <NavItem to="/" end>Home</NavItem>
             <NavItem to="/jobs">Jobs</NavItem>
             <NavItem to="/companies">Companies</NavItem>
@@ -289,7 +295,7 @@ export default function Header() {
 
           {/* Right side */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* "Post Job For Free" High-Converting CTA Button — Available for All Employers & Visitors */}
+            {/* Post Job Free Button */}
             <Link
               to={
                 isAuthenticated
@@ -305,20 +311,12 @@ export default function Header() {
                   navigate('/login?redirect=/employer/jobs/post')
                 }
               }}
-              className="hidden sm:inline-flex items-center gap-2 px-3.5 py-2 text-xs sm:text-sm font-bold text-blue-900 bg-gradient-to-r from-blue-50 to-indigo-50/90 hover:from-blue-100 hover:to-indigo-100 border border-blue-200/90 hover:border-blue-300 rounded-xl transition-all shadow-2xs hover:shadow-xs active:scale-[0.98] cursor-pointer group"
-              title="Post a job opening for free across Northeast India"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-semibold text-orange-600 bg-orange-50 hover:bg-orange-100 border border-orange-200/80 rounded-xl transition-colors"
+              title="Post a job opening across Northeast India"
             >
-              <div className="w-5 h-5 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-110 transition-transform">
-                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-              </div>
-              <span>Post Job For Free</span>
-              <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded-md bg-amber-400 text-blue-950 font-mono tracking-wider shadow-2xs">
-                Free
-              </span>
+              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span>Post Job Free</span>
             </Link>
-
-            {/* Subtle Divider (Desktop) */}
-            <div className="hidden sm:block h-6 w-px bg-slate-200/80 mx-0.5" />
 
             {isAuthenticated ? (
               <>
@@ -335,29 +333,18 @@ export default function Header() {
               <div className="hidden sm:flex items-center gap-2">
                 <Link
                   to="/login"
-                  className="px-3.5 py-2 text-sm font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors"
+                  className="px-3 py-1.5 text-sm font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors"
                 >
                   Log In
                 </Link>
                 <Link
                   to="/register"
-                  className="px-4.5 py-2 text-sm font-semibold text-white bg-gradient-to-r from-orange-500 via-orange-600 to-rose-600 hover:from-orange-600 hover:to-rose-700 rounded-xl shadow-xs hover:shadow-md hover:shadow-orange-500/20 active:scale-[0.98] transition-all cursor-pointer inline-flex items-center gap-1.5"
+                  className="px-4 py-1.5 text-sm font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-xl shadow-xs active:scale-[0.98] transition-all"
                 >
-                  <span>Register Free</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  Register
                 </Link>
               </div>
             )}
-
-            {/* Dark mode moon toggle */}
-            <button
-              type="button"
-              onClick={() => toast('Dark mode preference saved!')}
-              className="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition cursor-pointer"
-              aria-label="Toggle dark mode"
-            >
-              <Moon className="w-4 h-4" />
-            </button>
 
             {/* Mobile menu button */}
             <button
@@ -480,7 +467,7 @@ export default function Header() {
                 <Button variant="outline" size="md" className="w-full">Log In</Button>
               </Link>
               <Link to="/register" onClick={() => setMobileOpen(false)}>
-                <Button variant="primary" size="md" className="w-full bg-[#c22d25] hover:bg-[#a8241d] text-white">Register Free</Button>
+                <Button variant="primary" size="md" className="w-full bg-orange-600 hover:bg-orange-700 text-white">Register</Button>
               </Link>
             </div>
           )}
