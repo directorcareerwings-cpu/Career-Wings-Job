@@ -248,6 +248,9 @@ export const employerAPI = {
   createJob: (data: Record<string, unknown>) => api.post('/employer/jobs', data),
   updateJob: (id: string, data: Record<string, unknown>) =>
     api.put(`/employer/jobs/${id}`, data),
+  toggleJobFeatured: (id: string, isFeatured?: boolean) =>
+    api.patch(`/employer/jobs/${id}/feature`, isFeatured !== undefined ? { isFeatured } : {}),
+  getFeaturedQuota: () => api.get('/employer/jobs/featured-quota'),
   deleteJob: (id: string) => api.delete(`/employer/jobs/${id}`),
   getAllApplicants: (params?: Record<string, unknown>) =>
     api.get('/employer/all-applicants', { params }),

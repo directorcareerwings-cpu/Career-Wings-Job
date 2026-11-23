@@ -6,7 +6,7 @@ import { prisma } from '../lib/prisma';
 import { sendSuccess, sendPaginated } from '../lib/response';
 import { AppError } from '../lib/errors';
 import { AuthenticatedRequest } from '../middleware/auth';
-import { checkLimit, consumeCredit, getSubscriptionSummary } from '../services/subscription.service';
+import { checkLimit, consumeCredit, getSubscriptionSummary, getActiveSubscription } from '../services/subscription.service';
 import { createNotification } from '../services/notification.service';
 import { sendApplicationStatusEmail } from '../services/email.service';
 import { generateCandidatePDFBuffer } from '../lib/pdfGenerator';
@@ -111,6 +111,46 @@ export const uploadCompanyLogo = async (req: AuthenticatedRequest, res: Response
 
 // ---- JOBS ----
 
+/**
+ * Helper to calculate employer's active featured job allowance and current usage
+ */
+export const getEmployerFeaturedJobQuota = async (userId: string, employerId: string) => {
+  const sub = await getActiveSubscription(userId);
+  let limit = 0;
+  if (sub?.limitsSnapshot) {
+    try {
+      const limits = JSON.parse(sub.limitsSnapshot);
+      if (limits.featuredJobs !== undefined && limits.featuredJobs !== null) {
+        limit = Number(limits.featuredJobs);
+      }
+    } catch {}
+  }
+
+  const isUnlimited = limit === -1;
+
+  const used = await prisma.job.count({
+    where: {
+      employerId,
+      isFeatured: true,
+      deletedAt: null,
+      status: { notIn: ['CLOSED', 'EXPIRED'] },
+    },
+  });
+
+  const remaining = isUnlimited ? 999999 : Math.max(0, limit - used);
+  const canFeature = isUnlimited || used < limit;
+
+  return {
+    limit,
+    used,
+    remaining,
+    isUnlimited,
+    canFeature,
+    packageName: sub?.package?.name || 'Free Plan',
+    packageType: sub?.package?.type || 'EMPLOYER',
+  };
+};
+
 export const getEmployerJobs = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const employer = await prisma.employer.findUnique({ where: { userId: req.user!.id } });
@@ -172,7 +212,9 @@ export const getEmployerJobs = async (req: AuthenticatedRequest, res: Response, 
       rejected: statusMap['REJECTED'] || 0,
     };
 
-    sendPaginated(res, jobs, total, page, limit, 'Success', { counts });
+    const featuredQuota = await getEmployerFeaturedJobQuota(req.user!.id, employer.id);
+
+    sendPaginated(res, jobs, total, page, limit, 'Success', { counts, featuredQuota });
   } catch (error) { next(error); }
 };
 
@@ -205,8 +247,27 @@ export const postJob = async (req: AuthenticatedRequest, res: Response, next: Ne
       experienceMin, experienceMax, educationLevel, highestDegree, genderPreference, vacancies,
       state, district, city, country,
       applicationDeadline, applicationMethod, applicationEmail, applicationUrl,
-      skills,
+      skills, isFeatured,
     } = req.body;
+
+    // Validate Featured Job quota according to active package limits
+    const wantsFeatured = Boolean(isFeatured);
+    if (wantsFeatured) {
+      const quota = await getEmployerFeaturedJobQuota(req.user!.id, employer.id);
+      if (!quota.canFeature) {
+        if (quota.limit <= 0) {
+          throw new AppError(
+            `Your active package (${quota.packageName}) does not include Featured Job listings. Please upgrade your package to feature this job.`,
+            403
+          );
+        } else {
+          throw new AppError(
+            `You have used all ${quota.limit} featured job slots in your active package (${quota.used}/${quota.limit} used). Please unfeature another vacancy or upgrade your package.`,
+            403
+          );
+        }
+      }
+    }
 
     const baseSlug = slugify(`${title}-${employer.company?.name || 'company'}`, { lower: true, strict: true });
     let slug = baseSlug;
@@ -263,7 +324,8 @@ export const postJob = async (req: AuthenticatedRequest, res: Response, next: Ne
           applicationMethod: applicationMethod || 'PORTAL',
           applicationEmail: applicationEmail || null,
           applicationUrl: applicationUrl || null,
-          status,
+          status: (wantsFeatured && status === 'PUBLISHED') ? 'FEATURED' : status,
+          isFeatured: wantsFeatured,
           publishedAt: status === 'PUBLISHED' ? new Date() : null,
           expiresAt,
         },
@@ -365,19 +427,49 @@ export const updateJob = async (req: AuthenticatedRequest, res: Response, next: 
       throw new AppError('Cannot edit a closed or expired job', 400);
     }
 
-    const { skills, ...jobData } = req.body;
+    const { skills, isFeatured, ...jobData } = req.body;
     
+    let finalIsFeatured = job.isFeatured;
+    if (isFeatured !== undefined) {
+      const wantsFeatured = Boolean(isFeatured);
+      if (wantsFeatured && !job.isFeatured) {
+        const quota = await getEmployerFeaturedJobQuota(req.user!.id, employer.id);
+        if (!quota.canFeature) {
+          if (quota.limit <= 0) {
+            throw new AppError(
+              `Your active package (${quota.packageName}) does not include Featured Job listings. Please upgrade your package to feature this job.`,
+              403
+            );
+          } else {
+            throw new AppError(
+              `You have used all ${quota.limit} featured job slots available in your ${quota.packageName} package (${quota.used}/${quota.limit} used). Please unfeature another job or upgrade your plan.`,
+              403
+            );
+          }
+        }
+      }
+      finalIsFeatured = wantsFeatured;
+    }
+
     // If editing a published or featured job, it requires Admin re-approval before live
     const autoApprove = await prisma.adminSetting.findUnique({ where: { key: 'AUTO_APPROVE_JOBS' } });
     const isLive = job.status === 'PUBLISHED' || job.status === 'FEATURED';
     const needsApproval = isLive && autoApprove?.value !== 'true';
-    const newStatus = needsApproval ? 'PENDING' : job.status;
+    let newStatus = job.status;
+    if (needsApproval) {
+      newStatus = 'PENDING';
+    } else if (finalIsFeatured && (job.status === 'PUBLISHED' || job.status === 'FEATURED')) {
+      newStatus = 'FEATURED';
+    } else if (!finalIsFeatured && job.status === 'FEATURED') {
+      newStatus = 'PUBLISHED';
+    }
 
     const updated = await prisma.$transaction(async (tx) => {
       const updatedJob = await tx.job.update({
         where: { id: req.params.id },
         data: {
           ...jobData,
+          isFeatured: finalIsFeatured,
           status: newStatus,
           ...(needsApproval ? { publishedAt: null } : {}),
         },
@@ -449,6 +541,70 @@ export const deleteJob = async (req: AuthenticatedRequest, res: Response, next: 
       data: { deletedAt: new Date() },
     });
     sendSuccess(res, null, 'Job deleted');
+  } catch (error) { next(error); }
+};
+
+export const getFeaturedJobQuota = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const employer = await prisma.employer.findUnique({ where: { userId: req.user!.id } });
+    if (!employer) throw new AppError('Employer not found', 404);
+    const quota = await getEmployerFeaturedJobQuota(req.user!.id, employer.id);
+    sendSuccess(res, quota);
+  } catch (error) { next(error); }
+};
+
+export const toggleJobFeatured = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const employer = await prisma.employer.findUnique({ where: { userId: req.user!.id } });
+    if (!employer) throw new AppError('Employer not found', 404);
+
+    const job = await prisma.job.findFirst({
+      where: { id: req.params.id, employerId: employer.id, deletedAt: null },
+    });
+    if (!job) throw new AppError('Job not found or unauthorized', 404);
+
+    const targetFeatured = req.body.isFeatured !== undefined ? Boolean(req.body.isFeatured) : !job.isFeatured;
+
+    if (targetFeatured) {
+      if (!job.isFeatured) {
+        const quota = await getEmployerFeaturedJobQuota(req.user!.id, employer.id);
+        if (!quota.canFeature) {
+          if (quota.limit <= 0) {
+            throw new AppError(
+              `Your current package (${quota.packageName}) does not include Featured Job listings. Please upgrade your package to feature this job.`,
+              403
+            );
+          } else {
+            throw new AppError(
+              `You have used all ${quota.limit} featured job slots available in your ${quota.packageName} package (${quota.used}/${quota.limit} used). Please unfeature another job or upgrade your plan.`,
+              403
+            );
+          }
+        }
+      }
+
+      const updatedJob = await prisma.job.update({
+        where: { id: job.id },
+        data: {
+          isFeatured: true,
+          status: job.status === 'PUBLISHED' ? 'FEATURED' : job.status,
+        },
+      });
+
+      const updatedQuota = await getEmployerFeaturedJobQuota(req.user!.id, employer.id);
+      sendSuccess(res, { job: updatedJob, quota: updatedQuota }, 'Job is now Featured on homepage and top of search!');
+    } else {
+      const updatedJob = await prisma.job.update({
+        where: { id: job.id },
+        data: {
+          isFeatured: false,
+          status: job.status === 'FEATURED' ? 'PUBLISHED' : job.status,
+        },
+      });
+
+      const updatedQuota = await getEmployerFeaturedJobQuota(req.user!.id, employer.id);
+      sendSuccess(res, { job: updatedJob, quota: updatedQuota }, 'Job unfeatured. 1 slot freed up in your package.');
+    }
   } catch (error) { next(error); }
 };
 

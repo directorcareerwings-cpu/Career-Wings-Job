@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   getCompanyProfile, updateEmployerProfile, updateCompany, uploadCompanyLogo,
   getEmployerJobs, postJob, getEmployerJobById, updateJob, updateJobStatus, deleteJob,
+  getFeaturedJobQuota, toggleJobFeatured,
   getApplicants, getAllApplicants, updateApplicationStatus,
   searchCandidates, getCandidateDetail, downloadCandidateResume,
   revealCandidateContact, bulkDownloadCandidates, sendCandidateInterviewOffer,
@@ -36,9 +37,11 @@ router.post('/company/logo', (req, res, next) => {
 
 // Jobs
 router.get('/jobs', getEmployerJobs);
+router.get('/jobs/featured-quota', getFeaturedJobQuota);
 router.post('/jobs', requireQuota('jobPostings', 1, 'Your job posting limit has been reached. Upgrade your package to post more jobs.'), postJob);
 router.get('/jobs/:id', getEmployerJobById);
 router.put('/jobs/:id', updateJob);
+router.patch('/jobs/:id/feature', toggleJobFeatured);
 router.patch('/jobs/:id/status', updateJobStatus);
 router.delete('/jobs/:id', deleteJob);
 

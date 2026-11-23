@@ -461,6 +461,24 @@ export const getSubscriptionSummary = async (userId: string) => {
   try { usage = JSON.parse(sub.usageData || '{}'); } catch {}
   try { features = JSON.parse(sub.package.features || '[]'); } catch {}
 
+  // Sync live featured jobs count for employer
+  if (role === 'EMPLOYER') {
+    try {
+      const employer = await prisma.employer.findUnique({ where: { userId }, select: { id: true } });
+      if (employer) {
+        const activeFeaturedCount = await prisma.job.count({
+          where: {
+            employerId: employer.id,
+            isFeatured: true,
+            deletedAt: null,
+            status: { notIn: ['CLOSED', 'EXPIRED'] },
+          },
+        });
+        usage.featuredJobs = activeFeaturedCount;
+      }
+    } catch {}
+  }
+
   return {
     hasSubscription: true,
     subscriptionId: sub.id,

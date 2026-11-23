@@ -17,7 +17,9 @@ import {
   Clock,
   AlertCircle,
   Zap,
+  Star,
 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import { UpgradeBanner } from '@/components/common/UpgradePromptModal'
 
@@ -132,6 +134,7 @@ export default function PostJob() {
     salaryMin: 0,
     salaryMax: 0,
     description: '',
+    isFeatured: false,
   })
 
   // Degree Picker State
@@ -149,6 +152,14 @@ export default function PostJob() {
   const [isAiRefreshing, setIsAiRefreshing] = useState(false)
   const [isEmployerApproved, setIsEmployerApproved] = useState<boolean | null>(null)
   const [subSummary, setSubSummary] = useState<any>(null)
+  const [featuredQuota, setFeaturedQuota] = useState<{
+    limit: number
+    used: number
+    remaining: number
+    isUnlimited: boolean
+    canFeature: boolean
+    packageName: string
+  } | null>(null)
 
   useEffect(() => {
     // Check employer verification status
@@ -167,6 +178,16 @@ export default function PostJob() {
       .then((res) => {
         if (res.data?.data) {
           setSubSummary(res.data.data)
+        }
+      })
+      .catch(() => null)
+
+    // Check featured job quota for this employer
+    employerAPI
+      .getFeaturedQuota()
+      .then((res) => {
+        if (res.data?.data) {
+          setFeaturedQuota(res.data.data)
         }
       })
       .catch(() => null)
@@ -379,6 +400,7 @@ Benefits & Compensation:
         salaryPeriod: 'MONTHLY',
         description: form.description || `${form.title} role at Career Wings.`,
         skills: skills,
+        isFeatured: form.isFeatured,
       }
 
       const res = await employerAPI.createJob(payload)
@@ -1063,6 +1085,99 @@ Benefits & Compensation:
                 placeholder="Describe the role, responsibilities, requirements and perks..."
                 className="w-full px-4 py-3 rounded-2xl border border-slate-200 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-colors"
               />
+            </div>
+
+            {/* Featured Job Package Option */}
+            <div
+              className={cn(
+                'p-5 rounded-2xl border transition-all',
+                form.isFeatured
+                  ? 'bg-amber-500/5 border-amber-300 ring-2 ring-amber-500/20'
+                  : 'bg-white border-slate-200/90 hover:border-slate-300'
+              )}
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-3.5">
+                  <div
+                    className={cn(
+                      'w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors',
+                      form.isFeatured
+                        ? 'bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-500'
+                    )}
+                  >
+                    <Star className={cn('w-5 h-5', form.isFeatured ? 'fill-white' : '')} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-bold text-slate-900">
+                        Feature this Job on Homepage & Top of Search
+                      </h3>
+                      {form.isFeatured && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1 max-w-xl leading-relaxed">
+                      Featured jobs appear on the Career Wings homepage and are pinned to the top of candidate searches, generating up to 5x more applications.
+                    </p>
+
+                    {/* Quota Status */}
+                    <div className="mt-2 text-xs">
+                      {featuredQuota ? (
+                        featuredQuota.limit <= 0 ? (
+                          <div className="flex items-center gap-2 text-slate-500">
+                            <span className="text-rose-600 font-semibold">
+                              Not included in {featuredQuota.packageName}
+                            </span>
+                            <span>•</span>
+                            <button
+                              type="button"
+                              onClick={() => navigate('/employer/subscription')}
+                              className="text-amber-600 hover:text-amber-700 font-bold underline cursor-pointer"
+                            >
+                              Upgrade package to unlock
+                            </button>
+                          </div>
+                        ) : featuredQuota.canFeature ? (
+                          <span className="text-emerald-700 font-medium">
+                            ✓ {featuredQuota.isUnlimited ? 'Unlimited' : `${featuredQuota.remaining} of ${featuredQuota.limit}`} featured slots remaining in your {featuredQuota.packageName} plan
+                          </span>
+                        ) : (
+                          <div className="flex items-center gap-2 text-rose-600 font-medium">
+                            <span>All {featuredQuota.limit} featured slots used in your {featuredQuota.packageName} plan</span>
+                            <span>•</span>
+                            <button
+                              type="button"
+                              onClick={() => navigate('/employer/subscription')}
+                              className="text-amber-600 hover:text-amber-700 font-bold underline cursor-pointer"
+                            >
+                              Upgrade Plan
+                            </button>
+                          </div>
+                        )
+                      ) : (
+                        <span className="text-slate-400">Checking package limits...</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Toggle switch */}
+                <div className="self-start sm:self-center shrink-0">
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={form.isFeatured}
+                      disabled={!featuredQuota || !featuredQuota.canFeature}
+                      onChange={(e) => setForm({ ...form, isFeatured: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500 peer-disabled:opacity-40 peer-disabled:cursor-not-allowed"></div>
+                  </label>
+                </div>
+              </div>
             </div>
 
             {/* Admin Approval Notice Banner */}
