@@ -28,23 +28,55 @@ declare global {
 
 const loadRazorpaySDK = (): Promise<boolean> => {
   return new Promise((resolve) => {
-    if (typeof window !== 'undefined' && window.Razorpay) {
+    if (typeof window === 'undefined') {
+      resolve(false)
+      return
+    }
+    // If Razorpay SDK is already loaded and ready
+    if (window.Razorpay) {
       resolve(true)
       return
     }
-    const existing = document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]')
-    if (existing) {
-      existing.addEventListener('load', () => resolve(true))
-      existing.addEventListener('error', () => resolve(false))
-      if (window.Razorpay) resolve(true)
-      return
+
+    let isDone = false
+    const finish = (result: boolean) => {
+      if (!isDone) {
+        isDone = true
+        clearInterval(pollInterval)
+        clearTimeout(safetyTimer)
+        resolve(result)
+      }
     }
-    const script = document.createElement('script')
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js'
-    script.async = true
-    script.onload = () => resolve(true)
-    script.onerror = () => resolve(false)
-    document.body.appendChild(script)
+
+    // Safety timeout: 4.5 seconds max so checkout button never freezes indefinitely
+    const safetyTimer = setTimeout(() => {
+      finish(!!window.Razorpay)
+    }, 4500)
+
+    // Periodic check every 100ms in case the script tag in index.html is parsing
+    const pollInterval = setInterval(() => {
+      if (window.Razorpay) {
+        finish(true)
+      }
+    }, 100)
+
+    // Find or inject script
+    let script = document.querySelector<HTMLScriptElement>(
+      'script[src="https://checkout.razorpay.com/v1/checkout.js"]'
+    )
+    if (!script) {
+      script = document.createElement('script')
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+      script.async = true
+      document.body.appendChild(script)
+    }
+
+    script.addEventListener('load', () => {
+      setTimeout(() => finish(!!window.Razorpay), 100)
+    })
+    script.addEventListener('error', () => {
+      finish(false)
+    })
   })
 }
 
@@ -60,7 +92,8 @@ export default function Checkout() {
   const [appliedDiscount, setAppliedDiscount] = useState(0)
   const [validatingCoupon, setValidatingCoupon] = useState(false)
   const [processingPayment, setProcessingPayment] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [pageError, setPageError] = useState<string | null>(null)
+  const [paymentError, setPaymentError] = useState<string | null>(null)
   const [gatewayConfig, setGatewayConfig] = useState<{
     keyId: string
     mode: string
@@ -90,7 +123,7 @@ export default function Checkout() {
         if (found) {
           const pkgType = String(found.type).toUpperCase()
           if (user && user.role !== 'ADMIN' && user.role !== pkgType) {
-            setError(
+            setPageError(
               user.role === 'CANDIDATE'
                 ? 'This package is for Employer accounts only. As a Job Seeker, please select an official Candidate package.'
                 : 'This package is for Job Seekers only. As an Employer, please select an Employer recruitment package.'
@@ -99,7 +132,7 @@ export default function Checkout() {
             setPkg(found)
           }
         } else {
-          setError('Selected package was not found.')
+          setPageError('Selected package was not found.')
         }
 
         if (configRes?.data?.data) {
@@ -107,7 +140,7 @@ export default function Checkout() {
         }
       } catch (err) {
         console.error(err)
-        setError('Failed to load package details.')
+        setPageError('Failed to load package details.')
       } finally {
         setLoading(false)
       }
@@ -121,7 +154,7 @@ export default function Checkout() {
     if (!couponCode.trim() || !packageId) return
 
     setValidatingCoupon(true)
-    setError(null)
+    setPaymentError(null)
 
     try {
       const res = await paymentsAPI.validateCoupon(couponCode, packageId)
@@ -159,7 +192,7 @@ export default function Checkout() {
   const handlePayment = async () => {
     if (!pkg) return
     setProcessingPayment(true)
-    setError(null)
+    setPaymentError(null)
     setShowSandboxFallback(false)
 
     try {
@@ -182,13 +215,20 @@ export default function Checkout() {
       // 3. Ensure Razorpay SDK is loaded
       const isSdkLoaded = await loadRazorpaySDK()
       if (!isSdkLoaded || typeof window.Razorpay === 'undefined') {
-        toast.error('Could not connect to Razorpay SDK. You can complete via Test Sandbox.')
+        const errorMsg =
+          'Could not load Razorpay checkout (often blocked by browser ad-blockers or privacy shields). Please disable ad-blocker for careerwings.in or use the test simulation below.'
+        toast.error(errorMsg, { duration: 6000 })
+        setPaymentError(errorMsg)
         setShowSandboxFallback(true)
         setProcessingPayment(false)
         return
       }
 
-      const activeKey = keyId || gatewayConfig?.keyId || import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_your_key_id'
+      const activeKey =
+        keyId ||
+        gatewayConfig?.keyId ||
+        import.meta.env.VITE_RAZORPAY_KEY_ID ||
+        'rzp_live_U1yVTntRzK7jfm'
 
       // 4. Configure Razorpay checkout options
       const options: any = {
@@ -197,9 +237,10 @@ export default function Checkout() {
         currency: 'INR',
         name: 'Career Wings',
         description: `${pkg.name} Plan Subscription`,
-        image: '/favicon.png',
+        image: 'https://careerwings.in/favicon.png',
         handler: async (response: any) => {
           try {
+            setProcessingPayment(true)
             toast.loading('Verifying transaction with Razorpay...', { id: 'verify-toast' })
             await paymentsAPI.verifyPayment({
               razorpayOrderId: response.razorpay_order_id || orderId,
@@ -244,19 +285,29 @@ export default function Checkout() {
 
         rzp.on('payment.failed', function (response: any) {
           setProcessingPayment(false)
-          toast.error(`Payment failed: ${response.error?.description || 'Transaction declined'}`)
+          const failMsg = response.error?.description || 'Transaction declined by bank/gateway'
+          setPaymentError(`Payment failed: ${failMsg}`)
+          toast.error(`Payment failed: ${failMsg}`)
         })
 
         rzp.open()
+        // Automatically release button loading state after 1.5s so user is never frozen
+        setTimeout(() => {
+          setProcessingPayment(false)
+        }, 1500)
       } catch (sdkError: any) {
         console.warn('Razorpay open failed, showing sandbox fallback:', sdkError)
         setShowSandboxFallback(true)
+        setPaymentError('Could not launch payment dialog. Please allow popups or use instant test simulation.')
         setProcessingPayment(false)
       }
     } catch (err: any) {
       console.error('Payment initiation error:', err)
-      const errorMsg = err.response?.data?.message || 'Payment initiation failed'
-      setError(errorMsg)
+      const errorMsg =
+        err.response?.data?.message ||
+        err?.message ||
+        'Payment initiation failed. Please check your connection or contact support.'
+      setPaymentError(errorMsg)
       toast.error(errorMsg)
       setShowSandboxFallback(true)
       setProcessingPayment(false)
@@ -275,13 +326,13 @@ export default function Checkout() {
     )
   }
 
-  if (error || !pkg) {
+  if (pageError || !pkg) {
     return (
       <div className="min-h-screen flex flex-col bg-slate-50">
         <Header />
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
           <AlertCircle className="w-12 h-12 text-red-500 mb-3" />
-          <h2 className="text-xl font-bold text-slate-900 mb-2 max-w-lg">{error || 'Package not found'}</h2>
+          <h2 className="text-xl font-bold text-slate-900 mb-2 max-w-lg">{pageError || 'Package not found'}</h2>
           <div className="flex items-center gap-3 mt-4">
             <Link
               to={user?.role === 'EMPLOYER' ? '/employer/subscription' : '/subscription'}
@@ -331,6 +382,17 @@ export default function Checkout() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Main Checkout Area */}
           <div className="md:col-span-2 space-y-6">
+            {/* Payment Error Banner if any */}
+            {paymentError && (
+              <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 flex items-start gap-3 shadow-xs">
+                <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                <div className="text-xs space-y-1">
+                  <strong className="text-sm font-bold block text-rose-950">Payment Gateway Notice</strong>
+                  <p className="leading-relaxed">{paymentError}</p>
+                </div>
+              </div>
+            )}
+
             {/* Package Details Card */}
             <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
               <h2 className="text-base font-bold text-slate-900 mb-4 pb-3 border-b border-slate-100">
