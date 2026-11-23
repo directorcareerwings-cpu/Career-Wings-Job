@@ -26,6 +26,9 @@
     "db:restore": "pnpm --filter career-wings-server db:restore",
     "db:studio": "pnpm --filter career-wings-server db:studio"
   },
+  "dependencies": {
+    "razorpay": "^2.9.2"
+  },
   "devDependencies": {
     "concurrently": "^8.2.2"
   }

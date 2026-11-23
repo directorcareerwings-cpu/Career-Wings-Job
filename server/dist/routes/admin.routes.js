@@ -57,6 +57,87 @@ router.get('/candidates/:id', async (req, res, next) => {
     }
 });
 router.put('/candidates/:id/status', admin_controller_1.toggleCandidateStatus);
+async function deleteCandidatesInternal(candidateIds) {
+    if (!candidateIds || candidateIds.length === 0)
+        return 0;
+    const candidates = await prisma_1.prisma.candidate.findMany({
+        where: { id: { in: candidateIds } },
+        select: { id: true, userId: true },
+    });
+    if (candidates.length === 0)
+        return 0;
+    const validCandidateIds = candidates.map((c) => c.id);
+    const userIds = candidates.map((c) => c.userId).filter(Boolean);
+    await prisma_1.prisma.$transaction(async (tx) => {
+        // 1. Delete Candidate relational records
+        await tx.candidateSkill.deleteMany({ where: { candidateId: { in: validCandidateIds } } });
+        await tx.candidateLanguage.deleteMany({ where: { candidateId: { in: validCandidateIds } } });
+        await tx.certification.deleteMany({ where: { candidateId: { in: validCandidateIds } } });
+        await tx.education.deleteMany({ where: { candidateId: { in: validCandidateIds } } });
+        await tx.experience.deleteMany({ where: { candidateId: { in: validCandidateIds } } });
+        await tx.application.deleteMany({ where: { candidateId: { in: validCandidateIds } } });
+        await tx.savedJob.deleteMany({ where: { candidateId: { in: validCandidateIds } } });
+        await tx.jobAlert.deleteMany({ where: { candidateId: { in: validCandidateIds } } });
+        await tx.savedCandidate.deleteMany({ where: { candidateId: { in: validCandidateIds } } });
+        await tx.resumeSearchLog.deleteMany({ where: { candidateId: { in: validCandidateIds } } });
+        // Conversations & chat messages
+        const conversations = await tx.conversation.findMany({
+            where: { candidateId: { in: validCandidateIds } },
+            select: { id: true },
+        });
+        if (conversations.length > 0) {
+            const convoIds = conversations.map((cv) => cv.id);
+            await tx.chatMessage.deleteMany({ where: { conversationId: { in: convoIds } } });
+            await tx.conversation.deleteMany({ where: { id: { in: convoIds } } });
+        }
+        // 2. User relations
+        if (userIds.length > 0) {
+            await tx.chatMessage.deleteMany({ where: { senderId: { in: userIds } } });
+            await tx.refreshToken.deleteMany({ where: { userId: { in: userIds } } });
+            await tx.notification.deleteMany({ where: { userId: { in: userIds } } });
+            await tx.passwordReset.deleteMany({ where: { userId: { in: userIds } } });
+            await tx.emailLog.deleteMany({ where: { userId: { in: userIds } } });
+            await tx.otpVerification.deleteMany({ where: { userId: { in: userIds } } });
+            await tx.auditLog.deleteMany({ where: { userId: { in: userIds } } });
+            await tx.subscription.deleteMany({ where: { userId: { in: userIds } } });
+            await tx.payment.deleteMany({ where: { userId: { in: userIds } } });
+        }
+        // 3. Delete Candidate
+        await tx.candidate.deleteMany({ where: { id: { in: validCandidateIds } } });
+        // 4. Delete User
+        if (userIds.length > 0) {
+            await tx.user.deleteMany({ where: { id: { in: userIds } } });
+        }
+    });
+    return validCandidateIds.length;
+}
+// Bulk delete candidates
+router.post('/candidates/bulk-delete', async (req, res, next) => {
+    try {
+        const { candidateIds } = req.body;
+        if (!Array.isArray(candidateIds) || candidateIds.length === 0) {
+            throw new errors_1.AppError('candidateIds array is required', 400);
+        }
+        const count = await deleteCandidatesInternal(candidateIds);
+        (0, response_1.sendSuccess)(res, { count }, `${count} candidate(s) deleted successfully`);
+    }
+    catch (error) {
+        next(error);
+    }
+});
+// Delete single candidate
+router.delete('/candidates/:id', async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const count = await deleteCandidatesInternal([id]);
+        if (count === 0)
+            throw new errors_1.AppError('Candidate not found', 404);
+        (0, response_1.sendSuccess)(res, null, 'Candidate and account deleted successfully');
+    }
+    catch (error) {
+        next(error);
+    }
+});
 // Employers
 router.get('/employers', admin_controller_1.getAdminEmployers);
 router.get('/employers/:id', async (req, res, next) => {

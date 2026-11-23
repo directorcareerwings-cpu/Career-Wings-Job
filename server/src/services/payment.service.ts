@@ -74,23 +74,141 @@ export const getRazorpayConfig = async (): Promise<RazorpayGatewayConfig> => {
   }
 };
 
+async function callRazorpayREST(
+  endpoint: string,
+  options: {
+    method?: string;
+    body?: any;
+    keyId: string;
+    keySecret: string;
+  }
+): Promise<any> {
+  const auth = Buffer.from(`${options.keyId}:${options.keySecret}`).toString('base64');
+  const url = `https://api.razorpay.com/v1${endpoint}`;
+
+  if (typeof fetch === 'function') {
+    const res = await fetch(url, {
+      method: options.method || 'GET',
+      headers: {
+        Authorization: `Basic ${auth}`,
+        'Content-Type': 'application/json',
+      },
+      body: options.body ? JSON.stringify(options.body) : undefined,
+    });
+    const data: any = await res.json();
+    if (!res.ok) {
+      throw new Error(data?.error?.description || data?.message || `Razorpay API error HTTP ${res.status}`);
+    }
+    return data;
+  }
+
+  // Node.js https fallback
+  return new Promise((resolve, reject) => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const https = require('https');
+    const urlObj = new URL(url);
+    const postData = options.body ? JSON.stringify(options.body) : null;
+    const req = https.request(
+      {
+        hostname: urlObj.hostname,
+        path: urlObj.pathname + urlObj.search,
+        method: options.method || 'GET',
+        headers: {
+          Authorization: `Basic ${auth}`,
+          'Content-Type': 'application/json',
+          ...(postData ? { 'Content-Length': Buffer.byteLength(postData) } : {}),
+        },
+      },
+      (res: any) => {
+        let raw = '';
+        res.on('data', (chunk: any) => {
+          raw += chunk;
+        });
+        res.on('end', () => {
+          try {
+            const parsed = JSON.parse(raw);
+            if (res.statusCode >= 200 && res.statusCode < 300) {
+              resolve(parsed);
+            } else {
+              reject(new Error(parsed?.error?.description || parsed?.message || `Razorpay error HTTP ${res.statusCode}`));
+            }
+          } catch {
+            reject(new Error(`Failed to parse Razorpay response: ${raw.slice(0, 100)}`));
+          }
+        });
+      }
+    );
+    req.on('error', reject);
+    if (postData) req.write(postData);
+    req.end();
+  });
+}
+
+export class NativeRazorpayClient {
+  private keyId: string;
+  private keySecret: string;
+
+  constructor(options: { key_id: string; key_secret: string }) {
+    this.keyId = options.key_id;
+    this.keySecret = options.key_secret;
+  }
+
+  orders = {
+    create: async (params: { amount: number; currency: string; receipt?: string; notes?: any }) => {
+      return callRazorpayREST('/orders', {
+        method: 'POST',
+        body: params,
+        keyId: this.keyId,
+        keySecret: this.keySecret,
+      });
+    },
+    all: async (params?: { count?: number; skip?: number }) => {
+      const q = params?.count ? `?count=${params.count}` : '';
+      return callRazorpayREST(`/orders${q}`, {
+        method: 'GET',
+        keyId: this.keyId,
+        keySecret: this.keySecret,
+      });
+    },
+    fetch: async (orderId: string) => {
+      return callRazorpayREST(`/orders/${orderId}`, {
+        method: 'GET',
+        keyId: this.keyId,
+        keySecret: this.keySecret,
+      });
+    },
+  };
+
+  payments = {
+    fetch: async (paymentId: string) => {
+      return callRazorpayREST(`/payments/${paymentId}`, {
+        method: 'GET',
+        keyId: this.keyId,
+        keySecret: this.keySecret,
+      });
+    },
+    capture: async (paymentId: string, amount: number, currency: string = 'INR') => {
+      return callRazorpayREST(`/payments/${paymentId}/capture`, {
+        method: 'POST',
+        body: { amount, currency },
+        keyId: this.keyId,
+        keySecret: this.keySecret,
+      });
+    },
+  };
+}
+
 export const getRazorpayClient = async (): Promise<any> => {
   if (cachedRazorpayClient) return cachedRazorpayClient;
   const config = await getRazorpayConfig();
 
   if (config.keyId && config.keyId !== 'rzp_test_your_key_id' && config.keySecret) {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const Razorpay = require('razorpay');
-      cachedRazorpayClient = new Razorpay({
-        key_id: config.keyId,
-        key_secret: config.keySecret,
-      });
-      return cachedRazorpayClient;
-    } catch (e) {
-      console.warn('[PAYMENT] Razorpay client initialization error:', e);
-      return null;
-    }
+    // Pure native client with zero external dependencies (no 'razorpay' or 'axios' required)
+    cachedRazorpayClient = new NativeRazorpayClient({
+      key_id: config.keyId,
+      key_secret: config.keySecret,
+    });
+    return cachedRazorpayClient;
   }
   return null;
 };
@@ -118,10 +236,10 @@ export const testRazorpayConnection = async (
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Razorpay = require('razorpay');
-    const client = new Razorpay({ key_id: keyId, key_secret: keySecret });
+    // Pure native client: eliminates any "Cannot find module 'axios'" or "'razorpay'" errors
+    const client = new NativeRazorpayClient({ key_id: keyId, key_secret: keySecret });
     const response = await client.orders.all({ count: 1 });
+
     return {
       success: true,
       message: `Successfully connected to Razorpay API (${keyId.startsWith('rzp_live') ? 'Live Mode' : 'Test Mode'}).`,
