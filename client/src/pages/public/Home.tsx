@@ -152,15 +152,10 @@ function HeroSection() {
   const heroBannerUrl = publicSettings?.HERO_IMAGE_URL
 
   return (
-    <section className="relative bg-gradient-to-b from-[#F0F6FE] via-[#E8F2FC] to-[#F3F8FE] text-slate-900 pt-6 pb-14 md:pt-8 md:pb-20 overflow-hidden border-b border-blue-100">
-      {/* Soft ambient light glow blobs */}
-      <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-blue-300/25 rounded-full blur-[130px] pointer-events-none" />
-      <div className="absolute top-1/3 right-1/4 w-[450px] h-[450px] bg-sky-200/35 rounded-full blur-[130px] pointer-events-none" />
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#0284c70a_1px,transparent_1px),linear-gradient(to_bottom,#0284c70a_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none" />
-
+    <section className="relative bg-[#F8FAFC] text-slate-900 pt-6 pb-14 md:pt-8 md:pb-20 border-b border-slate-200/70">
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 z-10">
         {/* Hero Banner */}
-        <div className="relative w-full rounded-2xl md:rounded-3xl overflow-hidden shadow-xl shadow-blue-900/10 border border-blue-100 bg-white mb-6 md:mb-8">
+        <div className="relative w-full rounded-2xl md:rounded-3xl overflow-hidden shadow-sm border border-slate-200/80 bg-white mb-6 md:mb-8">
           {heroBannerUrl ? (
             <img
               src={heroBannerUrl}
@@ -232,7 +227,7 @@ function HeroSection() {
         </div>
 
         {/* Elevated Search Bar */}
-        <div className="w-full bg-white rounded-2xl shadow-xl shadow-blue-900/8 border border-blue-100/90 p-1.5 sm:p-2">
+        <div className="w-full bg-white rounded-2xl shadow-sm border border-slate-200/80 p-1.5 sm:p-2">
           <form onSubmit={handleSearch}>
             <div className="flex flex-col md:flex-row gap-1.5">
 
@@ -326,7 +321,7 @@ function HeroSection() {
                 setKeyword(tag)
                 navigate(`/jobs?keyword=${encodeURIComponent(tag)}`)
               }}
-              className="bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 font-medium px-3 py-1 rounded-full border border-blue-200/80 shadow-xs hover:border-blue-300 transition-all cursor-pointer"
+              className="bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 font-medium px-3 py-1 rounded-full border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-all cursor-pointer"
             >
               {tag}
             </button>
@@ -363,7 +358,7 @@ function HeroSection() {
           ].map(({ label, value, icon, bg }) => (
             <div
               key={label}
-              className="bg-white/95 backdrop-blur-md border border-blue-100 hover:border-blue-200 hover:shadow-md rounded-xl px-3 py-2.5 sm:px-4 sm:py-3 flex items-center gap-3 transition-all duration-200 group"
+              className="bg-white border border-slate-200/70 hover:border-slate-300 hover:shadow-sm rounded-xl px-3 py-2.5 sm:px-4 sm:py-3 flex items-center gap-3 transition-all duration-200 group"
             >
               <div className={`w-9 h-9 rounded-lg ${bg} border flex items-center justify-center shrink-0 transition-transform group-hover:scale-105`}>
                 {icon}
@@ -516,21 +511,17 @@ function PopularCategories() {
   const serverCategories: Category[] = data?.data?.data || []
 
   return (
-    <section className="py-16 bg-[#0D1117] relative overflow-hidden">
-      {/* Decorative glows */}
-      <div className="absolute top-0 right-1/3 w-72 h-72 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 left-1/4 w-64 h-64 bg-indigo-500/8 rounded-full blur-3xl pointer-events-none" />
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+    <section className="py-16 bg-[#F8FAFC] border-y border-slate-200/70">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-2xl mx-auto mb-12">
-          <div className="inline-flex items-center gap-1.5 text-orange-400 font-semibold text-xs tracking-wider uppercase mb-2">
-            <Briefcase className="h-3.5 w-3.5" /> Industry Sectors
+          <div className="inline-flex items-center gap-1.5 text-orange-600 font-semibold text-xs tracking-wider uppercase mb-2">
+            <Briefcase className="h-3.5 w-3.5 text-orange-500" /> Industry Sectors
           </div>
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">
             Browse Jobs by{' '}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-400">Top Industry</span>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-amber-600">Top Industry</span>
           </h2>
-          <p className="text-gray-400 text-sm sm:text-base mt-2">
+          <p className="text-slate-600 text-sm sm:text-base mt-2">
             Find the right match in your professional domain with tailored requirements and salary packages.
           </p>
         </div>
@@ -540,32 +531,32 @@ function PopularCategories() {
             <Link
               key={cat.slug}
               to={`/jobs?category=${encodeURIComponent(cat.slug)}`}
-              className="group relative bg-white/5 rounded-2xl p-5 border border-white/10 hover:border-white/25 hover:bg-white/8 hover:shadow-2xl transition-all duration-300 flex flex-col justify-between overflow-hidden"
+              className="group bg-white rounded-2xl p-5 border border-slate-200/80 hover:border-slate-300 hover:shadow-md transition-all duration-200 flex flex-col justify-between"
             >
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <div className={`h-12 w-12 rounded-xl bg-gradient-to-br ${cat.color} flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform duration-200`}>
+                  <div className={`h-12 w-12 rounded-xl bg-gradient-to-br ${cat.color} flex items-center justify-center text-white shadow-xs group-hover:scale-105 transition-transform duration-200`}>
                     {cat.icon}
                   </div>
-                  <span className="text-xs font-bold text-gray-400 bg-white/5 border border-white/10 px-2.5 py-1 rounded-full">
+                  <span className="text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200/70 px-2.5 py-1 rounded-full">
                     {cat.count}
                   </span>
                 </div>
 
-                <h3 className="font-bold text-base text-white group-hover:text-orange-400 transition-colors">
+                <h3 className="font-bold text-base text-slate-900 group-hover:text-blue-600 transition-colors">
                   {cat.name}
                 </h3>
 
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {cat.popular.slice(0, 3).map((p) => (
-                    <span key={p} className="text-[11px] text-gray-500 bg-white/5 px-2 py-0.5 rounded-md">
+                    <span key={p} className="text-[11px] text-slate-500 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-md font-medium">
                       {p}
                     </span>
                   ))}
                 </div>
               </div>
 
-              <div className="mt-5 pt-3 border-t border-white/10 flex items-center justify-between text-xs font-semibold text-gray-400 group-hover:text-orange-400 transition-colors">
+              <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-slate-500 group-hover:text-blue-600 transition-colors">
                 <span>View Openings</span>
                 <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
               </div>
@@ -575,7 +566,7 @@ function PopularCategories() {
 
         <div className="text-center mt-10">
           <Link to="/categories">
-            <button className="bg-white/5 hover:bg-white/10 border border-white/15 hover:border-white/25 text-white font-semibold px-8 py-3 rounded-xl transition-colors text-sm">
+            <button className="bg-white hover:bg-slate-50 border border-slate-300 hover:border-slate-400 text-slate-800 font-semibold px-8 py-3 rounded-xl transition-colors text-sm shadow-xs cursor-pointer">
               View All 25+ Categories
             </button>
           </Link>
@@ -635,16 +626,16 @@ function HowItWorks() {
   const steps = role === 'candidate' ? candidateSteps : employerSteps
 
   return (
-    <section className="py-16 bg-white border-y border-gray-100">
+    <section className="py-16 bg-[#F8FAFC] border-y border-slate-200/70">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-xl mx-auto mb-10">
-          <div className="inline-flex items-center gap-1.5 text-accent-600 font-semibold text-xs tracking-wider uppercase mb-2">
-            <Zap className="h-3.5 w-3.5" /> Simple 3-Step Process
+          <div className="inline-flex items-center gap-1.5 text-orange-600 font-semibold text-xs tracking-wider uppercase mb-2">
+            <Zap className="h-3.5 w-3.5 text-orange-500" /> Simple 3-Step Process
           </div>
-          <h2 className="font-display text-2xl sm:text-3xl md:text-4xl font-bold text-primary-900">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">
             How Career Wings Works
           </h2>
-          <p className="text-gray-500 text-sm sm:text-base mt-2">
+          <p className="text-slate-600 text-sm sm:text-base mt-2">
             Fast, transparent, and built specifically for the Northeast job ecosystem.
           </p>
 
@@ -671,25 +662,25 @@ function HowItWorks() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
           {steps.map((s, idx) => (
             <div
               key={s.step}
-              className="bg-white rounded-2xl p-8 border border-gray-200 hover:border-blue-200 hover:shadow-xl transition-all duration-300 relative group border-l-4 border-l-blue-500"
+              className="bg-white rounded-2xl p-7 sm:p-8 border border-slate-200/80 hover:border-slate-300 hover:shadow-md transition-all duration-200 relative group"
             >
               <div className="flex items-center justify-between mb-6">
-                <div className="h-14 w-14 rounded-2xl bg-white shadow-md border border-gray-100 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <div className="h-14 w-14 rounded-2xl bg-slate-50 border border-slate-200/60 flex items-center justify-center group-hover:scale-105 transition-transform">
                   {s.icon}
                 </div>
-                <span className="font-display font-extrabold text-4xl text-gray-200 group-hover:text-accent-400/40 transition-colors">
+                <span className="font-display font-extrabold text-4xl text-slate-200 group-hover:text-orange-300 transition-colors">
                   {s.step}
                 </span>
               </div>
 
-              <h3 className="font-display font-bold text-xl text-gray-900 mb-2.5">
+              <h3 className="font-display font-bold text-lg sm:text-xl text-slate-900 mb-2.5">
                 {s.title}
               </h3>
-              <p className="text-sm text-gray-600 leading-relaxed">
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
                 {s.desc}
               </p>
             </div>
@@ -726,26 +717,23 @@ function TopCompanies() {
   const companies: Company[] = data?.data?.data || []
 
   return (
-    <section className="py-16 bg-gray-50 relative">
-      {/* Dot grid background */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle,#d1d5db_1px,transparent_1px)] [background-size:24px_24px] opacity-40 pointer-events-none" />
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+    <section className="py-16 bg-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 gap-4">
           <div>
-            <div className="inline-flex items-center gap-1.5 text-accent-600 font-semibold text-xs tracking-wider uppercase mb-1">
-              <Building2 className="h-3.5 w-3.5" /> Verified Enterprise Partners
+            <div className="inline-flex items-center gap-1.5 text-orange-600 font-semibold text-xs tracking-wider uppercase mb-1">
+              <Building2 className="h-3.5 w-3.5 text-orange-500" /> Verified Enterprise Partners
             </div>
-            <h2 className="font-display text-2xl sm:text-3xl font-bold text-primary-900">
+            <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
               Top Employers Actively Hiring
             </h2>
-            <p className="text-gray-500 text-sm mt-1">
+            <p className="text-slate-500 text-sm mt-1">
               Connect directly with trusted corporations and leading institutions in the Northeast.
             </p>
           </div>
           <Link
             to="/companies"
-            className="inline-flex items-center gap-1 text-accent-600 font-semibold text-sm hover:text-accent-700 self-start sm:self-auto"
+            className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 font-semibold text-sm self-start sm:self-auto transition-colors"
           >
             <span>View all companies</span>
             <ArrowRight className="h-4 w-4" />
@@ -753,7 +741,7 @@ function TopCompanies() {
         </div>
 
         {companies.length === 0 ? (
-          <div className="text-center py-12 px-4 rounded-2xl bg-white border border-gray-200/80 max-w-lg mx-auto shadow-xs">
+          <div className="text-center py-12 px-4 rounded-2xl bg-white border border-slate-200/80 max-w-lg mx-auto shadow-xs">
             <Building2 className="h-10 w-10 text-slate-300 mx-auto mb-2.5" />
             <h3 className="text-base font-semibold text-slate-800">Verified Companies</h3>
             <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
@@ -777,42 +765,42 @@ function TopCompanies() {
               return (
                 <div
                   key={comp.id || comp._id || comp.slug || comp.name}
-                  className="bg-white rounded-2xl p-5 border border-gray-200 hover:border-blue-300 hover:shadow-xl transition-all duration-300 flex flex-col justify-between"
+                  className="bg-slate-50/70 rounded-2xl p-5 border border-slate-200/80 hover:bg-white hover:border-slate-300 hover:shadow-md transition-all duration-200 flex flex-col justify-between"
                 >
                   <div>
                     <div className="flex items-start justify-between gap-3 mb-3">
                       {comp.logo ? (
-                        <img src={comp.logo} alt={comp.name} className="h-12 w-12 rounded-xl object-contain border border-gray-100 p-1" />
+                        <img src={comp.logo} alt={comp.name} className="h-12 w-12 rounded-xl object-contain border border-slate-100 p-1" />
                       ) : (
-                        <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-bold text-lg flex items-center justify-center shadow-sm">
+                        <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-bold text-lg flex items-center justify-center shadow-xs">
                           {initial}
                         </div>
                       )}
                       {comp.isVerified && (
-                        <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full flex items-center gap-1">
+                        <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full flex items-center gap-1 border border-emerald-200/60">
                           <ShieldCheck className="h-3.5 w-3.5" /> Verified
                         </span>
                       )}
                     </div>
 
-                    <h3 className="font-display font-bold text-base text-gray-900">{comp.name}</h3>
-                    <p className="text-xs text-gray-500 font-medium mt-0.5">{comp.industry || 'Corporate Partner'}</p>
+                    <h3 className="font-bold text-base text-slate-900">{comp.name}</h3>
+                    <p className="text-xs text-slate-500 font-medium mt-0.5">{comp.industry || 'Corporate Partner'}</p>
 
-                    <div className="flex items-center gap-3 mt-3 text-xs text-gray-500">
+                    <div className="flex items-center gap-3 mt-3 text-xs text-slate-500">
                       <span className="flex items-center gap-1">
-                        <MapPin className="h-3.5 w-3.5 text-gray-400" />
+                        <MapPin className="h-3.5 w-3.5 text-slate-400" />
                         {location}
                       </span>
                     </div>
                   </div>
 
-                  <div className="mt-5 pt-3 border-t border-gray-100 flex items-center justify-between">
-                    <span className="text-xs font-bold text-accent-600 bg-accent-50 px-2.5 py-1 rounded-md">
+                  <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-xs font-bold text-orange-600 bg-orange-50 border border-orange-200/60 px-2.5 py-1 rounded-md">
                       {openJobs}
                     </span>
                     <Link
                       to={`/jobs?keyword=${encodeURIComponent(comp.name)}`}
-                      className="text-xs font-bold text-primary-900 hover:text-accent-600 flex items-center gap-1 transition-colors"
+                      className="text-xs font-bold text-slate-900 hover:text-blue-600 flex items-center gap-1 transition-colors"
                     >
                       <span>Explore</span>
                       <ChevronRight className="h-3.5 w-3.5" />
@@ -833,43 +821,39 @@ function TopCompanies() {
 function WhyCareerWings() {
   const perks = [
     {
-      icon: <Globe className="h-6 w-6 text-blue-400" />,
+      icon: <Globe className="h-6 w-6 text-blue-600" />,
       title: 'Dedicated Northeast Focus',
       desc: 'The only portal built tailored for Assam, Meghalaya, Tripura, Sikkim, Nagaland, Arunachal, Manipur, & Mizoram.',
     },
     {
-      icon: <ShieldCheck className="h-6 w-6 text-emerald-400" />,
+      icon: <ShieldCheck className="h-6 w-6 text-emerald-600" />,
       title: '100% Verified Employers',
       desc: 'Every company is manually verified with GST & business credentials to protect job seekers from fake consultancies.',
     },
     {
-      icon: <Zap className="h-6 w-6 text-amber-400" />,
+      icon: <Zap className="h-6 w-6 text-amber-500" />,
       title: 'Instant WhatsApp & SMS Alerts',
       desc: 'Never miss an opening. Get real-time alert updates matching your preferred role and salary criteria.',
     },
     {
-      icon: <Award className="h-6 w-6 text-purple-400" />,
+      icon: <Award className="h-6 w-6 text-purple-600" />,
       title: 'Transparent Salaries & Perks',
       desc: 'Filter jobs with clear in-hand salary ranges in INR, health insurance coverage, and PF benefits.',
     },
   ]
 
   return (
-    <section className="py-16 bg-[#0A2540] text-white relative overflow-hidden">
-      {/* Animated radial glows */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(249,115,22,0.12),transparent_55%)] pointer-events-none" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,rgba(59,130,246,0.10),transparent_55%)] pointer-events-none" />
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+    <section className="py-16 bg-[#F8FAFC] border-y border-slate-200/70">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-2xl mx-auto mb-12">
-          <div className="inline-flex items-center gap-1.5 text-orange-400 font-semibold text-xs tracking-wider uppercase mb-2">
-            <Sparkles className="h-3.5 w-3.5" /> The Career Wings Advantage
+          <div className="inline-flex items-center gap-1.5 text-orange-600 font-semibold text-xs tracking-wider uppercase mb-2">
+            <Sparkles className="h-3.5 w-3.5 text-orange-500" /> The Career Wings Advantage
           </div>
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">
             Why Professionals Choose{' '}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-400">Career Wings</span>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-amber-600">Career Wings</span>
           </h2>
-          <p className="text-gray-400 text-sm sm:text-base mt-2">
+          <p className="text-slate-600 text-sm sm:text-base mt-2">
             Empowering regional talent with transparent hiring and premier career opportunities.
           </p>
         </div>
@@ -878,13 +862,13 @@ function WhyCareerWings() {
           {perks.map((p) => (
             <div
               key={p.title}
-              className="bg-white/5 border border-white/10 rounded-2xl p-6 hover:bg-white/8 hover:border-white/20 hover:shadow-2xl transition-all duration-200 group"
+              className="bg-white border border-slate-200/80 rounded-2xl p-6 hover:border-slate-300 hover:shadow-md transition-all duration-200 group"
             >
-              <div className="h-12 w-12 rounded-xl bg-white/10 group-hover:bg-white/15 flex items-center justify-center mb-4 transition-colors">
+              <div className="h-12 w-12 rounded-xl bg-slate-50 shadow-2xs border border-slate-200/60 flex items-center justify-center mb-4 transition-transform group-hover:scale-105">
                 {p.icon}
               </div>
-              <h3 className="font-bold text-lg mb-2 text-white">{p.title}</h3>
-              <p className="text-sm text-gray-400 leading-relaxed">{p.desc}</p>
+              <h3 className="font-bold text-base text-slate-900 mb-2">{p.title}</h3>
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">{p.desc}</p>
             </div>
           ))}
         </div>
@@ -936,10 +920,10 @@ function Testimonials() {
           <div className="inline-flex items-center gap-1.5 text-orange-500 font-semibold text-xs tracking-wider uppercase mb-2">
             <Star className="h-3.5 w-3.5 fill-orange-500" /> Success Stories
           </div>
-          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900">
+          <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
             Real Stories from Northeast Professionals
           </h2>
-          <p className="text-gray-500 text-sm mt-2">
+          <p className="text-slate-500 text-sm mt-2">
             See how thousands of job seekers and hiring teams achieved their goals with Career Wings.
           </p>
         </div>
@@ -948,7 +932,7 @@ function Testimonials() {
           {testimonials.map((t, i) => (
             <div
               key={t.name}
-              className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-xl transition-all duration-200 flex flex-col justify-between relative overflow-hidden"
+              className="bg-slate-50/70 rounded-2xl p-6 border border-slate-200/80 shadow-2xs hover:shadow-md hover:bg-white hover:border-slate-300 transition-all duration-200 flex flex-col justify-between relative overflow-hidden"
             >
               {/* Top color accent bar */}
               <div className={`absolute top-0 left-0 right-0 h-1 ${['bg-blue-500', 'bg-emerald-500', 'bg-orange-500'][i % 3]
@@ -956,30 +940,30 @@ function Testimonials() {
 
               <div>
                 {/* Large decorative quote */}
-                <div className="text-6xl text-gray-100 font-serif leading-none mb-1 select-none -ml-1">"</div>
+                <div className="text-6xl text-slate-200 font-serif leading-none mb-1 select-none -ml-1">"</div>
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex gap-0.5 text-amber-400">
                     {[...Array(t.rating)].map((_, ri) => (
                       <Star key={ri} className="h-3.5 w-3.5 fill-current" />
                     ))}
                   </div>
-                  <span className="text-[11px] font-semibold text-orange-600 bg-orange-50 px-2.5 py-0.5 rounded-full">
+                  <span className="text-[11px] font-semibold text-orange-600 bg-orange-50 px-2.5 py-0.5 rounded-full border border-orange-200/60">
                     {t.tag}
                   </span>
                 </div>
-                <p className="text-gray-700 text-sm leading-relaxed mb-6">
+                <p className="text-slate-700 text-sm leading-relaxed mb-6">
                   {t.quote}
                 </p>
               </div>
 
-              <div className="flex items-center gap-3 pt-4 border-t border-gray-100">
-                <div className={`h-10 w-10 rounded-full font-bold flex items-center justify-center text-sm shrink-0 text-white ${['bg-blue-600', 'bg-emerald-600', 'bg-orange-500'][i % 3]
+              <div className="flex items-center gap-3 pt-4 border-t border-slate-100">
+                <div className={`h-10 w-10 rounded-full font-bold flex items-center justify-center text-sm shrink-0 text-white shadow-2xs ${['bg-blue-600', 'bg-emerald-600', 'bg-orange-500'][i % 3]
                   }`}>
                   {t.avatar}
                 </div>
                 <div>
-                  <h4 className="font-bold text-sm text-gray-900">{t.name}</h4>
-                  <p className="text-xs text-gray-500">{t.role} • {t.company}</p>
+                  <h4 className="font-bold text-sm text-slate-900">{t.name}</h4>
+                  <p className="text-xs text-slate-500">{t.role} • {t.company}</p>
                 </div>
               </div>
             </div>
@@ -1007,15 +991,11 @@ function EmployerCTA() {
   }
 
   return (
-    <section className="py-16 bg-gradient-to-br from-[#0D1117] via-[#0a1628] to-[#0A2540] text-white relative overflow-hidden">
-      {/* Enhanced glow effects */}
-      <div className="absolute top-0 right-0 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+    <section className="py-16 bg-[#0A2540] text-white border-t border-slate-800">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
           {/* Employer Callout */}
-          <div className="lg:col-span-7 bg-white/8 backdrop-blur-md rounded-3xl p-8 sm:p-10 border border-white/15 hover:border-white/25 transition-colors">
+          <div className="lg:col-span-7 bg-white/5 rounded-3xl p-8 sm:p-10 border border-white/10 hover:border-white/20 transition-colors">
             <div className="inline-flex items-center gap-1.5 text-accent-400 font-bold text-xs uppercase tracking-wider mb-3">
               <Building2 className="h-4 w-4" /> For Hiring Teams & Recruiters
             </div>
@@ -1050,8 +1030,8 @@ function EmployerCTA() {
                 to={
                   isAuthenticated
                     ? isEmployer || isAdmin
-                      ? '/employer/jobs/post'
-                      : '/login?redirect=/employer/jobs/post'
+                    ? '/employer/jobs/post'
+                    : '/login?redirect=/employer/jobs/post'
                     : '/register?role=EMPLOYER&redirect=/employer/jobs/post'
                 }
               >

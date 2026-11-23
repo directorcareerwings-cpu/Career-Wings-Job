@@ -25,7 +25,7 @@ const FALLBACK_LOGOS: CoolPlaceLogo[] = [
 
 function LogoCard({ logo }: { logo: CoolPlaceLogo }) {
   const card = (
-    <div className="group flex items-center justify-center bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-orange-200 transition-all duration-300 px-7 py-5 min-w-[170px] h-[80px]">
+    <div className="group flex items-center justify-center bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-sm hover:border-slate-300 transition-all duration-300 px-7 py-5 min-w-[170px] h-[80px]">
       <img
         src={logo.logoUrl}
         alt={logo.name}
@@ -61,18 +61,18 @@ export default function CoolPlacesToWork() {
   const track = [...logos, ...logos, ...logos]
 
   return (
-    <section className="py-12 bg-gradient-to-b from-amber-50/60 to-white overflow-hidden">
+    <section className="py-12 bg-white border-b border-slate-100 overflow-hidden">
       <div className="flex items-center justify-center gap-4 mb-8 px-4">
-        <div className="flex-1 max-w-[100px] h-px bg-gradient-to-r from-transparent to-amber-300" />
-        <div className="inline-flex items-center gap-2 bg-white border border-amber-200 rounded-full px-4 sm:px-5 py-2 shadow-sm shrink-0">
-          <span className="text-amber-500 text-base">&#8592;</span>
-          <span className="text-[10px] sm:text-xs font-bold tracking-[0.16em] uppercase text-gray-700">Cool Places to Work</span>
-          <span className="text-amber-500 text-base">&#8594;</span>
+        <div className="flex-1 max-w-[100px] h-px bg-slate-200" />
+        <div className="inline-flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-full px-4 sm:px-5 py-2 shadow-2xs shrink-0">
+          <span className="text-slate-400 text-base">&#8592;</span>
+          <span className="text-[10px] sm:text-xs font-bold tracking-[0.16em] uppercase text-slate-700">Cool Places to Work</span>
+          <span className="text-slate-400 text-base">&#8594;</span>
         </div>
-        <div className="flex-1 max-w-[100px] h-px bg-gradient-to-l from-transparent to-amber-300" />
+        <div className="flex-1 max-w-[100px] h-px bg-slate-200" />
       </div>
       <div className="relative w-full">
-        <div className="pointer-events-none absolute left-0 top-0 h-full w-20 z-10 bg-gradient-to-r from-amber-50/80 to-transparent" />
+        <div className="pointer-events-none absolute left-0 top-0 h-full w-20 z-10 bg-gradient-to-r from-white to-transparent" />
         <div className="pointer-events-none absolute right-0 top-0 h-full w-20 z-10 bg-gradient-to-l from-white to-transparent" />
         <div
           className="flex gap-4 px-4"
@@ -85,7 +85,7 @@ export default function CoolPlacesToWork() {
           ))}
         </div>
       </div>
-      <p className="text-center text-xs text-gray-400 mt-6 px-4">
+      <p className="text-center text-xs text-slate-400 mt-6 px-4">
         Top companies actively hiring across Northeast India
       </p>
     </section>

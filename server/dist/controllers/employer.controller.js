@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getEmployerDashboard = exports.getEmployerCounts = exports.getEmployerPayments = exports.getEmployerSubscription = exports.getAnalytics = exports.unsaveCandidate = exports.saveCandidate = exports.getSavedCandidates = exports.downloadCandidateResume = exports.getCandidateDetail = exports.sendCandidateInterviewOffer = exports.revealCandidateContact = exports.bulkDownloadCandidates = exports.searchCandidates = exports.updateApplicationStatus = exports.getApplicants = exports.getAllApplicants = exports.deleteJob = exports.updateJobStatus = exports.updateJob = exports.getEmployerJobById = exports.postJob = exports.getEmployerJobs = exports.uploadCompanyLogo = exports.updateCompany = exports.updateEmployerProfile = exports.getCompanyProfile = void 0;
+exports.getEmployerDashboard = exports.getEmployerCounts = exports.getEmployerPayments = exports.getEmployerSubscription = exports.getAnalytics = exports.unsaveCandidate = exports.saveCandidate = exports.getSavedCandidates = exports.downloadCandidateResume = exports.getCandidateDetail = exports.sendCandidateInterviewOffer = exports.revealCandidateContact = exports.bulkDownloadCandidates = exports.searchCandidates = exports.updateApplicationStatus = exports.getApplicants = exports.getAllApplicants = exports.toggleJobFeatured = exports.getFeaturedJobQuota = exports.deleteJob = exports.updateJobStatus = exports.updateJob = exports.getEmployerJobById = exports.postJob = exports.getEmployerJobs = exports.getEmployerFeaturedJobQuota = exports.uploadCompanyLogo = exports.updateCompany = exports.updateEmployerProfile = exports.getCompanyProfile = void 0;
 exports.computeCandidateJobMatch = computeCandidateJobMatch;
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
@@ -123,6 +123,43 @@ const uploadCompanyLogo = async (req, res, next) => {
 };
 exports.uploadCompanyLogo = uploadCompanyLogo;
 // ---- JOBS ----
+/**
+ * Helper to calculate employer's active featured job allowance and current usage
+ */
+const getEmployerFeaturedJobQuota = async (userId, employerId) => {
+    const sub = await (0, subscription_service_1.getActiveSubscription)(userId);
+    let limit = 0;
+    if (sub?.limitsSnapshot) {
+        try {
+            const limits = JSON.parse(sub.limitsSnapshot);
+            if (limits.featuredJobs !== undefined && limits.featuredJobs !== null) {
+                limit = Number(limits.featuredJobs);
+            }
+        }
+        catch { }
+    }
+    const isUnlimited = limit === -1;
+    const used = await prisma_1.prisma.job.count({
+        where: {
+            employerId,
+            isFeatured: true,
+            deletedAt: null,
+            status: { notIn: ['CLOSED', 'EXPIRED'] },
+        },
+    });
+    const remaining = isUnlimited ? 999999 : Math.max(0, limit - used);
+    const canFeature = isUnlimited || used < limit;
+    return {
+        limit,
+        used,
+        remaining,
+        isUnlimited,
+        canFeature,
+        packageName: sub?.package?.name || 'Free Plan',
+        packageType: sub?.package?.type || 'EMPLOYER',
+    };
+};
+exports.getEmployerFeaturedJobQuota = getEmployerFeaturedJobQuota;
 const getEmployerJobs = async (req, res, next) => {
     try {
         const employer = await prisma_1.prisma.employer.findUnique({ where: { userId: req.user.id } });
@@ -181,7 +218,8 @@ const getEmployerJobs = async (req, res, next) => {
             live: (statusMap['PUBLISHED'] || 0) + (statusMap['FEATURED'] || 0),
             rejected: statusMap['REJECTED'] || 0,
         };
-        (0, response_1.sendPaginated)(res, jobs, total, page, limit, 'Success', { counts });
+        const featuredQuota = await (0, exports.getEmployerFeaturedJobQuota)(req.user.id, employer.id);
+        (0, response_1.sendPaginated)(res, jobs, total, page, limit, 'Success', { counts, featuredQuota });
     }
     catch (error) {
         next(error);
@@ -205,7 +243,20 @@ const postJob = async (req, res, next) => {
         if (!limitCheck.allowed) {
             throw new errors_1.AppError('You have reached your job posting limit. Please upgrade your subscription.', 403);
         }
-        const { title, description, responsibilities, requirements, benefits, categoryId, industryId, department, salaryMin, salaryMax, salaryCurrency, salaryPeriod, showSalary, locationId, locationText, workMode, jobType, experienceMin, experienceMax, educationLevel, highestDegree, genderPreference, vacancies, state, district, city, country, applicationDeadline, applicationMethod, applicationEmail, applicationUrl, skills, } = req.body;
+        const { title, description, responsibilities, requirements, benefits, categoryId, industryId, department, salaryMin, salaryMax, salaryCurrency, salaryPeriod, showSalary, locationId, locationText, workMode, jobType, experienceMin, experienceMax, educationLevel, highestDegree, genderPreference, vacancies, state, district, city, country, applicationDeadline, applicationMethod, applicationEmail, applicationUrl, skills, isFeatured, } = req.body;
+        // Validate Featured Job quota according to active package limits
+        const wantsFeatured = Boolean(isFeatured);
+        if (wantsFeatured) {
+            const quota = await (0, exports.getEmployerFeaturedJobQuota)(req.user.id, employer.id);
+            if (!quota.canFeature) {
+                if (quota.limit <= 0) {
+                    throw new errors_1.AppError(`Your active package (${quota.packageName}) does not include Featured Job listings. Please upgrade your package to feature this job.`, 403);
+                }
+                else {
+                    throw new errors_1.AppError(`You have used all ${quota.limit} featured job slots in your active package (${quota.used}/${quota.limit} used). Please unfeature another vacancy or upgrade your package.`, 403);
+                }
+            }
+        }
         const baseSlug = (0, slugify_1.default)(`${title}-${employer.company?.name || 'company'}`, { lower: true, strict: true });
         let slug = baseSlug;
         let count = 0;
@@ -258,7 +309,8 @@ const postJob = async (req, res, next) => {
                     applicationMethod: applicationMethod || 'PORTAL',
                     applicationEmail: applicationEmail || null,
                     applicationUrl: applicationUrl || null,
-                    status,
+                    status: (wantsFeatured && status === 'PUBLISHED') ? 'FEATURED' : status,
+                    isFeatured: wantsFeatured,
                     publishedAt: status === 'PUBLISHED' ? new Date() : null,
                     expiresAt,
                 },
@@ -355,17 +407,43 @@ const updateJob = async (req, res, next) => {
         if (job.status === 'CLOSED' || job.status === 'EXPIRED') {
             throw new errors_1.AppError('Cannot edit a closed or expired job', 400);
         }
-        const { skills, ...jobData } = req.body;
+        const { skills, isFeatured, ...jobData } = req.body;
+        let finalIsFeatured = job.isFeatured;
+        if (isFeatured !== undefined) {
+            const wantsFeatured = Boolean(isFeatured);
+            if (wantsFeatured && !job.isFeatured) {
+                const quota = await (0, exports.getEmployerFeaturedJobQuota)(req.user.id, employer.id);
+                if (!quota.canFeature) {
+                    if (quota.limit <= 0) {
+                        throw new errors_1.AppError(`Your active package (${quota.packageName}) does not include Featured Job listings. Please upgrade your package to feature this job.`, 403);
+                    }
+                    else {
+                        throw new errors_1.AppError(`You have used all ${quota.limit} featured job slots available in your ${quota.packageName} package (${quota.used}/${quota.limit} used). Please unfeature another job or upgrade your plan.`, 403);
+                    }
+                }
+            }
+            finalIsFeatured = wantsFeatured;
+        }
         // If editing a published or featured job, it requires Admin re-approval before live
         const autoApprove = await prisma_1.prisma.adminSetting.findUnique({ where: { key: 'AUTO_APPROVE_JOBS' } });
         const isLive = job.status === 'PUBLISHED' || job.status === 'FEATURED';
         const needsApproval = isLive && autoApprove?.value !== 'true';
-        const newStatus = needsApproval ? 'PENDING' : job.status;
+        let newStatus = job.status;
+        if (needsApproval) {
+            newStatus = 'PENDING';
+        }
+        else if (finalIsFeatured && (job.status === 'PUBLISHED' || job.status === 'FEATURED')) {
+            newStatus = 'FEATURED';
+        }
+        else if (!finalIsFeatured && job.status === 'FEATURED') {
+            newStatus = 'PUBLISHED';
+        }
         const updated = await prisma_1.prisma.$transaction(async (tx) => {
             const updatedJob = await tx.job.update({
                 where: { id: req.params.id },
                 data: {
                     ...jobData,
+                    isFeatured: finalIsFeatured,
                     status: newStatus,
                     ...(needsApproval ? { publishedAt: null } : {}),
                 },
@@ -435,6 +513,69 @@ const deleteJob = async (req, res, next) => {
     }
 };
 exports.deleteJob = deleteJob;
+const getFeaturedJobQuota = async (req, res, next) => {
+    try {
+        const employer = await prisma_1.prisma.employer.findUnique({ where: { userId: req.user.id } });
+        if (!employer)
+            throw new errors_1.AppError('Employer not found', 404);
+        const quota = await (0, exports.getEmployerFeaturedJobQuota)(req.user.id, employer.id);
+        (0, response_1.sendSuccess)(res, quota);
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.getFeaturedJobQuota = getFeaturedJobQuota;
+const toggleJobFeatured = async (req, res, next) => {
+    try {
+        const employer = await prisma_1.prisma.employer.findUnique({ where: { userId: req.user.id } });
+        if (!employer)
+            throw new errors_1.AppError('Employer not found', 404);
+        const job = await prisma_1.prisma.job.findFirst({
+            where: { id: req.params.id, employerId: employer.id, deletedAt: null },
+        });
+        if (!job)
+            throw new errors_1.AppError('Job not found or unauthorized', 404);
+        const targetFeatured = req.body.isFeatured !== undefined ? Boolean(req.body.isFeatured) : !job.isFeatured;
+        if (targetFeatured) {
+            if (!job.isFeatured) {
+                const quota = await (0, exports.getEmployerFeaturedJobQuota)(req.user.id, employer.id);
+                if (!quota.canFeature) {
+                    if (quota.limit <= 0) {
+                        throw new errors_1.AppError(`Your current package (${quota.packageName}) does not include Featured Job listings. Please upgrade your package to feature this job.`, 403);
+                    }
+                    else {
+                        throw new errors_1.AppError(`You have used all ${quota.limit} featured job slots available in your ${quota.packageName} package (${quota.used}/${quota.limit} used). Please unfeature another job or upgrade your plan.`, 403);
+                    }
+                }
+            }
+            const updatedJob = await prisma_1.prisma.job.update({
+                where: { id: job.id },
+                data: {
+                    isFeatured: true,
+                    status: job.status === 'PUBLISHED' ? 'FEATURED' : job.status,
+                },
+            });
+            const updatedQuota = await (0, exports.getEmployerFeaturedJobQuota)(req.user.id, employer.id);
+            (0, response_1.sendSuccess)(res, { job: updatedJob, quota: updatedQuota }, 'Job is now Featured on homepage and top of search!');
+        }
+        else {
+            const updatedJob = await prisma_1.prisma.job.update({
+                where: { id: job.id },
+                data: {
+                    isFeatured: false,
+                    status: job.status === 'FEATURED' ? 'PUBLISHED' : job.status,
+                },
+            });
+            const updatedQuota = await (0, exports.getEmployerFeaturedJobQuota)(req.user.id, employer.id);
+            (0, response_1.sendSuccess)(res, { job: updatedJob, quota: updatedQuota }, 'Job unfeatured. 1 slot freed up in your package.');
+        }
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.toggleJobFeatured = toggleJobFeatured;
 // ---- APPLICANTS ----
 function computeCandidateJobMatch(job, candidate) {
     let totalScore = 0;

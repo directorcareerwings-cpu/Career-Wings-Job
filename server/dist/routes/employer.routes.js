@@ -26,9 +26,11 @@ router.post('/company/logo', (req, res, next) => {
 }, employer_controller_1.uploadCompanyLogo);
 // Jobs
 router.get('/jobs', employer_controller_1.getEmployerJobs);
+router.get('/jobs/featured-quota', employer_controller_1.getFeaturedJobQuota);
 router.post('/jobs', (0, packageGuard_1.requireQuota)('jobPostings', 1, 'Your job posting limit has been reached. Upgrade your package to post more jobs.'), employer_controller_1.postJob);
 router.get('/jobs/:id', employer_controller_1.getEmployerJobById);
 router.put('/jobs/:id', employer_controller_1.updateJob);
+router.patch('/jobs/:id/feature', employer_controller_1.toggleJobFeatured);
 router.patch('/jobs/:id/status', employer_controller_1.updateJobStatus);
 router.delete('/jobs/:id', employer_controller_1.deleteJob);
 // Applicants (ATS & Management)
