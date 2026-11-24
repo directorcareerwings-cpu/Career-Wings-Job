@@ -71,19 +71,32 @@ async function callRazorpayREST(endpoint, options) {
     const auth = Buffer.from(`${options.keyId}:${options.keySecret}`).toString('base64');
     const url = `https://api.razorpay.com/v1${endpoint}`;
     if (typeof fetch === 'function') {
-        const res = await fetch(url, {
-            method: options.method || 'GET',
-            headers: {
-                Authorization: `Basic ${auth}`,
-                'Content-Type': 'application/json',
-            },
-            body: options.body ? JSON.stringify(options.body) : undefined,
-        });
-        const data = await res.json();
-        if (!res.ok) {
-            throw new Error(data?.error?.description || data?.message || `Razorpay API error HTTP ${res.status}`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 12000);
+        try {
+            const res = await fetch(url, {
+                method: options.method || 'GET',
+                headers: {
+                    Authorization: `Basic ${auth}`,
+                    'Content-Type': 'application/json',
+                },
+                body: options.body ? JSON.stringify(options.body) : undefined,
+                signal: controller.signal,
+            });
+            clearTimeout(timeoutId);
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data?.error?.description || data?.message || `Razorpay API error HTTP ${res.status}`);
+            }
+            return data;
         }
-        return data;
+        catch (fetchErr) {
+            clearTimeout(timeoutId);
+            if (fetchErr.name === 'AbortError') {
+                throw new Error('Razorpay API request timed out after 12 seconds. Please check network connection.');
+            }
+            throw fetchErr;
+        }
     }
     // Node.js https fallback
     return new Promise((resolve, reject) => {
@@ -95,6 +108,7 @@ async function callRazorpayREST(endpoint, options) {
             hostname: urlObj.hostname,
             path: urlObj.pathname + urlObj.search,
             method: options.method || 'GET',
+            timeout: 12000,
             headers: {
                 Authorization: `Basic ${auth}`,
                 'Content-Type': 'application/json',
@@ -119,6 +133,10 @@ async function callRazorpayREST(endpoint, options) {
                     reject(new Error(`Failed to parse Razorpay response: ${raw.slice(0, 100)}`));
                 }
             });
+        });
+        req.on('timeout', () => {
+            req.destroy();
+            reject(new Error('Razorpay HTTPS request timed out after 12 seconds.'));
         });
         req.on('error', reject);
         if (postData)

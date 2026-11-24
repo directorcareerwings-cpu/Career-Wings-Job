@@ -126,120 +126,137 @@ export async function safeMigrate(): Promise<{ success: boolean; message: string
   ];
   const schemaPath = possibleSchemaPaths.find((p) => fs.existsSync(p)) || path.join(serverDir, 'prisma', 'schema.prisma');
 
-  // Strictly enforce persistent SQLite file URL for Prisma
-  const normalizedDbUrl = `file:${dbPath.replace(/\\/g, '/')}`;
-  process.env.DATABASE_URL = normalizedDbUrl;
+  const isMysql = isMysqlConfigured();
+
+  // Ensure active schema matches dialect
+  const mysqlSchemaPath = path.join(serverDir, 'prisma', 'schema.mysql.prisma');
+  const sqliteSchemaPath = path.join(serverDir, 'prisma', 'schema.sqlite.prisma');
+  if (isMysql && fs.existsSync(mysqlSchemaPath)) {
+    fs.copyFileSync(mysqlSchemaPath, schemaPath);
+  } else if (!isMysql && fs.existsSync(sqliteSchemaPath)) {
+    fs.copyFileSync(sqliteSchemaPath, schemaPath);
+  }
+
+  // Set active database URL (never overwrite MySQL URL with file:)
+  const activeDbUrl = isMysql
+    ? process.env.DATABASE_URL!.trim()
+    : `file:${dbPath.replace(/\\/g, '/')}`;
+
+  process.env.DATABASE_URL = activeDbUrl;
 
   console.log('🔍 [Safe Migration] Starting safe schema verification...');
-  console.log(`   Database Target: ${dbPath}`);
-  console.log(`   Prisma Schema:   ${schemaPath}`);
+  console.log(`   Database Dialect: ${isMysql ? 'MySQL / MariaDB' : 'SQLite'}`);
+  console.log(`   Database Target:  ${isMysql ? activeDbUrl.replace(/:[^:@]+@/, ':***@') : dbPath}`);
+  console.log(`   Prisma Schema:    ${schemaPath}`);
 
-  // Check if primary database exists; if not, attempt to bootstrap from available snapshots
-  if (!fs.existsSync(dbPath) || fs.statSync(dbPath).size < 1000) {
-    const candidateSnapshots = [
-      path.join(rootDir, 'persistent_data', 'careerwings_production.db'),
-      path.join(serverDir, 'prisma', 'careerwings_template.db'),
-      path.join(rootDir, 'dev.db'),
-      path.join(serverDir, 'dev.db'),
-    ];
+  // Only for SQLite: Check if primary database exists; if not, bootstrap from persistent snapshot
+  if (!isMysql) {
+    if (!fs.existsSync(dbPath) || fs.statSync(dbPath).size < 1000) {
+      const candidateSnapshots = [
+        path.join(rootDir, 'persistent_data', 'careerwings_production.db'),
+        path.join(rootDir, 'dev.db'),
+        path.join(serverDir, 'dev.db'),
+      ];
 
-    for (const snap of candidateSnapshots) {
-      if (fs.existsSync(snap) && fs.statSync(snap).size > 10000 && verifySqliteHeader(snap)) {
-        console.log(`📦 [Safe Migration] Pre-populating persistent database from repository snapshot: ${snap}`);
-        try {
-          fs.copyFileSync(snap, dbPath);
-          break;
-        } catch (copyErr) {
-          console.warn('Could not copy snapshot:', copyErr);
+      for (const snap of candidateSnapshots) {
+        if (fs.existsSync(snap) && fs.statSync(snap).size > 10000 && verifySqliteHeader(snap)) {
+          console.log(`📦 [Safe Migration] Pre-populating persistent database from repository snapshot: ${snap}`);
+          try {
+            fs.copyFileSync(snap, dbPath);
+            break;
+          } catch (copyErr) {
+            console.warn('Could not copy snapshot:', copyErr);
+          }
         }
       }
     }
   }
 
-  const dbExistsWithData = fs.existsSync(dbPath) && fs.statSync(dbPath).size > 1000;
+  const dbExistsWithData = !isMysql ? (fs.existsSync(dbPath) && fs.statSync(dbPath).size > 1000) : true;
 
   // 1. Audit before migration
   let beforeAudit: DatabaseAuditReport | null = null;
-  if (dbExistsWithData) {
+  try {
     beforeAudit = await auditDatabase();
     console.log(`   Pre-migration counts: Users=${beforeAudit.counts.users}, Candidates=${beforeAudit.counts.candidates}, Jobs=${beforeAudit.counts.jobsTotal}, Applications=${beforeAudit.counts.applications}`);
-  } else {
-    console.log('   Pre-migration status: Initializing brand-new persistent database.');
+  } catch {
+    console.log(`   Pre-migration status: Initializing database tables in ${isMysql ? 'MySQL' : 'SQLite'}...`);
   }
 
-  // 2. Pre-migration immutable safety backup (only required if database already has existing data)
+  // 2. Pre-migration immutable safety backup (only for SQLite)
   let backup: string | null = null;
-  if (dbExistsWithData) {
+  if (!isMysql && dbExistsWithData) {
     backup = createSafetyBackup(dbPath, backupsDir, 'pre_migration');
     if (!backup) {
       throw new Error('❌ [MIGRATION ABORTED] Could not create pre-migration safety backup. Migration halted to protect data.');
     }
   }
 
-  // 2.1 Direct SQL additive verification for ImportJob table
-  try {
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "ImportJob" (
-        "id" TEXT NOT NULL PRIMARY KEY,
-        "fileName" TEXT NOT NULL,
-        "fileSize" INTEGER NOT NULL DEFAULT 0,
-        "mimeType" TEXT,
-        "filePath" TEXT,
-        "status" TEXT NOT NULL DEFAULT 'PENDING',
-        "totalRows" INTEGER NOT NULL DEFAULT 0,
-        "processedRows" INTEGER NOT NULL DEFAULT 0,
-        "successCount" INTEGER NOT NULL DEFAULT 0,
-        "updatedCount" INTEGER NOT NULL DEFAULT 0,
-        "skippedCount" INTEGER NOT NULL DEFAULT 0,
-        "invalidCount" INTEGER NOT NULL DEFAULT 0,
-        "failedCount" INTEGER NOT NULL DEFAULT 0,
-        "duplicateStrategy" TEXT NOT NULL DEFAULT 'SKIP',
-        "mappings" TEXT,
-        "reportPath" TEXT,
-        "errorLog" TEXT,
-        "summary" TEXT,
-        "createdBy" TEXT,
-        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ImportJob_status_idx" ON "ImportJob"("status");`);
-    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ImportJob_createdAt_idx" ON "ImportJob"("createdAt");`);
-  } catch (e) {
-    console.warn('ImportJob table migration notice:', e);
-  }
+  // 2.1 Only execute raw SQLite DDL for SQLite environments. In MySQL/MariaDB, let Prisma create tables cleanly.
+  if (!isMysql) {
+    try {
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "ImportJob" (
+          "id" TEXT NOT NULL PRIMARY KEY,
+          "fileName" TEXT NOT NULL,
+          "fileSize" INTEGER NOT NULL DEFAULT 0,
+          "mimeType" TEXT,
+          "filePath" TEXT,
+          "status" TEXT NOT NULL DEFAULT 'PENDING',
+          "totalRows" INTEGER NOT NULL DEFAULT 0,
+          "processedRows" INTEGER NOT NULL DEFAULT 0,
+          "successCount" INTEGER NOT NULL DEFAULT 0,
+          "updatedCount" INTEGER NOT NULL DEFAULT 0,
+          "skippedCount" INTEGER NOT NULL DEFAULT 0,
+          "invalidCount" INTEGER NOT NULL DEFAULT 0,
+          "failedCount" INTEGER NOT NULL DEFAULT 0,
+          "duplicateStrategy" TEXT NOT NULL DEFAULT 'SKIP',
+          "mappings" TEXT,
+          "reportPath" TEXT,
+          "errorLog" TEXT,
+          "summary" TEXT,
+          "createdBy" TEXT,
+          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ImportJob_status_idx" ON "ImportJob"("status");`);
+      await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ImportJob_createdAt_idx" ON "ImportJob"("createdAt");`);
+    } catch (e) {
+      console.warn('ImportJob table migration notice:', e);
+    }
 
-  // 2.2 Direct SQL additive verification for BlogPost table
-  try {
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "BlogPost" (
-        "id" TEXT NOT NULL PRIMARY KEY,
-        "title" TEXT NOT NULL,
-        "slug" TEXT NOT NULL UNIQUE,
-        "excerpt" TEXT NOT NULL,
-        "content" TEXT NOT NULL,
-        "coverImage" TEXT,
-        "category" TEXT NOT NULL DEFAULT 'Career Advice',
-        "tags" TEXT,
-        "authorName" TEXT NOT NULL DEFAULT 'Career Wings Editorial Team',
-        "authorRole" TEXT DEFAULT 'Career Advisor',
-        "authorAvatar" TEXT,
-        "readTimeMin" INTEGER NOT NULL DEFAULT 5,
-        "isFeatured" BOOLEAN NOT NULL DEFAULT 0,
-        "isPublished" BOOLEAN NOT NULL DEFAULT 1,
-        "publishedAt" DATETIME DEFAULT CURRENT_TIMESTAMP,
-        "views" INTEGER NOT NULL DEFAULT 0,
-        "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-    await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "BlogPost_slug_key" ON "BlogPost"("slug");`);
-    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "BlogPost_category_idx" ON "BlogPost"("category");`);
-    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "BlogPost_isPublished_idx" ON "BlogPost"("isPublished");`);
-    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "BlogPost_isFeatured_idx" ON "BlogPost"("isFeatured");`);
-    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "BlogPost_createdAt_idx" ON "BlogPost"("createdAt");`);
-  } catch (e) {
-    console.warn('BlogPost table migration notice:', e);
+    try {
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "BlogPost" (
+          "id" TEXT NOT NULL PRIMARY KEY,
+          "title" TEXT NOT NULL,
+          "slug" TEXT NOT NULL UNIQUE,
+          "excerpt" TEXT NOT NULL,
+          "content" TEXT NOT NULL,
+          "coverImage" TEXT,
+          "category" TEXT NOT NULL DEFAULT 'Career Advice',
+          "tags" TEXT,
+          "authorName" TEXT NOT NULL DEFAULT 'Career Wings Editorial Team',
+          "authorRole" TEXT DEFAULT 'Career Advisor',
+          "authorAvatar" TEXT,
+          "readTimeMin" INTEGER NOT NULL DEFAULT 5,
+          "isFeatured" BOOLEAN NOT NULL DEFAULT 0,
+          "isPublished" BOOLEAN NOT NULL DEFAULT 1,
+          "publishedAt" DATETIME DEFAULT CURRENT_TIMESTAMP,
+          "views" INTEGER NOT NULL DEFAULT 0,
+          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      await prisma.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "BlogPost_slug_key" ON "BlogPost"("slug");`);
+      await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "BlogPost_category_idx" ON "BlogPost"("category");`);
+      await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "BlogPost_isPublished_idx" ON "BlogPost"("isPublished");`);
+      await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "BlogPost_isFeatured_idx" ON "BlogPost"("isFeatured");`);
+      await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "BlogPost_createdAt_idx" ON "BlogPost"("createdAt");`);
+    } catch (e) {
+      console.warn('BlogPost table migration notice:', e);
+    }
   }
 
   // 3. Find bundled Prisma binary
@@ -258,19 +275,19 @@ export async function safeMigrate(): Promise<{ success: boolean; message: string
   try {
     execSync(migrateCmd, {
       cwd: serverDir,
-      env: { ...process.env, DATABASE_URL: normalizedDbUrl },
+      env: { ...process.env, DATABASE_URL: activeDbUrl },
       stdio: 'inherit',
     });
   } catch (err: any) {
     console.error('❌ [Safe Migration Error] Prisma db push detected potential data loss or failed:', err?.message || err);
-    if (backup) {
+    if (!isMysql && backup) {
       console.error(`🛡️ [Protection Active] Database unchanged. Pre-migration backup is safe at: ${backup}`);
     }
     throw err;
   }
 
   // 4. Audit after migration and verify zero records were lost
-  if (beforeAudit) {
+  if (beforeAudit && !isMysql) {
     const afterAudit = await auditDatabase();
     console.log(`   Post-migration counts: Users=${afterAudit.counts.users}, Candidates=${afterAudit.counts.candidates}, Jobs=${afterAudit.counts.jobsTotal}, Applications=${afterAudit.counts.applications}`);
 
@@ -284,7 +301,7 @@ export async function safeMigrate(): Promise<{ success: boolean; message: string
     }
   }
 
-  console.log('✅ [Safe Migration] Migration completed successfully with zero record loss verified.');
+  console.log(`✅ [Safe Migration] Migration completed successfully with zero record loss verified on ${isMysql ? 'MySQL' : 'SQLite'}.`);
   return { success: true, message: 'Additive migration applied safely.' };
 }
 

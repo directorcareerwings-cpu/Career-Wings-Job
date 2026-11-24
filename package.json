@@ -13,7 +13,7 @@
     "dev": "concurrently \"pnpm --filter career-wings-server dev\" \"pnpm --filter career-wings-client dev\"",
     "dev:server": "pnpm --filter career-wings-server dev",
     "dev:client": "pnpm --filter career-wings-client dev",
-    "build": "pnpm --filter career-wings-server db:migrate:safe && pnpm --filter career-wings-server build && pnpm --filter career-wings-client build",
+    "build": "pnpm --filter career-wings-server build && pnpm --filter career-wings-client build",
     "build:server": "pnpm --filter career-wings-server build",
     "build:client": "pnpm --filter career-wings-client build",
     "start": "node server/dist/index.js",
@@ -27,6 +27,7 @@
     "db:studio": "pnpm --filter career-wings-server db:studio"
   },
   "dependencies": {
+    "axios": "^1.7.9",
     "razorpay": "^2.9.2"
   },
   "devDependencies": {

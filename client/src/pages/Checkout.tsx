@@ -195,6 +195,11 @@ export default function Checkout() {
     setPaymentError(null)
     setShowSandboxFallback(false)
 
+    // Safety watchdog: ensure button is never stuck for more than 12 seconds
+    const watchdogTimer = setTimeout(() => {
+      setProcessingPayment(false)
+    }, 12000)
+
     try {
       // 1. Create order on backend
       const res = await paymentsAPI.createOrder({
@@ -207,6 +212,7 @@ export default function Checkout() {
 
       // 2. Free package activation (amount is 0)
       if (amount === 0) {
+        clearTimeout(watchdogTimer)
         toast.success('Subscription activated successfully!')
         navigate(user?.role === 'EMPLOYER' ? '/employer/subscription' : '/subscription')
         return
@@ -215,6 +221,7 @@ export default function Checkout() {
       // 3. Ensure Razorpay SDK is loaded
       const isSdkLoaded = await loadRazorpaySDK()
       if (!isSdkLoaded || typeof window.Razorpay === 'undefined') {
+        clearTimeout(watchdogTimer)
         const errorMsg =
           'Could not load Razorpay checkout (often blocked by browser ad-blockers or privacy shields). Please disable ad-blocker for careerwings.in or use the test simulation below.'
         toast.error(errorMsg, { duration: 6000 })
@@ -284,24 +291,28 @@ export default function Checkout() {
         const rzp = new window.Razorpay(options)
 
         rzp.on('payment.failed', function (response: any) {
+          clearTimeout(watchdogTimer)
           setProcessingPayment(false)
           const failMsg = response.error?.description || 'Transaction declined by bank/gateway'
           setPaymentError(`Payment failed: ${failMsg}`)
           toast.error(`Payment failed: ${failMsg}`)
         })
 
+        clearTimeout(watchdogTimer)
         rzp.open()
         // Automatically release button loading state after 1.5s so user is never frozen
         setTimeout(() => {
           setProcessingPayment(false)
         }, 1500)
       } catch (sdkError: any) {
+        clearTimeout(watchdogTimer)
         console.warn('Razorpay open failed, showing sandbox fallback:', sdkError)
         setShowSandboxFallback(true)
         setPaymentError('Could not launch payment dialog. Please allow popups or use instant test simulation.')
         setProcessingPayment(false)
       }
     } catch (err: any) {
+      clearTimeout(watchdogTimer)
       console.error('Payment initiation error:', err)
       const errorMsg =
         err.response?.data?.message ||
