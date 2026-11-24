@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma';
 import { AppError } from '../lib/errors';
+import { sanitizeMysqlDatetimes } from '../lib/mysql-auto-init';
 
 interface LimitsConfig {
   [key: string]: number | boolean | null;
@@ -74,20 +75,37 @@ export const getActiveSubscription = async (userId: string) => {
   const now = new Date();
 
   // Find any active subscription where endDate has passed and expire it
-  const expiredSubs = await prisma.subscription.findMany({
-    where: {
-      userId,
-      status: 'ACTIVE',
-      endDate: { lt: now },
-    },
-    include: { package: true },
-  });
+  let expiredSubs: any[] = [];
+  try {
+    expiredSubs = await prisma.subscription.findMany({
+      where: {
+        userId,
+        status: 'ACTIVE',
+        endDate: { lt: now },
+      },
+      include: { package: true },
+    });
+  } catch (err: any) {
+    if (err?.message?.includes('invalid datetime') || err?.message?.includes('Value out of range')) {
+      await sanitizeMysqlDatetimes().catch(() => {});
+      try {
+        expiredSubs = await prisma.subscription.findMany({
+          where: {
+            userId,
+            status: 'ACTIVE',
+            endDate: { lt: now },
+          },
+          include: { package: true },
+        });
+      } catch {}
+    }
+  }
 
   for (const sub of expiredSubs) {
     await prisma.subscription.update({
       where: { id: sub.id },
       data: { status: 'EXPIRED' },
-    });
+    }).catch(() => null);
 
     await prisma.notification.create({
       data: {
@@ -101,15 +119,33 @@ export const getActiveSubscription = async (userId: string) => {
   }
 
   // Find valid active subscription
-  let activeSub = await prisma.subscription.findFirst({
-    where: {
-      userId,
-      status: 'ACTIVE',
-      endDate: { gte: now },
-    },
-    include: { package: true },
-    orderBy: { endDate: 'desc' },
-  });
+  let activeSub: any = null;
+  try {
+    activeSub = await prisma.subscription.findFirst({
+      where: {
+        userId,
+        status: 'ACTIVE',
+        endDate: { gte: now },
+      },
+      include: { package: true },
+      orderBy: { endDate: 'desc' },
+    });
+  } catch (err: any) {
+    if (err?.message?.includes('invalid datetime') || err?.message?.includes('Value out of range')) {
+      await sanitizeMysqlDatetimes().catch(() => {});
+      try {
+        activeSub = await prisma.subscription.findFirst({
+          where: {
+            userId,
+            status: 'ACTIVE',
+            endDate: { gte: now },
+          },
+          include: { package: true },
+          orderBy: { endDate: 'desc' },
+        });
+      } catch {}
+    }
+  }
 
   // If no active subscription exists, auto-enroll into role-based free package
   if (!activeSub) {

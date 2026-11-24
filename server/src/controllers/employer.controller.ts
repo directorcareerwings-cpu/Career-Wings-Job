@@ -115,40 +115,53 @@ export const uploadCompanyLogo = async (req: AuthenticatedRequest, res: Response
  * Helper to calculate employer's active featured job allowance and current usage
  */
 export const getEmployerFeaturedJobQuota = async (userId: string, employerId: string) => {
-  const sub = await getActiveSubscription(userId);
-  let limit = 0;
-  if (sub?.limitsSnapshot) {
-    try {
-      const limits = JSON.parse(sub.limitsSnapshot);
-      if (limits.featuredJobs !== undefined && limits.featuredJobs !== null) {
-        limit = Number(limits.featuredJobs);
-      }
-    } catch {}
+  try {
+    const sub = await getActiveSubscription(userId);
+    let limit = 0;
+    if (sub?.limitsSnapshot) {
+      try {
+        const limits = JSON.parse(sub.limitsSnapshot);
+        if (limits.featuredJobs !== undefined && limits.featuredJobs !== null) {
+          limit = Number(limits.featuredJobs);
+        }
+      } catch {}
+    }
+
+    const isUnlimited = limit === -1;
+
+    const used = await prisma.job.count({
+      where: {
+        employerId,
+        isFeatured: true,
+        deletedAt: null,
+        status: { notIn: ['CLOSED', 'EXPIRED'] },
+      },
+    }).catch(() => 0);
+
+    const remaining = isUnlimited ? 999999 : Math.max(0, limit - used);
+    const canFeature = isUnlimited || used < limit;
+
+    return {
+      limit,
+      used,
+      remaining,
+      isUnlimited,
+      canFeature,
+      packageName: sub?.package?.name || 'Free Plan',
+      packageType: sub?.package?.type || 'EMPLOYER',
+    };
+  } catch (err) {
+    console.warn('Notice in getEmployerFeaturedJobQuota:', err);
+    return {
+      limit: 0,
+      used: 0,
+      remaining: 0,
+      isUnlimited: false,
+      canFeature: false,
+      packageName: 'Starter Plan',
+      packageType: 'EMPLOYER',
+    };
   }
-
-  const isUnlimited = limit === -1;
-
-  const used = await prisma.job.count({
-    where: {
-      employerId,
-      isFeatured: true,
-      deletedAt: null,
-      status: { notIn: ['CLOSED', 'EXPIRED'] },
-    },
-  });
-
-  const remaining = isUnlimited ? 999999 : Math.max(0, limit - used);
-  const canFeature = isUnlimited || used < limit;
-
-  return {
-    limit,
-    used,
-    remaining,
-    isUnlimited,
-    canFeature,
-    packageName: sub?.package?.name || 'Free Plan',
-    packageType: sub?.package?.type || 'EMPLOYER',
-  };
 };
 
 export const getEmployerJobs = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
