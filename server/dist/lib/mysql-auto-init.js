@@ -3,11 +3,43 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.sanitizeMysqlDatetimes = sanitizeMysqlDatetimes;
 exports.ensureMysqlDatabaseReady = ensureMysqlDatabaseReady;
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const prisma_1 = require("./prisma");
 const mysql_embedded_setup_1 = require("./mysql-embedded-setup");
+/**
+ * Sanitizes any invalid zero-date columns in MySQL (e.g. '0000-00-00 00:00:00')
+ * so Prisma's datetime deserializer never throws 'Value out of range'.
+ */
+async function sanitizeMysqlDatetimes() {
+    if (!(0, prisma_1.isMysqlConfigured)())
+        return;
+    const cleanupQueries = [
+        "UPDATE `User` SET `lastLoginAt` = NULL WHERE `lastLoginAt` < '1971-01-01' OR CAST(`lastLoginAt` AS CHAR) LIKE '0000%'",
+        "UPDATE `User` SET `emailVerifiedAt` = NULL WHERE `emailVerifiedAt` < '1971-01-01' OR CAST(`emailVerifiedAt` AS CHAR) LIKE '0000%'",
+        "UPDATE `User` SET `createdAt` = NOW() WHERE `createdAt` < '1971-01-01' OR CAST(`createdAt` AS CHAR) LIKE '0000%'",
+        "UPDATE `User` SET `updatedAt` = NOW() WHERE `updatedAt` < '1971-01-01' OR CAST(`updatedAt` AS CHAR) LIKE '0000%'",
+        "UPDATE `Candidate` SET `resumeUpdatedAt` = NULL WHERE `resumeUpdatedAt` < '1971-01-01' OR CAST(`resumeUpdatedAt` AS CHAR) LIKE '0000%'",
+        "UPDATE `Candidate` SET `createdAt` = NOW() WHERE `createdAt` < '1971-01-01' OR CAST(`createdAt` AS CHAR) LIKE '0000%'",
+        "UPDATE `Candidate` SET `updatedAt` = NOW() WHERE `updatedAt` < '1971-01-01' OR CAST(`updatedAt` AS CHAR) LIKE '0000%'",
+        "UPDATE `RefreshToken` SET `expiresAt` = DATE_ADD(NOW(), INTERVAL 30 DAY) WHERE `expiresAt` < '1971-01-01' OR CAST(`expiresAt` AS CHAR) LIKE '0000%'",
+        "UPDATE `RefreshToken` SET `createdAt` = NOW() WHERE `createdAt` < '1971-01-01' OR CAST(`createdAt` AS CHAR) LIKE '0000%'",
+        "UPDATE `Job` SET `createdAt` = NOW() WHERE `createdAt` < '1971-01-01' OR CAST(`createdAt` AS CHAR) LIKE '0000%'",
+        "UPDATE `Job` SET `updatedAt` = NOW() WHERE `updatedAt` < '1971-01-01' OR CAST(`updatedAt` AS CHAR) LIKE '0000%'",
+        "UPDATE `Job` SET `expiresAt` = NULL WHERE `expiresAt` < '1971-01-01' OR CAST(`expiresAt` AS CHAR) LIKE '0000%'",
+        "UPDATE `Employer` SET `createdAt` = NOW() WHERE `createdAt` < '1971-01-01' OR CAST(`createdAt` AS CHAR) LIKE '0000%'",
+        "UPDATE `Company` SET `createdAt` = NOW() WHERE `createdAt` < '1971-01-01' OR CAST(`createdAt` AS CHAR) LIKE '0000%'",
+        "UPDATE `AdminSetting` SET `updatedAt` = NOW() WHERE `updatedAt` < '1971-01-01' OR CAST(`updatedAt` AS CHAR) LIKE '0000%'",
+    ];
+    for (const q of cleanupQueries) {
+        try {
+            await prisma_1.prisma.$executeRawUnsafe(q);
+        }
+        catch { }
+    }
+}
 /**
  * Automatically initializes MySQL schema and seeds default data on Hostinger.
  * Runs on server boot without requiring external CLI or phpMyAdmin manual import.
@@ -58,7 +90,6 @@ async function ensureMysqlDatabaseReady(force = false) {
                 successCount++;
             }
             catch (err) {
-                // Ignore harmless duplicate key or existing table notices
                 const msg = err?.message || '';
                 if (!msg.includes('already exists') && !msg.includes('Duplicate key') && !msg.includes('Duplicate entry')) {
                     errorCount++;
@@ -71,7 +102,9 @@ async function ensureMysqlDatabaseReady(force = false) {
     else {
         console.log('✔ All core MySQL database tables verified.');
     }
-    // 3. Verify user records
+    // 3. Always run datetime sanitizer to eliminate any 0000-00-00 datetime values
+    await sanitizeMysqlDatetimes();
+    // 4. Verify user records
     try {
         const userCount = await prisma_1.prisma.user.count();
         console.log(`📊 Current MySQL database status: ${userCount} users present.`);
@@ -84,6 +117,7 @@ async function ensureMysqlDatabaseReady(force = false) {
                 }
             }
             await prisma_1.prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 1;').catch(() => { });
+            await sanitizeMysqlDatetimes();
             const postSeedCount = await prisma_1.prisma.user.count();
             console.log(`✔ Seeding complete! ${postSeedCount} users now available in MySQL.`);
         }

@@ -17,13 +17,39 @@ function findDb() {
   return null;
 }
 
-function escapeSqlValue(val) {
+function escapeSqlValue(val, colName) {
   if (val === null || val === undefined) return 'NULL';
-  if (typeof val === 'number') return String(val);
   if (typeof val === 'boolean') return val ? '1' : '0';
+
+  const isDateCol = colName && (
+    colName.endsWith('At') ||
+    colName.endsWith('Date') ||
+    colName.endsWith('Deadline') ||
+    colName === 'timestamp' ||
+    colName === 'verifiedAt'
+  );
+
   if (val instanceof Date) {
     return `'${val.toISOString().slice(0, 19).replace('T', ' ')}'`;
   }
+
+  if (isDateCol) {
+    if (!val || val === 0 || val === '0' || val === 'null' || val === 'NULL') return 'NULL';
+    let d;
+    if (typeof val === 'number') {
+      d = new Date(val);
+    } else if (typeof val === 'string') {
+      if (/^\d+$/.test(val)) d = new Date(Number(val));
+      else d = new Date(val);
+    }
+    if (d && !isNaN(d.getTime()) && d.getFullYear() > 1970) {
+      return `'${d.toISOString().slice(0, 19).replace('T', ' ')}'`;
+    }
+    return 'NULL';
+  }
+
+  if (typeof val === 'number') return String(val);
+
   // Check if string is an ISO date string
   if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(val)) {
     const formatted = val.slice(0, 19).replace('T', ' ');
@@ -134,7 +160,7 @@ function exportDump() {
       for (let i = 0; i < rows.length; i += chunkSize) {
         const chunk = rows.slice(i, i + chunkSize);
         const valueClauses = chunk.map(row => {
-          const vals = columns.map(col => escapeSqlValue(row[col]));
+          const vals = columns.map(col => escapeSqlValue(row[col], col));
           return `(${vals.join(', ')})`;
         });
 
