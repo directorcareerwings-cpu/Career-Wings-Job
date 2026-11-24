@@ -102,6 +102,11 @@ fi
 
 # 6. Run Safe Additive Schema Synchronization
 echo "🔍 Running safe database schema verification (zero data loss)..."
+if [ "${IS_MYSQL}" = true ]; then
+  if [ -f "server/dist/lib/mysql-auto-init.js" ]; then
+    node server/dist/lib/mysql-auto-init.js || true
+  fi
+fi
 if command -v pnpm &> /dev/null; then
   pnpm --filter career-wings-server db:migrate:safe || true
 elif [ -f "server/dist/lib/database-safety.js" ]; then

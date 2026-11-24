@@ -65,6 +65,7 @@ const public_routes_1 = __importDefault(require("./routes/public.routes"));
 const chat_routes_1 = __importDefault(require("./routes/chat.routes"));
 const blog_routes_1 = __importStar(require("./routes/blog.routes"));
 const blog_controller_1 = require("./controllers/blog.controller");
+const mysql_auto_init_1 = require("./lib/mysql-auto-init");
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 5000;
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
@@ -289,8 +290,11 @@ app.use(errors_1.errorHandler);
 const ensureDatabaseAndAdmin = async () => {
     try {
         const isMysql = (0, prisma_1.isMysqlConfigured)();
-        // 0. Only run raw SQLite DDL if in SQLite mode
-        if (!isMysql) {
+        if (isMysql) {
+            // Automatic MySQL Schema Creation and Data Seeding (No CLI or phpMyAdmin required)
+            await (0, mysql_auto_init_1.ensureMysqlDatabaseReady)();
+        }
+        else {
             try {
                 await prisma_1.prisma.$executeRawUnsafe(`
           CREATE TABLE IF NOT EXISTS "ImportJob" (
@@ -330,61 +334,50 @@ const ensureDatabaseAndAdmin = async () => {
             catch (e) {
                 console.warn('BlogPost table setup notice:', e);
             }
-        }
-        else {
+            // Verify core SQLite database tables exist
+            let tablesReady = false;
             try {
-                await (0, blog_controller_1.seedDefaultBlogPostsIfEmpty)();
+                await prisma_1.prisma.user.findFirst({ select: { id: true } });
+                tablesReady = true;
             }
-            catch (e) { }
-        }
-        // 1. Verify core database tables exist (database-agnostic: tests connection & query)
-        let tablesReady = false;
-        try {
-            await prisma_1.prisma.user.findFirst({ select: { id: true } });
-            tablesReady = true;
-        }
-        catch {
-            tablesReady = false;
-        }
-        if (!tablesReady) {
-            console.log(`⚡ Core database tables not detected in ${isMysql ? 'MySQL' : 'SQLite'}. Auto-syncing schema additively without data loss...`);
-            const projectRoot = (0, prisma_1.findProjectRoot)();
-            const serverDir = fs_1.default.existsSync(path_1.default.join(projectRoot, 'server', 'prisma', 'schema.prisma'))
-                ? path_1.default.join(projectRoot, 'server')
-                : projectRoot;
-            const schemaPath = path_1.default.join(serverDir, 'prisma', 'schema.prisma');
-            const activeDbUrl = isMysql
-                ? process.env.DATABASE_URL
-                : `file:${(0, prisma_1.getPersistentStoragePaths)().databasePath.replace(/\\/g, '/')}`;
-            const possiblePrismaBins = [
-                path_1.default.join(serverDir, 'node_modules', 'prisma', 'build', 'index.js'),
-                path_1.default.join(projectRoot, 'node_modules', 'prisma', 'build', 'index.js'),
-                path_1.default.join(process.cwd(), 'node_modules', 'prisma', 'build', 'index.js'),
-            ];
-            const prismaBin = possiblePrismaBins.find((b) => fs_1.default.existsSync(b));
-            try {
-                if (prismaBin) {
-                    (0, child_process_1.execSync)(`node "${prismaBin}" db push --schema="${schemaPath}" --skip-generate --accept-data-loss=false`, {
-                        cwd: serverDir,
-                        env: { ...process.env, DATABASE_URL: activeDbUrl },
-                        stdio: 'inherit',
-                    });
+            catch {
+                tablesReady = false;
+            }
+            if (!tablesReady) {
+                console.log('⚡ Core SQLite database tables not detected. Auto-syncing schema...');
+                const projectRoot = (0, prisma_1.findProjectRoot)();
+                const serverDir = fs_1.default.existsSync(path_1.default.join(projectRoot, 'server', 'prisma', 'schema.prisma'))
+                    ? path_1.default.join(projectRoot, 'server')
+                    : projectRoot;
+                const schemaPath = path_1.default.join(serverDir, 'prisma', 'schema.prisma');
+                const activeDbUrl = `file:${(0, prisma_1.getPersistentStoragePaths)().databasePath.replace(/\\/g, '/')}`;
+                const possiblePrismaBins = [
+                    path_1.default.join(serverDir, 'node_modules', 'prisma', 'build', 'index.js'),
+                    path_1.default.join(projectRoot, 'node_modules', 'prisma', 'build', 'index.js'),
+                    path_1.default.join(process.cwd(), 'node_modules', 'prisma', 'build', 'index.js'),
+                ];
+                const prismaBin = possiblePrismaBins.find((b) => fs_1.default.existsSync(b));
+                try {
+                    if (prismaBin) {
+                        (0, child_process_1.execSync)(`node "${prismaBin}" db push --schema="${schemaPath}" --skip-generate --accept-data-loss=false`, {
+                            cwd: serverDir,
+                            env: { ...process.env, DATABASE_URL: activeDbUrl },
+                            stdio: 'inherit',
+                        });
+                    }
+                    else {
+                        (0, child_process_1.execSync)(`npx prisma db push --schema="${schemaPath}" --skip-generate --accept-data-loss=false`, {
+                            cwd: serverDir,
+                            env: { ...process.env, DATABASE_URL: activeDbUrl },
+                            stdio: 'inherit',
+                        });
+                    }
+                    console.log('✔ Schema synced successfully.');
                 }
-                else {
-                    (0, child_process_1.execSync)(`npx prisma db push --schema="${schemaPath}" --skip-generate --accept-data-loss=false`, {
-                        cwd: serverDir,
-                        env: { ...process.env, DATABASE_URL: activeDbUrl },
-                        stdio: 'inherit',
-                    });
+                catch (pushErr) {
+                    console.error('❌ [Database Push Error] Could not auto-sync schema:', pushErr?.message || pushErr);
                 }
-                console.log('✔ Schema synced successfully.');
             }
-            catch (pushErr) {
-                console.error('❌ [Database Push Error] Could not auto-sync schema:', pushErr?.message || pushErr);
-            }
-        }
-        else {
-            console.log(`✔ All core database tables verified in ${isMysql ? 'MySQL production' : 'persistent SQLite'} database.`);
         }
         // 2. Ensure admin account exists (Strictly preserve existing credentials!)
         const existingAdmin = await prisma_1.prisma.user.findFirst({

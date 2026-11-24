@@ -30,6 +30,7 @@ import publicRoutes from './routes/public.routes';
 import chatRoutes from './routes/chat.routes';
 import blogRoutes, { adminBlogRouter } from './routes/blog.routes';
 import { ensureBlogPostTable, seedDefaultBlogPostsIfEmpty } from './controllers/blog.controller';
+import { ensureMysqlDatabaseReady } from './lib/mysql-auto-init';
 
 const app: Express = express();
 const PORT = process.env.PORT || 5000;
@@ -189,14 +190,14 @@ app.get('/api/health', async (req: Request, res: Response) => {
       dialect: isMysql ? 'mysql' : 'sqlite',
       storage: isMysql
         ? {
-            engine: 'Hostinger MySQL Database Server',
-            persistence: 'Permanent (Independent of Git redeployments)',
-          }
+          engine: 'Hostinger MySQL Database Server',
+          persistence: 'Permanent (Independent of Git redeployments)',
+        }
         : {
-            dir: storagePaths.storageDir,
-            database: path.basename(storagePaths.databasePath),
-            isExternal: storagePaths.isExternalToRepo,
-          },
+          dir: storagePaths.storageDir,
+          database: path.basename(storagePaths.databasePath),
+          isExternal: storagePaths.isExternalToRepo,
+        },
       counts: {
         users: userCount,
         candidates: candidateCount,
@@ -280,8 +281,10 @@ const ensureDatabaseAndAdmin = async () => {
   try {
     const isMysql = isMysqlConfigured();
 
-    // 0. Only run raw SQLite DDL if in SQLite mode
-    if (!isMysql) {
+    if (isMysql) {
+      // Automatic MySQL Schema Creation and Data Seeding (No CLI or phpMyAdmin required)
+      await ensureMysqlDatabaseReady();
+    } else {
       try {
         await prisma.$executeRawUnsafe(`
           CREATE TABLE IF NOT EXISTS "ImportJob" (
@@ -320,60 +323,51 @@ const ensureDatabaseAndAdmin = async () => {
       } catch (e) {
         console.warn('BlogPost table setup notice:', e);
       }
-    } else {
+
+      // Verify core SQLite database tables exist
+      let tablesReady = false;
       try {
-        await seedDefaultBlogPostsIfEmpty();
-      } catch (e) {}
-    }
-
-    // 1. Verify core database tables exist (database-agnostic: tests connection & query)
-    let tablesReady = false;
-    try {
-      await prisma.user.findFirst({ select: { id: true } });
-      tablesReady = true;
-    } catch {
-      tablesReady = false;
-    }
-
-    if (!tablesReady) {
-      console.log(`⚡ Core database tables not detected in ${isMysql ? 'MySQL' : 'SQLite'}. Auto-syncing schema additively without data loss...`);
-      
-      const projectRoot = findProjectRoot();
-      const serverDir = fs.existsSync(path.join(projectRoot, 'server', 'prisma', 'schema.prisma'))
-        ? path.join(projectRoot, 'server')
-        : projectRoot;
-      const schemaPath = path.join(serverDir, 'prisma', 'schema.prisma');
-      const activeDbUrl = isMysql
-        ? process.env.DATABASE_URL!
-        : `file:${getPersistentStoragePaths().databasePath.replace(/\\/g, '/')}`;
-
-      const possiblePrismaBins = [
-        path.join(serverDir, 'node_modules', 'prisma', 'build', 'index.js'),
-        path.join(projectRoot, 'node_modules', 'prisma', 'build', 'index.js'),
-        path.join(process.cwd(), 'node_modules', 'prisma', 'build', 'index.js'),
-      ];
-      const prismaBin = possiblePrismaBins.find((b) => fs.existsSync(b));
-
-      try {
-        if (prismaBin) {
-          execSync(`node "${prismaBin}" db push --schema="${schemaPath}" --skip-generate --accept-data-loss=false`, {
-            cwd: serverDir,
-            env: { ...process.env, DATABASE_URL: activeDbUrl },
-            stdio: 'inherit',
-          });
-        } else {
-          execSync(`npx prisma db push --schema="${schemaPath}" --skip-generate --accept-data-loss=false`, {
-            cwd: serverDir,
-            env: { ...process.env, DATABASE_URL: activeDbUrl },
-            stdio: 'inherit',
-          });
-        }
-        console.log('✔ Schema synced successfully.');
-      } catch (pushErr: any) {
-        console.error('❌ [Database Push Error] Could not auto-sync schema:', pushErr?.message || pushErr);
+        await prisma.user.findFirst({ select: { id: true } });
+        tablesReady = true;
+      } catch {
+        tablesReady = false;
       }
-    } else {
-      console.log(`✔ All core database tables verified in ${isMysql ? 'MySQL production' : 'persistent SQLite'} database.`);
+
+      if (!tablesReady) {
+        console.log('⚡ Core SQLite database tables not detected. Auto-syncing schema...');
+        const projectRoot = findProjectRoot();
+        const serverDir = fs.existsSync(path.join(projectRoot, 'server', 'prisma', 'schema.prisma'))
+          ? path.join(projectRoot, 'server')
+          : projectRoot;
+        const schemaPath = path.join(serverDir, 'prisma', 'schema.prisma');
+        const activeDbUrl = `file:${getPersistentStoragePaths().databasePath.replace(/\\/g, '/')}`;
+
+        const possiblePrismaBins = [
+          path.join(serverDir, 'node_modules', 'prisma', 'build', 'index.js'),
+          path.join(projectRoot, 'node_modules', 'prisma', 'build', 'index.js'),
+          path.join(process.cwd(), 'node_modules', 'prisma', 'build', 'index.js'),
+        ];
+        const prismaBin = possiblePrismaBins.find((b) => fs.existsSync(b));
+
+        try {
+          if (prismaBin) {
+            execSync(`node "${prismaBin}" db push --schema="${schemaPath}" --skip-generate --accept-data-loss=false`, {
+              cwd: serverDir,
+              env: { ...process.env, DATABASE_URL: activeDbUrl },
+              stdio: 'inherit',
+            });
+          } else {
+            execSync(`npx prisma db push --schema="${schemaPath}" --skip-generate --accept-data-loss=false`, {
+              cwd: serverDir,
+              env: { ...process.env, DATABASE_URL: activeDbUrl },
+              stdio: 'inherit',
+            });
+          }
+          console.log('✔ Schema synced successfully.');
+        } catch (pushErr: any) {
+          console.error('❌ [Database Push Error] Could not auto-sync schema:', pushErr?.message || pushErr);
+        }
+      }
     }
 
     // 2. Ensure admin account exists (Strictly preserve existing credentials!)
@@ -424,9 +418,9 @@ const ensureDatabaseAndAdmin = async () => {
       if (junkSkills.length > 0) {
         console.log(`🧹 Cleaning ${junkSkills.length} junk skills from database...`);
         for (const s of junkSkills) {
-          await prisma.candidateSkill.deleteMany({ where: { skillId: s.id } }).catch(() => {});
-          await prisma.jobSkill.deleteMany({ where: { skillId: s.id } }).catch(() => {});
-          await prisma.skill.delete({ where: { id: s.id } }).catch(() => {});
+          await prisma.candidateSkill.deleteMany({ where: { skillId: s.id } }).catch(() => { });
+          await prisma.jobSkill.deleteMany({ where: { skillId: s.id } }).catch(() => { });
+          await prisma.skill.delete({ where: { id: s.id } }).catch(() => { });
         }
         console.log('✔ Junk skills cleaned successfully.');
       }

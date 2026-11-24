@@ -1,6 +1,6 @@
 -- ==============================================================
 -- Career Wings — Full MySQL Database Dump
--- Generated: 2026-11-24T10:10:06.446Z
+-- Generated: 2026-11-24T11:30:17.335Z
 -- Source SQLite Database: careerwings_production.db
 -- Suitable for 1-Click Import into Hostinger phpMyAdmin
 -- ==============================================================
