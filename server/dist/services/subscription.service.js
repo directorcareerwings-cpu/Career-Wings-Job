@@ -80,19 +80,20 @@ const getActiveSubscription = async (userId) => {
         });
     }
     catch (err) {
-        if (err?.message?.includes('invalid datetime') || err?.message?.includes('Value out of range')) {
-            await (0, mysql_auto_init_1.sanitizeMysqlDatetimes)().catch(() => { });
-            try {
-                expiredSubs = await prisma_1.prisma.subscription.findMany({
-                    where: {
-                        userId,
-                        status: 'ACTIVE',
-                        endDate: { lt: now },
-                    },
-                    include: { package: true },
-                });
-            }
-            catch { }
+        console.warn('Notice querying expired subscriptions, attempting self-heal:', err?.message);
+        await (0, mysql_auto_init_1.sanitizeMysqlDatetimes)().catch(() => { });
+        try {
+            expiredSubs = await prisma_1.prisma.subscription.findMany({
+                where: {
+                    userId,
+                    status: 'ACTIVE',
+                    endDate: { lt: now },
+                },
+                include: { package: true },
+            });
+        }
+        catch {
+            expiredSubs = [];
         }
     }
     for (const sub of expiredSubs) {
@@ -124,25 +125,31 @@ const getActiveSubscription = async (userId) => {
         });
     }
     catch (err) {
-        if (err?.message?.includes('invalid datetime') || err?.message?.includes('Value out of range')) {
-            await (0, mysql_auto_init_1.sanitizeMysqlDatetimes)().catch(() => { });
-            try {
-                activeSub = await prisma_1.prisma.subscription.findFirst({
-                    where: {
-                        userId,
-                        status: 'ACTIVE',
-                        endDate: { gte: now },
-                    },
-                    include: { package: true },
-                    orderBy: { endDate: 'desc' },
-                });
-            }
-            catch { }
+        console.warn('Notice querying active subscription, running sanitize:', err?.message);
+        await (0, mysql_auto_init_1.sanitizeMysqlDatetimes)().catch(() => { });
+        try {
+            activeSub = await prisma_1.prisma.subscription.findFirst({
+                where: {
+                    userId,
+                    status: 'ACTIVE',
+                    endDate: { gte: now },
+                },
+                include: { package: true },
+                orderBy: { endDate: 'desc' },
+            });
+        }
+        catch {
+            activeSub = null;
         }
     }
     // If no active subscription exists, auto-enroll into role-based free package
     if (!activeSub) {
-        activeSub = await (0, exports.autoEnrollFreePackage)(userId);
+        try {
+            activeSub = await (0, exports.autoEnrollFreePackage)(userId);
+        }
+        catch {
+            activeSub = null;
+        }
     }
     return activeSub;
 };
@@ -408,8 +415,15 @@ exports.expireSubscriptions = expireSubscriptions;
  * Comprehensive Subscription Summary for dashboard display
  */
 const getSubscriptionSummary = async (userId) => {
-    const sub = await (0, exports.getActiveSubscription)(userId);
-    const role = await (0, exports.getUserRole)(userId);
+    let sub = null;
+    try {
+        sub = await (0, exports.getActiveSubscription)(userId);
+    }
+    catch (err) {
+        console.warn('Notice in getActiveSubscription within getSubscriptionSummary:', err?.message);
+        sub = null;
+    }
+    const role = await (0, exports.getUserRole)(userId).catch(() => null);
     if (!sub) {
         const freePackage = await (0, exports.getFreePackage)(role || undefined);
         return {

@@ -21,8 +21,10 @@ import {
   Upload,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useEducationMaster } from '@/hooks/useEducationMaster'
 
 export default function CandidateProfile() {
+  const { educationLevels, highestDegrees } = useEducationMaster()
   const { user, updateUser } = useAuth()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -560,13 +562,10 @@ export default function CandidateProfile() {
                   onChange={handleChange}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition bg-white"
                 >
-                  <option value="10th / HSLC">10th / HSLC</option>
-                  <option value="12th / Higher Secondary">12th / Higher Secondary</option>
-                  <option value="Diploma / Polytechnic">Diploma / Polytechnic</option>
-                  <option value="Bachelor Degree">Bachelor Degree</option>
-                  <option value="Master Degree">Master Degree</option>
-                  <option value="Post Graduate Diploma">Post Graduate Diploma</option>
-                  <option value="Doctorate / Ph.D">Doctorate / Ph.D</option>
+                  <option value="">-- Select Qualification --</option>
+                  {educationLevels.map((lvl) => (
+                    <option key={lvl} value={lvl}>{lvl}</option>
+                  ))}
                 </select>
               </div>
 
@@ -624,26 +623,9 @@ export default function CandidateProfile() {
                 className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition bg-white"
               >
                 <option value="">-- Select single highest degree (e.g. B.A, B.Com, B.Sc, B.Tech, MBA, Ph.D...) --</option>
-                <option value="Bachelor Degree">Bachelor Degree</option>
-                <option value="B.A">B.A (Bachelor of Arts)</option>
-                <option value="B.Com">B.Com (Bachelor of Commerce)</option>
-                <option value="B.Sc">B.Sc (Bachelor of Science)</option>
-                <option value="B.Tech / B.E">B.Tech / B.E (Engineering)</option>
-                <option value="BBA / BBM">BBA / BBM (Business Management)</option>
-                <option value="BCA">BCA (Computer Applications)</option>
-                <option value="Master Degree">Master Degree</option>
-                <option value="M.A">M.A (Master of Arts)</option>
-                <option value="M.Com">M.Com (Master of Commerce)</option>
-                <option value="M.Sc">M.Sc (Master of Science)</option>
-                <option value="MBA / PGDM">MBA / PGDM (Business Admin)</option>
-                <option value="MCA">MCA (Computer Applications)</option>
-                <option value="M.Tech">M.Tech / M.E</option>
-                <option value="MBBS / Medical">MBBS / Medical / BDS / Nursing</option>
-                <option value="LLB / Law">LLB / LLM (Law)</option>
-                <option value="Diploma / Polytechnic">Diploma / Polytechnic</option>
-                <option value="12th / Higher Secondary">12th / Higher Secondary</option>
-                <option value="10th / HSLC">10th / HSLC</option>
-                <option value="Ph.D / Doctorate">Ph.D / Doctorate</option>
+                {highestDegrees.map((deg) => (
+                  <option key={deg} value={deg}>{deg}</option>
+                ))}
               </select>
 
               {form.highestDegree && (

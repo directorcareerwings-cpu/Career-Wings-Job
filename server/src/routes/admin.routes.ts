@@ -42,6 +42,14 @@ import {
   createSkill,
   updateSkill,
   deleteSkill,
+  getEducationMaster,
+  addEducationLevel,
+  deleteEducationLevel,
+  addHighestDegree,
+  deleteHighestDegree,
+  addCandidateEducation,
+  deleteCandidateEducation,
+  updateCandidateEducationAndDegree,
   getSettings,
   updateSetting,
   bulkUpdateSettings,
@@ -780,6 +788,18 @@ router.get('/skills', getSkills);
 router.post('/skills', createSkill);
 router.put('/skills/:id', updateSkill);
 router.delete('/skills/:id', deleteSkill);
+
+// Master Data: Education Qualifications & Highest Degrees
+router.get('/education-master', getEducationMaster);
+router.post('/education-levels', addEducationLevel);
+router.delete('/education-levels/:name', deleteEducationLevel);
+router.post('/highest-degrees', addHighestDegree);
+router.delete('/highest-degrees/:name', deleteHighestDegree);
+
+// Candidate Education Records (Admin Management)
+router.post('/candidates/:candidateId/education', addCandidateEducation);
+router.delete('/candidates/:candidateId/education/:educationId', deleteCandidateEducation);
+router.put('/candidates/:candidateId/education-degree', updateCandidateEducationAndDegree);
 
 // CMS & Settings
 router.get('/cms', getSettings);

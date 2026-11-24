@@ -11,15 +11,22 @@ import { MYSQL_DATETIME_CLEANUP_QUERIES } from './mysql-datetime-queries';
 export async function sanitizeMysqlDatetimes(): Promise<void> {
   if (!isMysqlConfigured()) return;
 
-  // Temporarily disable strict SQL mode so zero dates can be matched and updated without error
+  // Execute cleanup queries inside a single connection transaction with relaxed sql_mode
   try {
-    await prisma.$executeRawUnsafe("SET SESSION sql_mode = ''");
-  } catch {}
-
-  for (const q of MYSQL_DATETIME_CLEANUP_QUERIES) {
-    try {
-      await prisma.$executeRawUnsafe(q);
-    } catch {}
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe("SET SESSION sql_mode = ''").catch(() => {});
+      for (const q of MYSQL_DATETIME_CLEANUP_QUERIES) {
+        try {
+          await tx.$executeRawUnsafe(q);
+        } catch {}
+      }
+    });
+  } catch {
+    for (const q of MYSQL_DATETIME_CLEANUP_QUERIES) {
+      try {
+        await prisma.$executeRawUnsafe(q);
+      } catch {}
+    }
   }
 }
 

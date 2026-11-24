@@ -426,6 +426,19 @@ export const adminAPI = {
   updateSkill: (id: string, data: Record<string, unknown>) =>
     api.put(`/admin/skills/${id}`, data),
   deleteSkill: (id: string) => api.delete(`/admin/skills/${id}`),
+  // Education & Degree Master
+  getEducationMaster: () => api.get('/admin/education-master'),
+  createEducationLevel: (data: { name: string }) => api.post('/admin/education-levels', data),
+  deleteEducationLevel: (name: string) => api.delete(`/admin/education-levels/${encodeURIComponent(name)}`),
+  createHighestDegree: (data: { name: string }) => api.post('/admin/highest-degrees', data),
+  deleteHighestDegree: (name: string) => api.delete(`/admin/highest-degrees/${encodeURIComponent(name)}`),
+  // Candidate Education Records (Admin)
+  addCandidateEducation: (candidateId: string, data: Record<string, unknown>) =>
+    api.post(`/admin/candidates/${candidateId}/education`, data),
+  deleteCandidateEducation: (candidateId: string, educationId: string) =>
+    api.delete(`/admin/candidates/${candidateId}/education/${educationId}`),
+  updateCandidateEducationAndDegree: (candidateId: string, data: { educationLevel?: string; highestDegree?: string }) =>
+    api.put(`/admin/candidates/${candidateId}/education-degree`, data),
   // Notifications
   sendNotification: (data: Record<string, unknown>) =>
     api.post('/admin/notifications', data),
@@ -496,6 +509,7 @@ export const publicAPI = {
   getTopCompanies: () => api.get('/companies/top'),
   getCoolPlaces: () => api.get('/cool-places'),
   getSettings: () => api.get('/settings'),
+  getEducationMaster: () => api.get('/education-master'),
 }
 
 // ─── Payments API ─────────────────────────────────────────────────────────────

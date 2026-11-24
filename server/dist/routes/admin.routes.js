@@ -654,6 +654,16 @@ router.get('/skills', admin_controller_1.getSkills);
 router.post('/skills', admin_controller_1.createSkill);
 router.put('/skills/:id', admin_controller_1.updateSkill);
 router.delete('/skills/:id', admin_controller_1.deleteSkill);
+// Master Data: Education Qualifications & Highest Degrees
+router.get('/education-master', admin_controller_1.getEducationMaster);
+router.post('/education-levels', admin_controller_1.addEducationLevel);
+router.delete('/education-levels/:name', admin_controller_1.deleteEducationLevel);
+router.post('/highest-degrees', admin_controller_1.addHighestDegree);
+router.delete('/highest-degrees/:name', admin_controller_1.deleteHighestDegree);
+// Candidate Education Records (Admin Management)
+router.post('/candidates/:candidateId/education', admin_controller_1.addCandidateEducation);
+router.delete('/candidates/:candidateId/education/:educationId', admin_controller_1.deleteCandidateEducation);
+router.put('/candidates/:candidateId/education-degree', admin_controller_1.updateCandidateEducationAndDegree);
 // CMS & Settings
 router.get('/cms', admin_controller_1.getSettings);
 router.put('/cms', admin_controller_1.bulkUpdateSettings);

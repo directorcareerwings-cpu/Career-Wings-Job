@@ -22,6 +22,7 @@ import {
   Image as ImageIcon,
   Mail,
   BookOpen,
+  GraduationCap,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
@@ -60,6 +61,7 @@ const navSections: NavSection[] = [
       { to: '/admin/categories', icon: Layers, label: 'Categories' },
       { to: '/admin/locations', icon: MapPin, label: 'Locations' },
       { to: '/admin/skills', icon: Zap, label: 'Skills' },
+      { to: '/admin/education', icon: GraduationCap, label: 'Education & Degrees' },
       { to: '/admin/cool-places', icon: Sparkles, label: 'Cool Places to Work' },
     ],
   },

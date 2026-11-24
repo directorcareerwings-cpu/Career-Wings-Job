@@ -15,6 +15,7 @@ import {
   getRobots,
   getPublicCoolPlaces,
   getPublicSettings,
+  getPublicEducationMaster,
 } from '../controllers/public.controller';
 
 const router = Router();
@@ -22,6 +23,7 @@ const router = Router();
 // Public endpoints
 router.get('/stats', getStats);
 router.get('/settings', getPublicSettings);
+router.get('/education-master', getPublicEducationMaster);
 router.get('/packages', getPublicPackages);
 router.get('/jobs/featured', getFeaturedJobs);
 router.get('/companies', getCompanies);

@@ -4,7 +4,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createCoolPlace = exports.getAdminCoolPlaces = exports.broadcastNotification = exports.getRegistrationReport = exports.getRevenueReport = exports.bulkUpdateSettings = exports.updateSetting = exports.getSettings = exports.deleteSkill = exports.updateSkill = exports.createSkill = exports.getSkills = exports.deleteLocation = exports.updateLocation = exports.createLocation = exports.getLocations = exports.deleteCategory = exports.updateCategory = exports.createCategory = exports.getCategories = exports.deleteCoupon = exports.updateCoupon = exports.createCoupon = exports.getCoupons = exports.getUserPackageHistoryHandler = exports.updateSubscriptionStatusHandler = exports.extendSubscriptionHandler = exports.assignPackageManually = exports.getAdminSubscriptions = exports.testRazorpayAdminConnectionHandler = exports.updateRazorpayAdminConfigHandler = exports.getRazorpayAdminConfigHandler = exports.getPaymentStatsHandler = exports.getAdminPayments = exports.deletePackage = exports.togglePackageActive = exports.duplicatePackage = exports.updatePackage = exports.createPackage = exports.getAdminPackages = exports.toggleFeatureJob = exports.rejectJob = exports.approveJob = exports.getAdminJobs = exports.toggleEmployerStatus = exports.verifyEmployer = exports.getAdminEmployers = exports.toggleCandidateStatus = exports.getAdminCandidates = exports.getDashboard = void 0;
-exports.getAdminEmailTemplatesHandler = exports.getAdminEmailStatsHandler = exports.retryAdminEmailHandler = exports.getAdminEmailLogsHandler = exports.testAdminEmailConnectionHandler = exports.updateAdminEmailConfigHandler = exports.getAdminEmailConfigHandler = exports.uploadLogo = exports.uploadHeroImage = exports.uploadCoolPlaceLogo = exports.deleteCoolPlace = exports.updateCoolPlace = void 0;
+exports.updateCandidateEducationAndDegree = exports.deleteCandidateEducation = exports.addCandidateEducation = exports.deleteHighestDegree = exports.addHighestDegree = exports.deleteEducationLevel = exports.addEducationLevel = exports.getEducationMaster = exports.DEFAULT_HIGHEST_DEGREES = exports.DEFAULT_EDUCATION_LEVELS = exports.getAdminEmailTemplatesHandler = exports.getAdminEmailStatsHandler = exports.retryAdminEmailHandler = exports.getAdminEmailLogsHandler = exports.testAdminEmailConnectionHandler = exports.updateAdminEmailConfigHandler = exports.getAdminEmailConfigHandler = exports.uploadLogo = exports.uploadHeroImage = exports.uploadCoolPlaceLogo = exports.deleteCoolPlace = exports.updateCoolPlace = void 0;
+exports.getEducationMasterData = getEducationMasterData;
 const prisma_1 = require("../lib/prisma");
 const response_1 = require("../lib/response");
 const errors_1 = require("../lib/errors");
@@ -1567,4 +1568,269 @@ const getAdminEmailTemplatesHandler = async (req, res, next) => {
     }
 };
 exports.getAdminEmailTemplatesHandler = getAdminEmailTemplatesHandler;
+// ========================================
+// EDUCATION & HIGHEST DEGREE MASTER MANAGEMENT
+// ========================================
+exports.DEFAULT_EDUCATION_LEVELS = [
+    '10th / HSLC',
+    '12th / Higher Secondary',
+    'Diploma / Polytechnic',
+    'Bachelor Degree',
+    'Master Degree',
+    'Post Graduate Diploma',
+    'Doctorate / Ph.D',
+    'Any qualification',
+];
+exports.DEFAULT_HIGHEST_DEGREES = [
+    'B.A',
+    'B.Com',
+    'B.Sc',
+    'B.Tech',
+    'B.E',
+    'BBA',
+    'BCA',
+    'B.Ed',
+    'B.Pharm',
+    'M.A',
+    'M.Com',
+    'M.Sc',
+    'M.Tech',
+    'MBA',
+    'MCA',
+    'M.Ed',
+    'M.Pharm',
+    'MBBS',
+    'BDS',
+    'BAMS',
+    'BHMS',
+    'Nursing (B.Sc / GNM)',
+    'LLB',
+    'LLM',
+    'Diploma / Polytechnic',
+    'ITI',
+    'Ph.D / Doctorate',
+    'CA / CS / ICWA',
+];
+async function getEducationMasterData() {
+    const [eduSetting, degreeSetting] = await Promise.all([
+        prisma_1.prisma.adminSetting.findUnique({ where: { key: 'MASTER_EDUCATION_LEVELS' } }),
+        prisma_1.prisma.adminSetting.findUnique({ where: { key: 'MASTER_HIGHEST_DEGREES' } }),
+    ]);
+    let educationLevels = exports.DEFAULT_EDUCATION_LEVELS;
+    if (eduSetting?.value) {
+        try {
+            const parsed = JSON.parse(eduSetting.value);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                educationLevels = parsed;
+            }
+        }
+        catch { }
+    }
+    let highestDegrees = exports.DEFAULT_HIGHEST_DEGREES;
+    if (degreeSetting?.value) {
+        try {
+            const parsed = JSON.parse(degreeSetting.value);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                highestDegrees = parsed;
+            }
+        }
+        catch { }
+    }
+    return { educationLevels, highestDegrees };
+}
+const getEducationMaster = async (req, res, next) => {
+    try {
+        const data = await getEducationMasterData();
+        (0, response_1.sendSuccess)(res, data, 'Education and degree master list');
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.getEducationMaster = getEducationMaster;
+const addEducationLevel = async (req, res, next) => {
+    try {
+        const { name } = req.body;
+        if (!name || typeof name !== 'string' || !name.trim()) {
+            throw new errors_1.AppError('Education level name is required', 400);
+        }
+        const trimmed = name.trim();
+        const data = await getEducationMasterData();
+        const exists = data.educationLevels.some(l => l.toLowerCase() === trimmed.toLowerCase());
+        if (exists) {
+            throw new errors_1.AppError('This education qualification already exists', 400);
+        }
+        const updated = [...data.educationLevels, trimmed];
+        await prisma_1.prisma.adminSetting.upsert({
+            where: { key: 'MASTER_EDUCATION_LEVELS' },
+            create: {
+                key: 'MASTER_EDUCATION_LEVELS',
+                value: JSON.stringify(updated),
+                group: 'CONTENT',
+                label: 'Master Educational Qualifications',
+                type: 'JSON',
+            },
+            update: {
+                value: JSON.stringify(updated),
+            },
+        });
+        (0, response_1.sendSuccess)(res, { educationLevels: updated }, 'Education level added successfully', 201);
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.addEducationLevel = addEducationLevel;
+const deleteEducationLevel = async (req, res, next) => {
+    try {
+        const name = decodeURIComponent(req.params.name || '').trim();
+        if (!name) {
+            throw new errors_1.AppError('Education level name is required', 400);
+        }
+        const data = await getEducationMasterData();
+        const updated = data.educationLevels.filter(l => l.toLowerCase() !== name.toLowerCase());
+        await prisma_1.prisma.adminSetting.upsert({
+            where: { key: 'MASTER_EDUCATION_LEVELS' },
+            create: {
+                key: 'MASTER_EDUCATION_LEVELS',
+                value: JSON.stringify(updated),
+                group: 'CONTENT',
+                label: 'Master Educational Qualifications',
+                type: 'JSON',
+            },
+            update: {
+                value: JSON.stringify(updated),
+            },
+        });
+        (0, response_1.sendSuccess)(res, { educationLevels: updated }, 'Education level deleted successfully');
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.deleteEducationLevel = deleteEducationLevel;
+const addHighestDegree = async (req, res, next) => {
+    try {
+        const { name } = req.body;
+        if (!name || typeof name !== 'string' || !name.trim()) {
+            throw new errors_1.AppError('Degree name is required', 400);
+        }
+        const trimmed = name.trim();
+        const data = await getEducationMasterData();
+        const exists = data.highestDegrees.some(d => d.toLowerCase() === trimmed.toLowerCase());
+        if (exists) {
+            throw new errors_1.AppError('This degree already exists', 400);
+        }
+        const updated = [...data.highestDegrees, trimmed];
+        await prisma_1.prisma.adminSetting.upsert({
+            where: { key: 'MASTER_HIGHEST_DEGREES' },
+            create: {
+                key: 'MASTER_HIGHEST_DEGREES',
+                value: JSON.stringify(updated),
+                group: 'CONTENT',
+                label: 'Master Highest Degrees',
+                type: 'JSON',
+            },
+            update: {
+                value: JSON.stringify(updated),
+            },
+        });
+        (0, response_1.sendSuccess)(res, { highestDegrees: updated }, 'Highest degree added successfully', 201);
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.addHighestDegree = addHighestDegree;
+const deleteHighestDegree = async (req, res, next) => {
+    try {
+        const name = decodeURIComponent(req.params.name || '').trim();
+        if (!name) {
+            throw new errors_1.AppError('Degree name is required', 400);
+        }
+        const data = await getEducationMasterData();
+        const updated = data.highestDegrees.filter(d => d.toLowerCase() !== name.toLowerCase());
+        await prisma_1.prisma.adminSetting.upsert({
+            where: { key: 'MASTER_HIGHEST_DEGREES' },
+            create: {
+                key: 'MASTER_HIGHEST_DEGREES',
+                value: JSON.stringify(updated),
+                group: 'CONTENT',
+                label: 'Master Highest Degrees',
+                type: 'JSON',
+            },
+            update: {
+                value: JSON.stringify(updated),
+            },
+        });
+        (0, response_1.sendSuccess)(res, { highestDegrees: updated }, 'Highest degree deleted successfully');
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.deleteHighestDegree = deleteHighestDegree;
+// Candidate Education Record management (Admin)
+const addCandidateEducation = async (req, res, next) => {
+    try {
+        const { candidateId } = req.params;
+        const { degree, institution, fieldOfStudy, startYear, endYear, grade } = req.body;
+        if (!degree || !institution || !startYear) {
+            throw new errors_1.AppError('Degree, institution, and start year are required', 400);
+        }
+        const candidate = await prisma_1.prisma.candidate.findUnique({ where: { id: candidateId } });
+        if (!candidate)
+            throw new errors_1.AppError('Candidate not found', 404);
+        const record = await prisma_1.prisma.education.create({
+            data: {
+                candidateId,
+                degree,
+                institution,
+                fieldOfStudy: fieldOfStudy || null,
+                startYear: Number(startYear),
+                endYear: endYear ? Number(endYear) : null,
+                grade: grade || null,
+            },
+        });
+        (0, response_1.sendSuccess)(res, record, 'Candidate education added successfully', 201);
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.addCandidateEducation = addCandidateEducation;
+const deleteCandidateEducation = async (req, res, next) => {
+    try {
+        const { candidateId, educationId } = req.params;
+        const record = await prisma_1.prisma.education.findFirst({
+            where: { id: educationId, candidateId },
+        });
+        if (!record)
+            throw new errors_1.AppError('Education record not found', 404);
+        await prisma_1.prisma.education.delete({ where: { id: educationId } });
+        (0, response_1.sendSuccess)(res, null, 'Candidate education deleted successfully');
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.deleteCandidateEducation = deleteCandidateEducation;
+const updateCandidateEducationAndDegree = async (req, res, next) => {
+    try {
+        const { candidateId } = req.params;
+        const { educationLevel, highestDegree } = req.body;
+        const candidate = await prisma_1.prisma.candidate.update({
+            where: { id: candidateId },
+            data: {
+                ...(educationLevel !== undefined ? { educationLevel } : {}),
+                ...(highestDegree !== undefined ? { highestDegree } : {}),
+            },
+        });
+        (0, response_1.sendSuccess)(res, candidate, 'Candidate qualification updated successfully');
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.updateCandidateEducationAndDegree = updateCandidateEducationAndDegree;
 //# sourceMappingURL=admin.controller.js.map

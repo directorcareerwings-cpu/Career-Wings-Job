@@ -86,18 +86,19 @@ export const getActiveSubscription = async (userId: string) => {
       include: { package: true },
     });
   } catch (err: any) {
-    if (err?.message?.includes('invalid datetime') || err?.message?.includes('Value out of range')) {
-      await sanitizeMysqlDatetimes().catch(() => {});
-      try {
-        expiredSubs = await prisma.subscription.findMany({
-          where: {
-            userId,
-            status: 'ACTIVE',
-            endDate: { lt: now },
-          },
-          include: { package: true },
-        });
-      } catch {}
+    console.warn('Notice querying expired subscriptions, attempting self-heal:', err?.message);
+    await sanitizeMysqlDatetimes().catch(() => {});
+    try {
+      expiredSubs = await prisma.subscription.findMany({
+        where: {
+          userId,
+          status: 'ACTIVE',
+          endDate: { lt: now },
+        },
+        include: { package: true },
+      });
+    } catch {
+      expiredSubs = [];
     }
   }
 
@@ -131,25 +132,30 @@ export const getActiveSubscription = async (userId: string) => {
       orderBy: { endDate: 'desc' },
     });
   } catch (err: any) {
-    if (err?.message?.includes('invalid datetime') || err?.message?.includes('Value out of range')) {
-      await sanitizeMysqlDatetimes().catch(() => {});
-      try {
-        activeSub = await prisma.subscription.findFirst({
-          where: {
-            userId,
-            status: 'ACTIVE',
-            endDate: { gte: now },
-          },
-          include: { package: true },
-          orderBy: { endDate: 'desc' },
-        });
-      } catch {}
+    console.warn('Notice querying active subscription, running sanitize:', err?.message);
+    await sanitizeMysqlDatetimes().catch(() => {});
+    try {
+      activeSub = await prisma.subscription.findFirst({
+        where: {
+          userId,
+          status: 'ACTIVE',
+          endDate: { gte: now },
+        },
+        include: { package: true },
+        orderBy: { endDate: 'desc' },
+      });
+    } catch {
+      activeSub = null;
     }
   }
 
   // If no active subscription exists, auto-enroll into role-based free package
   if (!activeSub) {
-    activeSub = await autoEnrollFreePackage(userId);
+    try {
+      activeSub = await autoEnrollFreePackage(userId);
+    } catch {
+      activeSub = null;
+    }
   }
 
   return activeSub;
@@ -465,8 +471,14 @@ export const expireSubscriptions = async (): Promise<void> => {
  * Comprehensive Subscription Summary for dashboard display
  */
 export const getSubscriptionSummary = async (userId: string) => {
-  const sub = await getActiveSubscription(userId);
-  const role = await getUserRole(userId);
+  let sub: any = null;
+  try {
+    sub = await getActiveSubscription(userId);
+  } catch (err: any) {
+    console.warn('Notice in getActiveSubscription within getSubscriptionSummary:', err?.message);
+    sub = null;
+  }
+  const role = await getUserRole(userId).catch(() => null);
 
   if (!sub) {
     const freePackage = await getFreePackage(role || undefined);

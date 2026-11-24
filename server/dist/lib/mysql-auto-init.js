@@ -17,16 +17,25 @@ const mysql_datetime_queries_1 = require("./mysql-datetime-queries");
 async function sanitizeMysqlDatetimes() {
     if (!(0, prisma_1.isMysqlConfigured)())
         return;
-    // Temporarily disable strict SQL mode so zero dates can be matched and updated without error
+    // Execute cleanup queries inside a single connection transaction with relaxed sql_mode
     try {
-        await prisma_1.prisma.$executeRawUnsafe("SET SESSION sql_mode = ''");
+        await prisma_1.prisma.$transaction(async (tx) => {
+            await tx.$executeRawUnsafe("SET SESSION sql_mode = ''").catch(() => { });
+            for (const q of mysql_datetime_queries_1.MYSQL_DATETIME_CLEANUP_QUERIES) {
+                try {
+                    await tx.$executeRawUnsafe(q);
+                }
+                catch { }
+            }
+        });
     }
-    catch { }
-    for (const q of mysql_datetime_queries_1.MYSQL_DATETIME_CLEANUP_QUERIES) {
-        try {
-            await prisma_1.prisma.$executeRawUnsafe(q);
+    catch {
+        for (const q of mysql_datetime_queries_1.MYSQL_DATETIME_CLEANUP_QUERIES) {
+            try {
+                await prisma_1.prisma.$executeRawUnsafe(q);
+            }
+            catch { }
         }
-        catch { }
     }
 }
 /**

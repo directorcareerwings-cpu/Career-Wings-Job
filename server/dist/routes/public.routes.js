@@ -6,6 +6,7 @@ const router = (0, express_1.Router)();
 // Public endpoints
 router.get('/stats', public_controller_1.getStats);
 router.get('/settings', public_controller_1.getPublicSettings);
+router.get('/education-master', public_controller_1.getPublicEducationMaster);
 router.get('/packages', public_controller_1.getPublicPackages);
 router.get('/jobs/featured', public_controller_1.getFeaturedJobs);
 router.get('/companies', public_controller_1.getCompanies);

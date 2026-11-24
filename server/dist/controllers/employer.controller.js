@@ -253,7 +253,13 @@ const postJob = async (req, res, next) => {
             throw new errors_1.AppError('Your employer account is currently pending Admin approval. Once our team approves your profile, you will be able to post jobs.', 403);
         }
         // Check subscription limit
-        const limitCheck = await (0, subscription_service_1.checkLimit)(req.user.id, 'jobPostings');
+        let limitCheck = { allowed: true };
+        try {
+            limitCheck = await (0, subscription_service_1.checkLimit)(req.user.id, 'jobPostings');
+        }
+        catch (err) {
+            console.warn('Notice checking job limit:', err);
+        }
         if (!limitCheck.allowed) {
             throw new errors_1.AppError('You have reached your job posting limit. Please upgrade your subscription.', 403);
         }
@@ -281,8 +287,14 @@ const postJob = async (req, res, next) => {
         const isAutoApprove = autoApprove?.value === 'true';
         const status = isAutoApprove ? 'PUBLISHED' : 'PENDING';
         // Calculate job validity from subscription
-        const subSummary = await (0, subscription_service_1.getSubscriptionSummary)(req.user.id);
-        const jobDurationDays = subSummary.limits?.jobDurationDays || 30;
+        let jobDurationDays = 30;
+        try {
+            const subSummary = await (0, subscription_service_1.getSubscriptionSummary)(req.user.id);
+            jobDurationDays = subSummary.limits?.jobDurationDays || 30;
+        }
+        catch (err) {
+            console.warn('Notice calculating job validity, fallback to 30 days:', err);
+        }
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + jobDurationDays);
         const fullLocationText = locationText || [city || 'Guwahati', district || 'Kamrup Metropolitan (Guwahati)', state || 'Assam'].filter(Boolean).join(', ');

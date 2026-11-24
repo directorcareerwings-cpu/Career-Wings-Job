@@ -78,6 +78,7 @@ const AdminCoupons = lazy(() => import('@/pages/admin/Coupons'))
 const AdminCategories = lazy(() => import('@/pages/admin/Categories'))
 const AdminLocations = lazy(() => import('@/pages/admin/Locations'))
 const AdminSkills = lazy(() => import('@/pages/admin/Skills'))
+const AdminEducation = lazy(() => import('@/pages/admin/Education'))
 const AdminNotifications = lazy(() => import('@/pages/admin/NotificationsAdmin'))
 const AdminReports = lazy(() => import('@/pages/admin/Reports'))
 const AdminCMS = lazy(() => import('@/pages/admin/CMS'))
@@ -201,6 +202,7 @@ export default function App() {
         <Route path="/admin/categories" element={<ProtectedRoute role="admin"><AdminCategories /></ProtectedRoute>} />
         <Route path="/admin/locations" element={<ProtectedRoute role="admin"><AdminLocations /></ProtectedRoute>} />
         <Route path="/admin/skills" element={<ProtectedRoute role="admin"><AdminSkills /></ProtectedRoute>} />
+        <Route path="/admin/education" element={<ProtectedRoute role="admin"><AdminEducation /></ProtectedRoute>} />
         <Route path="/admin/notifications" element={<ProtectedRoute role="admin"><AdminNotifications /></ProtectedRoute>} />
         <Route path="/admin/reports" element={<ProtectedRoute role="admin"><AdminReports /></ProtectedRoute>} />
         <Route path="/admin/blog" element={<ProtectedRoute role="admin"><AdminBlog /></ProtectedRoute>} />

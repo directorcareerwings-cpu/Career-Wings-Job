@@ -4,6 +4,7 @@ import { sendSuccess, sendPaginated } from '../lib/response';
 import { AppError } from '../lib/errors';
 import { getCached, setCached } from '../lib/memoryCache';
 import { sanitizeMysqlDatetimes } from '../lib/mysql-auto-init';
+import { getEducationMasterData } from './admin.controller';
 
 export const getStats = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -396,6 +397,15 @@ export const getPublicSettings = async (req: Request, res: Response, next: NextF
     });
     setCached('public_settings', map, 60);
     sendSuccess(res, map);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getPublicEducationMaster = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const data = await getEducationMasterData();
+    sendSuccess(res, data, 'Education and degree master list');
   } catch (error) {
     next(error);
   }

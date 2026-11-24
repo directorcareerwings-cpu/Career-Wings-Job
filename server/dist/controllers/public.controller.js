@@ -1,11 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getPublicSettings = exports.getPublicCoolPlaces = exports.getRobots = exports.getSitemap = exports.getLocationBySlug = exports.getLocations = exports.getCategoryBySlug = exports.getCategories = exports.getCompanyJobs = exports.getCompanyBySlug = exports.getTopCompanies = exports.getCompanies = exports.getFeaturedJobs = exports.getPublicPackages = exports.getStats = void 0;
+exports.getPublicEducationMaster = exports.getPublicSettings = exports.getPublicCoolPlaces = exports.getRobots = exports.getSitemap = exports.getLocationBySlug = exports.getLocations = exports.getCategoryBySlug = exports.getCategories = exports.getCompanyJobs = exports.getCompanyBySlug = exports.getTopCompanies = exports.getCompanies = exports.getFeaturedJobs = exports.getPublicPackages = exports.getStats = void 0;
 const prisma_1 = require("../lib/prisma");
 const response_1 = require("../lib/response");
 const errors_1 = require("../lib/errors");
 const memoryCache_1 = require("../lib/memoryCache");
 const mysql_auto_init_1 = require("../lib/mysql-auto-init");
+const admin_controller_1 = require("./admin.controller");
 const getStats = async (req, res, next) => {
     try {
         const [totalJobs, totalCompanies, totalCandidates] = await Promise.all([
@@ -397,4 +398,14 @@ const getPublicSettings = async (req, res, next) => {
     }
 };
 exports.getPublicSettings = getPublicSettings;
+const getPublicEducationMaster = async (req, res, next) => {
+    try {
+        const data = await (0, admin_controller_1.getEducationMasterData)();
+        (0, response_1.sendSuccess)(res, data, 'Education and degree master list');
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.getPublicEducationMaster = getPublicEducationMaster;
 //# sourceMappingURL=public.controller.js.map

@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
+import { useEducationMaster } from '@/hooks/useEducationMaster'
 import { UpgradeBanner } from '@/components/common/UpgradePromptModal'
 
 const ASSAM_DISTRICTS = [
@@ -116,6 +117,7 @@ export default function PostJob() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false)
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
+  const { educationLevels, highestDegrees } = useEducationMaster()
 
   // Form State
   const [form, setForm] = useState({
@@ -559,13 +561,9 @@ Benefits & Compensation:
                     onChange={handleChange}
                     className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 appearance-none bg-white focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-colors cursor-pointer"
                   >
-                    <option value="Any qualification">Any qualification</option>
-                    <option value="10th Pass">10th Pass</option>
-                    <option value="12th Pass">12th Pass</option>
-                    <option value="Diploma / ITI">Diploma / ITI</option>
-                    <option value="Bachelor Degree">Bachelor Degree</option>
-                    <option value="Master Degree">Master Degree</option>
-                    <option value="Doctorate / Ph.D">Doctorate / Ph.D</option>
+                    {educationLevels.map((lvl) => (
+                      <option key={lvl} value={lvl}>{lvl}</option>
+                    ))}
                   </select>
                   <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3.5 top-3 pointer-events-none" />
                 </div>
@@ -620,7 +618,7 @@ Benefits & Compensation:
               {/* Degree Dropdown Menu */}
               {degreeDropdownOpen && (
                 <div className="mt-2 p-3 bg-white rounded-xl border border-slate-200 shadow-lg grid grid-cols-3 sm:grid-cols-5 gap-2 max-h-56 overflow-y-auto">
-                  {POPULAR_DEGREES.map((deg) => {
+                  {highestDegrees.map((deg) => {
                     const isSelected = selectedDegrees.includes(deg)
                     return (
                       <button
@@ -701,7 +699,7 @@ Benefits & Compensation:
                     </button>
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {POPULAR_DEGREES.map((deg) => (
+                    {(highestDegrees && highestDegrees.length > 0 ? highestDegrees : POPULAR_DEGREES).map((deg) => (
                       <button
                         key={deg}
                         type="button"

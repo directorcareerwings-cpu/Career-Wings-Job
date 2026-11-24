@@ -1524,5 +1524,252 @@ export const getAdminEmailTemplatesHandler = async (req: Request, res: Response,
   } catch (error) { next(error); }
 };
 
+// ========================================
+// EDUCATION & HIGHEST DEGREE MASTER MANAGEMENT
+// ========================================
+
+export const DEFAULT_EDUCATION_LEVELS = [
+  '10th / HSLC',
+  '12th / Higher Secondary',
+  'Diploma / Polytechnic',
+  'Bachelor Degree',
+  'Master Degree',
+  'Post Graduate Diploma',
+  'Doctorate / Ph.D',
+  'Any qualification',
+];
+
+export const DEFAULT_HIGHEST_DEGREES = [
+  'B.A',
+  'B.Com',
+  'B.Sc',
+  'B.Tech',
+  'B.E',
+  'BBA',
+  'BCA',
+  'B.Ed',
+  'B.Pharm',
+  'M.A',
+  'M.Com',
+  'M.Sc',
+  'M.Tech',
+  'MBA',
+  'MCA',
+  'M.Ed',
+  'M.Pharm',
+  'MBBS',
+  'BDS',
+  'BAMS',
+  'BHMS',
+  'Nursing (B.Sc / GNM)',
+  'LLB',
+  'LLM',
+  'Diploma / Polytechnic',
+  'ITI',
+  'Ph.D / Doctorate',
+  'CA / CS / ICWA',
+];
+
+export async function getEducationMasterData(): Promise<{ educationLevels: string[]; highestDegrees: string[] }> {
+  const [eduSetting, degreeSetting] = await Promise.all([
+    prisma.adminSetting.findUnique({ where: { key: 'MASTER_EDUCATION_LEVELS' } }),
+    prisma.adminSetting.findUnique({ where: { key: 'MASTER_HIGHEST_DEGREES' } }),
+  ]);
+
+  let educationLevels: string[] = DEFAULT_EDUCATION_LEVELS;
+  if (eduSetting?.value) {
+    try {
+      const parsed = JSON.parse(eduSetting.value);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        educationLevels = parsed;
+      }
+    } catch {}
+  }
+
+  let highestDegrees: string[] = DEFAULT_HIGHEST_DEGREES;
+  if (degreeSetting?.value) {
+    try {
+      const parsed = JSON.parse(degreeSetting.value);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        highestDegrees = parsed;
+      }
+    } catch {}
+  }
+
+  return { educationLevels, highestDegrees };
+}
+
+export const getEducationMaster = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const data = await getEducationMasterData();
+    sendSuccess(res, data, 'Education and degree master list');
+  } catch (error) { next(error); }
+};
+
+export const addEducationLevel = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { name } = req.body;
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      throw new AppError('Education level name is required', 400);
+    }
+    const trimmed = name.trim();
+    const data = await getEducationMasterData();
+    const exists = data.educationLevels.some(l => l.toLowerCase() === trimmed.toLowerCase());
+    if (exists) {
+      throw new AppError('This education qualification already exists', 400);
+    }
+    const updated = [...data.educationLevels, trimmed];
+    await prisma.adminSetting.upsert({
+      where: { key: 'MASTER_EDUCATION_LEVELS' },
+      create: {
+        key: 'MASTER_EDUCATION_LEVELS',
+        value: JSON.stringify(updated),
+        group: 'CONTENT',
+        label: 'Master Educational Qualifications',
+        type: 'JSON',
+      },
+      update: {
+        value: JSON.stringify(updated),
+      },
+    });
+    sendSuccess(res, { educationLevels: updated }, 'Education level added successfully', 201);
+  } catch (error) { next(error); }
+};
+
+export const deleteEducationLevel = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const name = decodeURIComponent(req.params.name || '').trim();
+    if (!name) {
+      throw new AppError('Education level name is required', 400);
+    }
+    const data = await getEducationMasterData();
+    const updated = data.educationLevels.filter(l => l.toLowerCase() !== name.toLowerCase());
+    await prisma.adminSetting.upsert({
+      where: { key: 'MASTER_EDUCATION_LEVELS' },
+      create: {
+        key: 'MASTER_EDUCATION_LEVELS',
+        value: JSON.stringify(updated),
+        group: 'CONTENT',
+        label: 'Master Educational Qualifications',
+        type: 'JSON',
+      },
+      update: {
+        value: JSON.stringify(updated),
+      },
+    });
+    sendSuccess(res, { educationLevels: updated }, 'Education level deleted successfully');
+  } catch (error) { next(error); }
+};
+
+export const addHighestDegree = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { name } = req.body;
+    if (!name || typeof name !== 'string' || !name.trim()) {
+      throw new AppError('Degree name is required', 400);
+    }
+    const trimmed = name.trim();
+    const data = await getEducationMasterData();
+    const exists = data.highestDegrees.some(d => d.toLowerCase() === trimmed.toLowerCase());
+    if (exists) {
+      throw new AppError('This degree already exists', 400);
+    }
+    const updated = [...data.highestDegrees, trimmed];
+    await prisma.adminSetting.upsert({
+      where: { key: 'MASTER_HIGHEST_DEGREES' },
+      create: {
+        key: 'MASTER_HIGHEST_DEGREES',
+        value: JSON.stringify(updated),
+        group: 'CONTENT',
+        label: 'Master Highest Degrees',
+        type: 'JSON',
+      },
+      update: {
+        value: JSON.stringify(updated),
+      },
+    });
+    sendSuccess(res, { highestDegrees: updated }, 'Highest degree added successfully', 201);
+  } catch (error) { next(error); }
+};
+
+export const deleteHighestDegree = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const name = decodeURIComponent(req.params.name || '').trim();
+    if (!name) {
+      throw new AppError('Degree name is required', 400);
+    }
+    const data = await getEducationMasterData();
+    const updated = data.highestDegrees.filter(d => d.toLowerCase() !== name.toLowerCase());
+    await prisma.adminSetting.upsert({
+      where: { key: 'MASTER_HIGHEST_DEGREES' },
+      create: {
+        key: 'MASTER_HIGHEST_DEGREES',
+        value: JSON.stringify(updated),
+        group: 'CONTENT',
+        label: 'Master Highest Degrees',
+        type: 'JSON',
+      },
+      update: {
+        value: JSON.stringify(updated),
+      },
+    });
+    sendSuccess(res, { highestDegrees: updated }, 'Highest degree deleted successfully');
+  } catch (error) { next(error); }
+};
+
+// Candidate Education Record management (Admin)
+export const addCandidateEducation = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { candidateId } = req.params;
+    const { degree, institution, fieldOfStudy, startYear, endYear, grade } = req.body;
+    if (!degree || !institution || !startYear) {
+      throw new AppError('Degree, institution, and start year are required', 400);
+    }
+    const candidate = await prisma.candidate.findUnique({ where: { id: candidateId } });
+    if (!candidate) throw new AppError('Candidate not found', 404);
+
+    const record = await prisma.education.create({
+      data: {
+        candidateId,
+        degree,
+        institution,
+        fieldOfStudy: fieldOfStudy || null,
+        startYear: Number(startYear),
+        endYear: endYear ? Number(endYear) : null,
+        grade: grade || null,
+      },
+    });
+    sendSuccess(res, record, 'Candidate education added successfully', 201);
+  } catch (error) { next(error); }
+};
+
+export const deleteCandidateEducation = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { candidateId, educationId } = req.params;
+    const record = await prisma.education.findFirst({
+      where: { id: educationId, candidateId },
+    });
+    if (!record) throw new AppError('Education record not found', 404);
+
+    await prisma.education.delete({ where: { id: educationId } });
+    sendSuccess(res, null, 'Candidate education deleted successfully');
+  } catch (error) { next(error); }
+};
+
+export const updateCandidateEducationAndDegree = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { candidateId } = req.params;
+    const { educationLevel, highestDegree } = req.body;
+    const candidate = await prisma.candidate.update({
+      where: { id: candidateId },
+      data: {
+        ...(educationLevel !== undefined ? { educationLevel } : {}),
+        ...(highestDegree !== undefined ? { highestDegree } : {}),
+      },
+    });
+    sendSuccess(res, candidate, 'Candidate qualification updated successfully');
+  } catch (error) { next(error); }
+};
+
+
 
 

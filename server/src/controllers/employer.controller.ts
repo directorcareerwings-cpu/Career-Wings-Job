@@ -248,7 +248,12 @@ export const postJob = async (req: AuthenticatedRequest, res: Response, next: Ne
     }
 
     // Check subscription limit
-    const limitCheck = await checkLimit(req.user!.id, 'jobPostings');
+    let limitCheck = { allowed: true };
+    try {
+      limitCheck = await checkLimit(req.user!.id, 'jobPostings');
+    } catch (err) {
+      console.warn('Notice checking job limit:', err);
+    }
     if (!limitCheck.allowed) {
       throw new AppError('You have reached your job posting limit. Please upgrade your subscription.', 403);
     }
@@ -293,8 +298,13 @@ export const postJob = async (req: AuthenticatedRequest, res: Response, next: Ne
     const status = isAutoApprove ? 'PUBLISHED' : 'PENDING';
 
     // Calculate job validity from subscription
-    const subSummary = await getSubscriptionSummary(req.user!.id);
-    const jobDurationDays = (subSummary.limits?.jobDurationDays as number) || 30;
+    let jobDurationDays = 30;
+    try {
+      const subSummary = await getSubscriptionSummary(req.user!.id);
+      jobDurationDays = (subSummary.limits?.jobDurationDays as number) || 30;
+    } catch (err) {
+      console.warn('Notice calculating job validity, fallback to 30 days:', err);
+    }
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + jobDurationDays);
 
