@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { sendSuccess, sendPaginated } from '../lib/response';
 import { AppError } from '../lib/errors';
 import { getCached, setCached } from '../lib/memoryCache';
+import { sanitizeMysqlDatetimes } from '../lib/mysql-auto-init';
 
 export const getStats = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -29,10 +30,23 @@ export const getPublicPackages = async (req: Request, res: Response, next: NextF
     const where: Record<string, unknown> = { isActive: true };
     if (type) where.type = String(type).toUpperCase();
 
-    const packages = await prisma.package.findMany({
-      where,
-      orderBy: { sortOrder: 'asc' },
-    });
+    let packages;
+    try {
+      packages = await prisma.package.findMany({
+        where,
+        orderBy: { sortOrder: 'asc' },
+      });
+    } catch (dbErr: any) {
+      if (dbErr?.message?.includes('invalid datetime') || dbErr?.message?.includes('Value out of range')) {
+        await sanitizeMysqlDatetimes().catch(() => {});
+        packages = await prisma.package.findMany({
+          where,
+          orderBy: { sortOrder: 'asc' },
+        });
+      } else {
+        throw dbErr;
+      }
+    }
     sendSuccess(res, packages);
   } catch (error) {
     next(error);

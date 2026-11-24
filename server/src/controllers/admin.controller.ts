@@ -16,6 +16,7 @@ import {
   clearEmailConfigCache,
   retryFailedEmail,
 } from '../services/email.service';
+import { sanitizeMysqlDatetimes } from '../lib/mysql-auto-init';
 
 // ---- DASHBOARD ----
 
@@ -422,9 +423,21 @@ export const toggleFeatureJob = async (req: AuthenticatedRequest, res: Response,
 
 export const getAdminPackages = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const packages = await prisma.package.findMany({
-      orderBy: [{ type: 'asc' }, { sortOrder: 'asc' }, { createdAt: 'desc' }],
-    });
+    let packages;
+    try {
+      packages = await prisma.package.findMany({
+        orderBy: [{ type: 'asc' }, { sortOrder: 'asc' }, { createdAt: 'desc' }],
+      });
+    } catch (dbErr: any) {
+      if (dbErr?.message?.includes('invalid datetime') || dbErr?.message?.includes('Value out of range')) {
+        await sanitizeMysqlDatetimes().catch(() => {});
+        packages = await prisma.package.findMany({
+          orderBy: [{ type: 'asc' }, { sortOrder: 'asc' }, { createdAt: 'desc' }],
+        });
+      } else {
+        throw dbErr;
+      }
+    }
     sendSuccess(res, packages);
   } catch (error) { next(error); }
 };

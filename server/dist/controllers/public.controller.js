@@ -5,6 +5,7 @@ const prisma_1 = require("../lib/prisma");
 const response_1 = require("../lib/response");
 const errors_1 = require("../lib/errors");
 const memoryCache_1 = require("../lib/memoryCache");
+const mysql_auto_init_1 = require("../lib/mysql-auto-init");
 const getStats = async (req, res, next) => {
     try {
         const [totalJobs, totalCompanies, totalCandidates] = await Promise.all([
@@ -30,10 +31,25 @@ const getPublicPackages = async (req, res, next) => {
         const where = { isActive: true };
         if (type)
             where.type = String(type).toUpperCase();
-        const packages = await prisma_1.prisma.package.findMany({
-            where,
-            orderBy: { sortOrder: 'asc' },
-        });
+        let packages;
+        try {
+            packages = await prisma_1.prisma.package.findMany({
+                where,
+                orderBy: { sortOrder: 'asc' },
+            });
+        }
+        catch (dbErr) {
+            if (dbErr?.message?.includes('invalid datetime') || dbErr?.message?.includes('Value out of range')) {
+                await (0, mysql_auto_init_1.sanitizeMysqlDatetimes)().catch(() => { });
+                packages = await prisma_1.prisma.package.findMany({
+                    where,
+                    orderBy: { sortOrder: 'asc' },
+                });
+            }
+            else {
+                throw dbErr;
+            }
+        }
         (0, response_1.sendSuccess)(res, packages);
     }
     catch (error) {

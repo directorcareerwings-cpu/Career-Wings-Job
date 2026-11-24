@@ -1032,7 +1032,7 @@ ALTER TABLE `ChatMessage` ADD CONSTRAINT `ChatMessage_senderId_fkey` FOREIGN KEY
 
 -- ==============================================================
 -- Career Wings — Full MySQL Database Dump
--- Generated: 2026-11-24T12:47:46.268Z
+-- Generated: 2026-11-24T15:07:03.900Z
 -- Source SQLite Database: careerwings_production.db
 -- Suitable for 1-Click Import into Hostinger phpMyAdmin
 -- ==============================================================

@@ -13,6 +13,7 @@ const payment_service_1 = require("../services/payment.service");
 const seo_service_1 = require("../services/seo.service");
 const subscription_service_1 = require("../services/subscription.service");
 const email_service_1 = require("../services/email.service");
+const mysql_auto_init_1 = require("../lib/mysql-auto-init");
 // ---- DASHBOARD ----
 const getDashboard = async (req, res, next) => {
     try {
@@ -398,9 +399,23 @@ exports.toggleFeatureJob = toggleFeatureJob;
 // ---- PACKAGES ----
 const getAdminPackages = async (req, res, next) => {
     try {
-        const packages = await prisma_1.prisma.package.findMany({
-            orderBy: [{ type: 'asc' }, { sortOrder: 'asc' }, { createdAt: 'desc' }],
-        });
+        let packages;
+        try {
+            packages = await prisma_1.prisma.package.findMany({
+                orderBy: [{ type: 'asc' }, { sortOrder: 'asc' }, { createdAt: 'desc' }],
+            });
+        }
+        catch (dbErr) {
+            if (dbErr?.message?.includes('invalid datetime') || dbErr?.message?.includes('Value out of range')) {
+                await (0, mysql_auto_init_1.sanitizeMysqlDatetimes)().catch(() => { });
+                packages = await prisma_1.prisma.package.findMany({
+                    orderBy: [{ type: 'asc' }, { sortOrder: 'asc' }, { createdAt: 'desc' }],
+                });
+            }
+            else {
+                throw dbErr;
+            }
+        }
         (0, response_1.sendSuccess)(res, packages);
     }
     catch (error) {
