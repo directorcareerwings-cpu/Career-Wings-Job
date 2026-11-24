@@ -1,0 +1,17 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # 1. Reverse proxy API calls to the local Node.js application
+  RewriteRule ^api/(.*) http://127.0.0.1:5000/api/$1 [P,L]
+
+  # 2. Reverse proxy uploaded resumes/files to the backend
+  RewriteRule ^uploads/(.*) http://127.0.0.1:5000/uploads/$1 [P,L]
+
+  # 3. React Router Single Page App fallback
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteCond %{REQUEST_FILENAME} !-l
+  RewriteRule . /index.html [L]
+</IfModule>
