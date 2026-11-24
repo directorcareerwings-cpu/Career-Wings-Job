@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import slugify from 'slugify';
-import { prisma } from '../lib/prisma';
+import { prisma, isMysqlConfigured } from '../lib/prisma';
 import { sendSuccess } from '../lib/response';
 import { AppError } from '../lib/errors';
 
@@ -8,6 +8,7 @@ import { AppError } from '../lib/errors';
  * Ensure BlogPost table exists in SQLite database (zero-dependency fail-safe)
  */
 export const ensureBlogPostTable = async (): Promise<void> => {
+  if (isMysqlConfigured()) return;
   try {
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "BlogPost" (

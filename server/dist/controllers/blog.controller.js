@@ -12,6 +12,8 @@ const errors_1 = require("../lib/errors");
  * Ensure BlogPost table exists in SQLite database (zero-dependency fail-safe)
  */
 const ensureBlogPostTable = async () => {
+    if ((0, prisma_1.isMysqlConfigured)())
+        return;
     try {
         await prisma_1.prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "BlogPost" (

@@ -1,0 +1,1072 @@
+// Career Wings - Production Database Schema
+// Using SQLite for local dev (switch to postgresql for production)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ========================================
+// ENUMS (SQLite uses String for enums)
+// ========================================
+
+// User roles
+// role: "CANDIDATE" | "EMPLOYER" | "ADMIN"
+
+// Job statuses
+// status: "DRAFT" | "PENDING" | "PUBLISHED" | "FEATURED" | "PAUSED" | "CLOSED" | "EXPIRED" | "REJECTED"
+
+// Application statuses
+// status: "APPLIED" | "VIEWED" | "SHORTLISTED" | "INTERVIEW" | "SELECTED" | "REJECTED"
+
+// Work mode
+// workMode: "REMOTE" | "ON_SITE" | "HYBRID"
+
+// Job type
+// jobType: "FULL_TIME" | "PART_TIME" | "CONTRACT" | "INTERNSHIP" | "FREELANCE"
+
+// Package type
+// packageType: "CANDIDATE" | "EMPLOYER"
+
+// Payment status
+// paymentStatus: "PENDING" | "SUCCESS" | "FAILED" | "CANCELLED" | "REFUNDED"
+
+// Notification type
+// notificationType: "APPLICATION" | "JOB_ALERT" | "PACKAGE" | "SYSTEM"
+
+// ========================================
+// CORE MODELS
+// ========================================
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  role          String   @default("CANDIDATE") // CANDIDATE | EMPLOYER | ADMIN
+  isActive      Boolean  @default(true)
+  isVerified    Boolean  @default(false)
+  emailVerifiedAt DateTime?
+  lastLoginAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  candidate     Candidate?
+  employer      Employer?
+  refreshTokens RefreshToken[]
+  notifications Notification[]
+  payments      Payment[]
+  subscriptions Subscription[]
+  auditLogs     AuditLog[]
+  passwordResets PasswordReset[]
+  emailLogs     EmailLog[]
+  otpVerifications OtpVerification[]
+  chatMessages  ChatMessage[]
+
+  @@index([email])
+  @@index([role])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  isRevoked Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+}
+
+model PasswordReset {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  isUsed    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+}
+
+// ========================================
+// CANDIDATE MODELS
+// ========================================
+
+model Candidate {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  firstName         String
+  lastName          String
+  phone             String?
+  dateOfBirth       String?
+  gender            String?  // MALE | FEMALE | OTHER | PREFER_NOT_TO_SAY
+  profilePhoto      String?
+  headline          String?
+  summary           String?
+  currentLocation   String?
+  preferredLocations String?  // JSON array as string
+  expectedSalaryMin Int?
+  expectedSalaryMax Int?
+  currentSalary     Int?
+  noticePeriod      String?  // IMMEDIATE | 15_DAYS | 30_DAYS | 60_DAYS | 90_DAYS
+  availabilityStatus String? // ACTIVELY_LOOKING | OPEN | NOT_LOOKING
+  totalExperience   Float?   // in years
+  currentRole       String?  // e.g. Senior Software Engineer / Sales Exec
+  currentCompany    String?  // e.g. TCS / Wipro / Career Wings / Freelance
+  country           String?  @default("India IN")
+  state             String?  // e.g. Assam, Meghalaya
+  city              String?  // e.g. Guwahati, Shillong
+  educationLevel    String?  // e.g. Bachelor Degree, Master Degree
+  highestDegree     String?  // e.g. B.A, B.Com, B.Sc, B.Tech, MBA
+  college           String?  // e.g. Gauhati University / Cotton University
+  profileCompletion Int      @default(0)
+  
+  // Privacy settings
+  resumeVisibility  String   @default("PUBLIC") // PUBLIC | EMPLOYERS_ONLY | PRIVATE
+  profileVisibility String   @default("PUBLIC")
+  showEmail         Boolean  @default(false)
+  showPhone         Boolean  @default(false)
+  
+  // Resume
+  resumeFile        String?
+  resumeFileName    String?
+  resumeUpdatedAt   DateTime?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  deletedAt         DateTime?
+
+  // Relations
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  education         Education[]
+  experience        Experience[]
+  candidateSkills   CandidateSkill[]
+  certifications    Certification[]
+  languages         CandidateLanguage[]
+  applications      Application[]
+  savedJobs         SavedJob[]
+  jobAlerts         JobAlert[]
+  conversations     Conversation[]
+
+  @@index([userId])
+  @@index([currentLocation])
+  @@index([availabilityStatus])
+}
+
+model Education {
+  id           String   @id @default(cuid())
+  candidateId  String
+  institution  String
+  degree       String
+  fieldOfStudy String?
+  startYear    Int
+  endYear      Int?
+  isCurrently  Boolean  @default(false)
+  grade        String?
+  description  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  candidate    Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+}
+
+model Experience {
+  id           String   @id @default(cuid())
+  candidateId  String
+  company      String
+  title        String
+  location     String?
+  workMode     String?
+  startDate    String
+  endDate      String?
+  isCurrent    Boolean  @default(false)
+  description  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  candidate    Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+}
+
+model Certification {
+  id          String   @id @default(cuid())
+  candidateId String
+  name        String
+  issuer      String
+  issueDate   String?
+  expiryDate  String?
+  credentialId String?
+  credentialUrl String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+}
+
+model CandidateLanguage {
+  id          String   @id @default(cuid())
+  candidateId String
+  language    String
+  proficiency String   // BASIC | CONVERSATIONAL | PROFESSIONAL | NATIVE
+
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@unique([candidateId, language])
+  @@index([candidateId])
+}
+
+// ========================================
+// EMPLOYER MODELS
+// ========================================
+
+model Employer {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  companyId       String?
+  firstName       String
+  lastName        String
+  phone           String?
+  designation     String?
+  isVerified      Boolean  @default(false)
+  verifiedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company         Company? @relation(fields: [companyId], references: [id])
+  jobs            Job[]
+  savedCandidates SavedCandidate[]
+  resumeSearchLogs ResumeSearchLog[]
+  conversations   Conversation[]
+
+  @@index([userId])
+  @@index([companyId])
+}
+
+model Company {
+  id              String   @id @default(cuid())
+  name            String
+  slug            String   @unique
+  logo            String?
+  website         String?
+  email           String?
+  phone           String?
+  description     String?
+  industry        String?
+  companySize     String?  // 1-10 | 11-50 | 51-200 | 201-500 | 501-1000 | 1000+
+  foundedYear     Int?
+  headquarters    String?
+  linkedin        String?
+  twitter         String?
+  facebook        String?
+  isVerified      Boolean  @default(false)
+  isFeatured      Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  // Relations
+  employers       Employer[]
+  jobs            Job[]
+
+  @@index([slug])
+  @@index([industry])
+  @@index([isVerified])
+}
+
+// ========================================
+// JOB MODELS
+// ========================================
+
+model Job {
+  id              String   @id @default(cuid())
+  slug            String   @unique
+  title           String
+  employerId      String
+  companyId       String?
+  
+  // Job details
+  description     String
+  responsibilities String?
+  requirements    String?
+  benefits        String?
+  
+  // Classification
+  categoryId      String?
+  industryId      String?
+  department      String?
+  
+  // Compensation
+  salaryMin       Int?
+  salaryMax       Int?
+  salaryCurrency  String   @default("INR")
+  salaryPeriod    String   @default("MONTHLY") // MONTHLY | YEARLY | HOURLY
+  showSalary      Boolean  @default(true)
+  
+  // Location
+  locationId      String?
+  locationText    String?
+  state           String?  @default("Assam")
+  district        String?  @default("Kamrup Metropolitan (Guwahati)")
+  city            String?  @default("Guwahati")
+  country         String?  @default("India")
+  workMode        String   @default("ON_SITE") // REMOTE | ON_SITE | HYBRID
+  
+  // Job type
+  jobType         String   @default("FULL_TIME") // FULL_TIME | PART_TIME | CONTRACT | INTERNSHIP | FREELANCE
+  
+  // Requirements
+  experienceMin   Int?     // in years
+  experienceMax   Int?
+  educationLevel  String?
+  highestDegree   String?
+  genderPreference String?
+  vacancies       Int      @default(1)
+  
+  // Application
+  applicationDeadline DateTime?
+  applicationMethod  String  @default("PORTAL") // PORTAL | EMAIL | EXTERNAL
+  applicationEmail   String?
+  applicationUrl     String?
+  
+  // Status
+  status          String   @default("DRAFT")   // DRAFT | PENDING | PUBLISHED | FEATURED | PAUSED | CLOSED | EXPIRED | REJECTED
+  rejectionReason String?
+  isFeatured      Boolean  @default(false)
+  
+  // SEO
+  seoTitle        String?
+  seoDescription  String?
+  
+  // Stats
+  viewCount       Int      @default(0)
+  applicationCount Int     @default(0)
+  
+  // Timing
+  publishedAt     DateTime?
+  expiresAt       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  // Relations
+  employer        Employer @relation(fields: [employerId], references: [id])
+  company         Company? @relation(fields: [companyId], references: [id])
+  category        Category? @relation(fields: [categoryId], references: [id])
+  industry        Industry? @relation(fields: [industryId], references: [id])
+  location        Location? @relation(fields: [locationId], references: [id])
+  jobSkills       JobSkill[]
+  applications    Application[]
+  savedByUsers    SavedJob[]
+  conversations   Conversation[]
+
+  @@index([slug])
+  @@index([status])
+  @@index([employerId])
+  @@index([companyId])
+  @@index([categoryId])
+  @@index([locationId])
+  @@index([jobType])
+  @@index([workMode])
+  @@index([isFeatured])
+  @@index([publishedAt])
+  @@index([expiresAt])
+}
+
+// ========================================
+// SKILLS & MASTER DATA
+// ========================================
+
+model Skill {
+  id             String   @id @default(cuid())
+  name           String   @unique
+  slug           String   @unique
+  category       String?
+  isPopular      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  candidateSkills CandidateSkill[]
+  jobSkills       JobSkill[]
+
+  @@index([slug])
+  @@index([isPopular])
+}
+
+model CandidateSkill {
+  id          String   @id @default(cuid())
+  candidateId String
+  skillId     String
+  proficiency String?  // BEGINNER | INTERMEDIATE | EXPERT
+
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  skill       Skill     @relation(fields: [skillId], references: [id])
+
+  @@unique([candidateId, skillId])
+  @@index([candidateId])
+  @@index([skillId])
+}
+
+model JobSkill {
+  id      String @id @default(cuid())
+  jobId   String
+  skillId String
+  isRequired Boolean @default(true)
+
+  job     Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  skill   Skill  @relation(fields: [skillId], references: [id])
+
+  @@unique([jobId, skillId])
+  @@index([jobId])
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  icon        String?
+  description String?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  jobCount    Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  jobs        Job[]
+
+  @@index([slug])
+  @@index([isActive])
+}
+
+model Location {
+  id        String   @id @default(cuid())
+  city      String
+  state     String
+  country   String   @default("India")
+  slug      String   @unique
+  isPopular Boolean  @default(false)
+  jobCount  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  jobs      Job[]
+
+  @@index([slug])
+  @@index([state])
+  @@index([isPopular])
+}
+
+model Industry {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  jobs      Job[]
+
+  @@index([slug])
+}
+
+// ========================================
+// APPLICATION SYSTEM
+// ========================================
+
+model Application {
+  id            String   @id @default(cuid())
+  candidateId   String
+  jobId         String
+  resumeSnapshot String?  // path to resume at time of application
+  coverLetter   String?
+  status        String   @default("APPLIED") // APPLIED | VIEWED | SHORTLISTED | INTERVIEW | SELECTED | REJECTED
+  employerNotes String?
+  rejectionReason String?
+  appliedAt     DateTime @default(now())
+  viewedAt      DateTime?
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  candidate     Candidate @relation(fields: [candidateId], references: [id])
+  job           Job       @relation(fields: [jobId], references: [id])
+
+  @@unique([candidateId, jobId]) // prevent duplicate applications
+  @@index([candidateId])
+  @@index([jobId])
+  @@index([status])
+  @@index([appliedAt])
+}
+
+model SavedJob {
+  id          String   @id @default(cuid())
+  candidateId String
+  jobId       String
+  savedAt     DateTime @default(now())
+
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  job         Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([candidateId, jobId])
+  @@index([candidateId])
+}
+
+model SavedCandidate {
+  id          String   @id @default(cuid())
+  employerId  String
+  candidateId String
+  notes       String?
+  savedAt     DateTime @default(now())
+
+  employer    Employer  @relation(fields: [employerId], references: [id], onDelete: Cascade)
+
+  @@unique([employerId, candidateId])
+  @@index([employerId])
+}
+
+// ========================================
+// PACKAGE & SUBSCRIPTION SYSTEM
+// ========================================
+
+model Package {
+  id            String   @id @default(cuid())
+  name          String
+  slug          String   @unique
+  type          String   // CANDIDATE | EMPLOYER
+  description   String?
+  price         Float    @default(0)
+  durationDays  Int      @default(30)
+  status        String   @default("ACTIVE") // ACTIVE | DRAFT | DISABLED
+  isActive      Boolean  @default(true)
+  isFeatured    Boolean  @default(false)
+  sortOrder     Int      @default(0)
+  color         String?  // UI accent color
+  badge         String?  // e.g. "Popular", "Best Value", "Urgent Hiring"
+  
+  // Limits stored as JSON string
+  // For CANDIDATE: { "jobApplications": 10, "resumeVisibility": true, "jobAlerts": 3, "featuredProfile": false }
+  // For EMPLOYER:  { "jobPostings": 5, "resumeSearches": 25, "profileViews": 50, "resumeDownloads": 10, "contactCandidates": 10, "featuredJobs": 0, "featuredCompany": false, "jobDurationDays": 30 }
+  limits        String   @default("{}")
+  features      String   @default("[]") // JSON array of feature strings for display
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  subscriptions Subscription[]
+  payments      Payment[]
+
+  @@index([type])
+  @@index([status])
+  @@index([isActive])
+}
+
+model Subscription {
+  id              String   @id @default(cuid())
+  userId          String
+  packageId       String
+  
+  // Limits at time of subscription (snapshot of package limits)
+  limitsSnapshot  String   @default("{}")
+  
+  // Usage tracking
+  usageData       String   @default("{}") // JSON: { "jobApplications": 3, "resumeSearches": 10, ... }
+  
+  status          String   @default("ACTIVE") // ACTIVE | EXPIRED | CANCELLED | SUSPENDED
+  startDate       DateTime @default(now())
+  endDate         DateTime
+  paymentId       String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation(fields: [userId], references: [id])
+  package         Package  @relation(fields: [packageId], references: [id])
+  payment         Payment? @relation(fields: [paymentId], references: [id])
+
+  @@index([userId])
+  @@index([packageId])
+  @@index([status])
+  @@index([endDate])
+}
+
+// ========================================
+// PAYMENT SYSTEM
+// ========================================
+
+model Payment {
+  id                String   @id @default(cuid())
+  userId            String
+  packageId         String?
+  amount            Float
+  currency          String   @default("INR")
+  status            String   @default("PENDING") // PENDING | SUCCESS | FAILED | CANCELLED | REFUNDED
+  
+  // Razorpay
+  razorpayOrderId   String?  @unique
+  razorpayPaymentId String?  @unique
+  razorpaySignature String?
+  
+  // Coupon
+  couponId          String?
+  discountAmount    Float    @default(0)
+  
+  // Invoice
+  invoiceNumber     String?  @unique
+  invoiceUrl        String?
+  
+  notes             String?
+  failureReason     String?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user              User     @relation(fields: [userId], references: [id])
+  package           Package? @relation(fields: [packageId], references: [id])
+  coupon            Coupon?  @relation(fields: [couponId], references: [id])
+  subscriptions     Subscription[]
+
+  @@index([userId])
+  @@index([packageId])
+  @@index([status])
+  @@index([razorpayOrderId])
+  @@index([createdAt])
+}
+
+model Coupon {
+  id              String   @id @default(cuid())
+  code            String   @unique
+  description     String?
+  discountType    String   // PERCENTAGE | FIXED
+  discountValue   Float
+  maxDiscount     Float?   // cap for percentage discounts
+  minOrderAmount  Float    @default(0)
+  usageLimit      Int?
+  usageCount      Int      @default(0)
+  perUserLimit    Int      @default(1)
+  applicableTo    String   @default("ALL") // ALL | CANDIDATE | EMPLOYER
+  isActive        Boolean  @default(true)
+  startsAt        DateTime?
+  expiresAt       DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  payments        Payment[]
+
+  @@index([code])
+  @@index([isActive])
+}
+
+// ========================================
+// NOTIFICATION SYSTEM
+// ========================================
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // APPLICATION_RECEIVED | APPLICATION_VIEWED | SHORTLISTED | INTERVIEW | SELECTED | REJECTED | JOB_ALERT | PACKAGE_EXPIRY | JOB_EXPIRY | LOW_CREDITS | SYSTEM
+  title     String
+  message   String
+  link      String?
+  isRead    Boolean  @default(false)
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+model JobAlert {
+  id          String   @id @default(cuid())
+  candidateId String
+  title       String
+  keyword     String?
+  locationId  String?
+  locationText String?
+  categoryId  String?
+  jobType     String?
+  salaryMin   Int?
+  frequency   String   @default("DAILY") // DAILY | WEEKLY
+  isActive    Boolean  @default(true)
+  lastSentAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+
+  @@index([candidateId])
+  @@index([isActive])
+}
+
+// ========================================
+// RESUME SEARCH LOG
+// ========================================
+
+model ResumeSearchLog {
+  id          String   @id @default(cuid())
+  employerId  String
+  candidateId String
+  action      String   // VIEWED | DOWNLOADED | CONTACTED
+  createdAt   DateTime @default(now())
+
+  employer    Employer @relation(fields: [employerId], references: [id])
+
+  @@index([employerId])
+  @@index([candidateId])
+  @@index([createdAt])
+}
+
+// ========================================
+// ADMIN / CMS
+// ========================================
+
+model AdminSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  type      String   @default("TEXT") // TEXT | JSON | BOOLEAN | NUMBER
+  group     String   @default("GENERAL")
+  label     String?
+  updatedAt DateTime @updatedAt
+
+  @@index([key])
+  @@index([group])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  action      String
+  entity      String
+  entityId    String?
+  oldValues   String?
+  newValues   String?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  user        User?    @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entity])
+  @@index([createdAt])
+}
+
+// ========================================
+// EMAIL, OTP & NOTIFICATION MODELS
+// ========================================
+
+model EmailLog {
+  id                String    @id @default(cuid())
+  userId            String?
+  recipientEmail    String
+  emailType         String    // OTP_VERIFICATION | WELCOME | PASSWORD_RESET_OTP | PASSWORD_CHANGED | etc.
+  subject           String
+  templateName      String
+  status            String    @default("QUEUED") // QUEUED | SENT | FAILED | BOUNCED
+  providerMessageId String?
+  sentAt            DateTime?
+  failedAt          DateTime?
+  failureReason     String?
+  attemptCount      Int       @default(1)
+  htmlBody          String?
+  metadata          String?
+  createdAt         DateTime  @default(now())
+
+  user              User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([recipientEmail])
+  @@index([status])
+  @@index([emailType])
+  @@index([createdAt])
+  @@index([userId])
+}
+
+model OtpVerification {
+  id           String    @id @default(cuid())
+  userId       String?
+  email        String
+  otpHash      String
+  type         String    @default("REGISTRATION") // REGISTRATION | PASSWORD_RESET
+  expiresAt    DateTime
+  attemptCount Int       @default(0)
+  maxAttempts  Int       @default(5)
+  isUsed       Boolean   @default(false)
+  usedAt       DateTime?
+  createdAt    DateTime  @default(now())
+
+  user         User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([email, type])
+  @@index([expiresAt])
+  @@index([userId])
+}
+
+model EmailTemplate {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  name      String
+  subject   String
+  bodyHtml  String
+  variables String   // JSON array of variables
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([key])
+}
+
+// ========================================
+// COOL PLACES TO WORK
+// ========================================
+
+model CoolPlaceLogo {
+  id          String   @id @default(cuid())
+  name        String
+  logoUrl     String
+  website     String?
+  displayOrder Int     @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([displayOrder])
+}
+
+// ========================================
+// SEO & GOOGLE INDEXING SYSTEM
+// ========================================
+
+model SeoPage {
+  id               String    @id @default(cuid())
+  url              String    @unique // e.g. "/", "/jobs", "/jobs/slug-title"
+  name             String    // Human readable page name
+  pageType         String    // HOMEPAGE | JOB_LISTING | JOB_DETAIL | COMPANY_LISTING | COMPANY_DETAIL | CATEGORY_LISTING | CATEGORY_DETAIL | LOCATION_LISTING | LOCATION_DETAIL | STATIC_PAGE | SEO_LANDING
+  entityId         String?   // ID of the job, company, category, etc. if linked
+  
+  // Meta tags
+  seoTitle         String?
+  seoDescription   String?
+  canonicalUrl     String?
+  ogTitle          String?
+  ogDescription    String?
+  ogImage          String?
+  twitterTitle     String?
+  twitterDescription String?
+  structuredData   String?   // JSON-LD string
+  
+  // Directives
+  isIndexable      Boolean   @default(true)  // index vs noindex
+  isFollowable     Boolean   @default(true)  // follow vs nofollow
+  inSitemap        Boolean   @default(true)  // include in sitemap
+  sitemapPriority  Float     @default(0.7)
+  sitemapChangeFreq String   @default("weekly") // always | hourly | daily | weekly | monthly | yearly | never
+  
+  // Google Indexing state
+  indexStatus      String    @default("UNKNOWN") // INDEXED | NOT_INDEXED | SUBMITTED | PENDING | FAILED | UNKNOWN
+  googleIndexed    Boolean   @default(false)
+  lastSubmittedAt  DateTime?
+  lastCheckedAt    DateTime?
+  lastCrawlStatus  String?   // e.g. "CRAWLED_SUCCESS", "NOT_FOUND_404", "NOINDEX_DETECTED"
+  
+  // SEO Health
+  seoScore         Int       @default(80)
+  seoAuditResults  String?   // JSON string with passedChecks, warnings, recommendations
+  
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([url])
+  @@index([pageType])
+  @@index([indexStatus])
+  @@index([isIndexable])
+  @@index([inSitemap])
+}
+
+model IndexingQueue {
+  id            String    @id @default(cuid())
+  url           String
+  pageId        String?
+  action        String    @default("INDEX") // INDEX | REMOVE
+  status        String    @default("PENDING") // PENDING | PROCESSING | SUBMITTED | FAILED | COMPLETED
+  attemptCount  Int       @default(0)
+  maxAttempts   Int       @default(3)
+  lastResponse  String?   // Raw text/JSON response from API
+  errorMessage  String?
+  nextRetryTime DateTime?
+  requestedBy   String?   // User ID or "SYSTEM"
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([url])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model SeoGlobalSetting {
+  id                      String    @id @default(cuid())
+  key                     String    @unique @default("GLOBAL")
+  enableSeo               Boolean   @default(true)
+  enableSitemap           Boolean   @default(true)
+  enableIndexing          Boolean   @default(true)
+  defaultRobotsPolicy     String    @default("index,follow")
+  defaultCanonicalPolicy  String    @default("self")
+  autoSubmitPublishedJobs Boolean   @default(true)
+  autoUpdateSitemap       Boolean   @default(true)
+  siteUrl                 String    @default("https://careerwings.in")
+  
+  // Google Search Console settings
+  gscConnected            Boolean   @default(false)
+  gscProperty             String?   // e.g. "sc-domain:careerwings.in" or "https://careerwings.in/"
+  gscAuthType             String    @default("SERVICE_ACCOUNT") // SERVICE_ACCOUNT | OAUTH
+  gscClientEmail          String?
+  gscPrivateKey           String?   // Securely stored
+  gscClientId             String?
+  gscClientSecret         String?
+  gscRefreshToken         String?
+  gscAccessToken          String?
+  gscTokenExpiresAt       DateTime?
+  
+  // Bing Webmaster Tools
+  bingApiKey              String?
+  
+  // Robots.txt custom content
+  robotsTxtContent        String?
+  
+  updatedAt               DateTime  @updatedAt
+}
+
+model SeoAuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  userEmail  String?
+  action     String   // e.g. "UPDATE_PAGE_META", "BULK_NOINDEX", "SUBMIT_INDEXING", "UPDATE_ROBOTS_TXT"
+  targetUrl  String?
+  details    String?  // JSON string
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+// ========================================
+// NETWORKING & MESSAGING CHAT
+// ========================================
+
+model Conversation {
+  id              String        @id @default(cuid())
+  employerId      String
+  candidateId     String
+  jobId           String?
+  lastMessage     String?
+  lastMessageAt   DateTime      @default(now())
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  employer        Employer      @relation(fields: [employerId], references: [id], onDelete: Cascade)
+  candidate       Candidate     @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  job             Job?          @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  messages        ChatMessage[]
+
+  @@unique([employerId, candidateId])
+  @@index([employerId])
+  @@index([candidateId])
+  @@index([lastMessageAt])
+}
+
+model ChatMessage {
+  id              String        @id @default(cuid())
+  conversationId  String
+  senderId        String
+  senderRole      String        // EMPLOYER | CANDIDATE | ADMIN
+  message         String
+  isRead          Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+
+  conversation    Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender          User          @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([senderId])
+  @@index([createdAt])
+}
+
+// ========================================
+// AI SMART IMPORT SYSTEM
+// ========================================
+
+model ImportJob {
+  id                String    @id @default(cuid())
+  fileName          String
+  fileSize          Int       @default(0)
+  mimeType          String?
+  filePath          String?   // Saved path of original uploaded file
+  status            String    @default("PENDING") // PENDING | PROCESSING | COMPLETED | FAILED
+  totalRows         Int       @default(0)
+  processedRows     Int       @default(0)
+  successCount      Int       @default(0)
+  updatedCount      Int       @default(0)
+  skippedCount      Int       @default(0)
+  invalidCount      Int       @default(0)
+  failedCount       Int       @default(0)
+  duplicateStrategy String    @default("SKIP") // SKIP | UPDATE | IMPORT_NEW
+  mappings          String?   // JSON string of detected/chosen column mappings
+  reportPath        String?   // Path to generated Excel report
+  errorLog          String?   // JSON array of error messages
+  summary           String?   // JSON summary
+  createdBy         String?   // User ID or "admin"
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ========================================
+// BLOG & EDITORIAL SYSTEM
+// ========================================
+
+model BlogPost {
+  id            String    @id @default(cuid())
+  title         String
+  slug          String    @unique
+  excerpt       String
+  content       String    // Rich text / Markdown / HTML
+  coverImage    String?
+  category      String    @default("Career Advice")
+  tags          String?   // JSON array string or comma-separated tags
+  authorName    String    @default("Career Wings Editorial Team")
+  authorRole    String?   @default("Career Advisor")
+  authorAvatar  String?
+  readTimeMin   Int       @default(5)
+  isFeatured    Boolean   @default(false)
+  isPublished   Boolean   @default(true)
+  publishedAt   DateTime? @default(now())
+  views         Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([slug])
+  @@index([category])
+  @@index([isPublished])
+  @@index([isFeatured])
+  @@index([createdAt])
+}
+

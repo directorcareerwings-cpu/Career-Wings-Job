@@ -9,6 +9,7 @@ exports.getPersistentStoragePaths = getPersistentStoragePaths;
 exports.getPersistentUploadsDir = getPersistentUploadsDir;
 exports.createSafetyBackup = createSafetyBackup;
 exports.verifySqliteHeader = verifySqliteHeader;
+exports.isMysqlConfigured = isMysqlConfigured;
 const client_1 = require("@prisma/client");
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
@@ -199,16 +200,24 @@ function verifySqliteHeader(filePath) {
     }
 }
 /**
+ * Detect whether MySQL or MariaDB is configured via DATABASE_URL
+ */
+function isMysqlConfigured() {
+    const envUrl = (process.env.DATABASE_URL || '').trim();
+    return envUrl.startsWith('mysql://') || envUrl.startsWith('mariadb://');
+}
+/**
  * Resolve the dedicated persistent database URL
  */
 function resolveDatabaseUrl() {
-    const envUrl = process.env.DATABASE_URL;
-    // Schema declares provider = "sqlite", which strictly requires a file: protocol URL.
-    // If an external database URL (mysql:// or postgresql://) is provided in the environment,
-    // warn and force the persistent SQLite database URL to prevent engine startup crashes.
-    if (envUrl && !envUrl.startsWith('file:') && (envUrl.startsWith('postgresql://') || envUrl.startsWith('mysql://'))) {
-        console.warn(`⚠️ [Database URL Warning] Detected external DATABASE_URL (${envUrl.replace(/:[^:@]+@/, ':***@')}), but schema.prisma declares provider = 'sqlite'.`);
-        console.warn(`   Overriding DATABASE_URL with persistent SQLite storage path to ensure stability and prevent runtime crashes.`);
+    const envUrl = (process.env.DATABASE_URL || '').trim();
+    // If MySQL / MariaDB URL is configured, connect directly to MySQL server
+    if (isMysqlConfigured()) {
+        const masked = envUrl.replace(/:[^:@]+@/, ':***@');
+        console.log(`🐬 [Prisma] CONNECTED TO PRODUCTION MYSQL DATABASE: ${masked}`);
+        console.log('   🛡️ [PERSISTENCE ACTIVE] Database is hosted on Hostinger MySQL server.');
+        console.log('   (Git pulls, code redeployments, and web root wipes will NEVER touch MySQL data)');
+        return envUrl;
     }
     const paths = getPersistentStoragePaths();
     const primaryDbPath = paths.databasePath;

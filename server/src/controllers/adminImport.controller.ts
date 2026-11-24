@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import bcrypt from 'bcryptjs';
 import slugify from 'slugify';
-import { prisma } from '../lib/prisma';
+import { prisma, isMysqlConfigured, getPersistentUploadsDir } from '../lib/prisma';
 import { sendSuccess } from '../lib/response';
 import { AppError } from '../lib/errors';
 import {
@@ -14,7 +14,6 @@ import {
   isInvalidOrJunkSkill,
   sanitizeCleanText,
 } from '../services/aiImport.service';
-import { getPersistentUploadsDir } from '../lib/prisma';
 
 const persistentUploads = getPersistentUploadsDir();
 const importsDir = persistentUploads.imports;
@@ -29,6 +28,7 @@ const reportsDir = persistentUploads.reports;
  * Ensure ImportJob table exists in SQLite database (zero-dependency fail-safe)
  */
 export const ensureImportJobTable = async (): Promise<void> => {
+  if (isMysqlConfigured()) return;
   try {
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "ImportJob" (
@@ -488,7 +488,7 @@ async function runBatchImport(
                 skillId: skill.id,
                 proficiency: 'INTERMEDIATE',
               },
-            }).catch(() => {});
+            }).catch(() => { });
           }
         }
 
@@ -502,7 +502,7 @@ async function runBatchImport(
               startYear: data.passingYear ? data.passingYear - 3 : 2018,
               endYear: data.passingYear || 2021,
             },
-          }).catch(() => {});
+          }).catch(() => { });
         }
 
         // Add Experience if currentRole / company provided
@@ -515,7 +515,7 @@ async function runBatchImport(
               startDate: '2022-01-01',
               isCurrent: true,
             },
-          }).catch(() => {});
+          }).catch(() => { });
         }
 
         successCount++;

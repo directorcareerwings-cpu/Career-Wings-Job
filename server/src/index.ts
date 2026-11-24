@@ -16,7 +16,7 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 import { errorHandler, notFoundHandler } from './lib/errors';
-import { prisma, getPersistentStoragePaths, getPersistentUploadsDir, findProjectRoot } from './lib/prisma';
+import { prisma, getPersistentStoragePaths, getPersistentUploadsDir, findProjectRoot, isMysqlConfigured } from './lib/prisma';
 import { startCronJobs } from './crons';
 
 // Routers
@@ -175,6 +175,7 @@ import { seoAdminRoutes, seoPublicRoutes } from './routes/seo.routes';
 // 4. Health Check
 app.get('/api/health', async (req: Request, res: Response) => {
   try {
+    const isMysql = isMysqlConfigured();
     const storagePaths = getPersistentStoragePaths();
     const [userCount, candidateCount, jobCount] = await Promise.all([
       prisma.user.count(),
@@ -185,11 +186,17 @@ app.get('/api/health', async (req: Request, res: Response) => {
     res.status(200).json({
       status: 'ok',
       db: 'connected',
-      storage: {
-        dir: storagePaths.storageDir,
-        database: path.basename(storagePaths.databasePath),
-        isExternal: storagePaths.isExternalToRepo,
-      },
+      dialect: isMysql ? 'mysql' : 'sqlite',
+      storage: isMysql
+        ? {
+            engine: 'Hostinger MySQL Database Server',
+            persistence: 'Permanent (Independent of Git redeployments)',
+          }
+        : {
+            dir: storagePaths.storageDir,
+            database: path.basename(storagePaths.databasePath),
+            isExternal: storagePaths.isExternalToRepo,
+          },
       counts: {
         users: userCount,
         candidates: candidateCount,
@@ -271,73 +278,74 @@ app.use(errorHandler);
 // Database initialization helper
 const ensureDatabaseAndAdmin = async () => {
   try {
-    // 0. Ensure ImportJob table exists via direct raw DDL (zero-dependency, instant)
-    try {
-      await prisma.$executeRawUnsafe(`
-        CREATE TABLE IF NOT EXISTS "ImportJob" (
-          "id" TEXT NOT NULL PRIMARY KEY,
-          "fileName" TEXT NOT NULL,
-          "fileSize" INTEGER NOT NULL DEFAULT 0,
-          "mimeType" TEXT,
-          "filePath" TEXT,
-          "status" TEXT NOT NULL DEFAULT 'PENDING',
-          "totalRows" INTEGER NOT NULL DEFAULT 0,
-          "processedRows" INTEGER NOT NULL DEFAULT 0,
-          "successCount" INTEGER NOT NULL DEFAULT 0,
-          "updatedCount" INTEGER NOT NULL DEFAULT 0,
-          "skippedCount" INTEGER NOT NULL DEFAULT 0,
-          "invalidCount" INTEGER NOT NULL DEFAULT 0,
-          "failedCount" INTEGER NOT NULL DEFAULT 0,
-          "duplicateStrategy" TEXT NOT NULL DEFAULT 'SKIP',
-          "mappings" TEXT,
-          "reportPath" TEXT,
-          "errorLog" TEXT,
-          "summary" TEXT,
-          "createdBy" TEXT,
-          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-        );
-      `);
-      await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ImportJob_status_idx" ON "ImportJob"("status");`);
-      await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ImportJob_createdAt_idx" ON "ImportJob"("createdAt");`);
-    } catch (e) {
-      console.warn('ImportJob table setup notice:', e);
-    }
+    const isMysql = isMysqlConfigured();
 
-    // 0.1 Ensure BlogPost table exists and initial career guides are seeded
-    try {
-      await ensureBlogPostTable();
-      await seedDefaultBlogPostsIfEmpty();
-    } catch (e) {
-      console.warn('BlogPost table setup notice:', e);
-    }
-
-    // 1. Verify core database tables exist
-    const requiredTables = ['User', 'Candidate', 'Employer', 'Company', 'Job', 'Application', 'AdminSetting', 'ImportJob', 'BlogPost'];
-    let missingTables: string[] = [];
-    
-    try {
-      const tableCheck: any = await prisma.$queryRawUnsafe(`SELECT name FROM sqlite_master WHERE type='table'`);
-      if (Array.isArray(tableCheck)) {
-        const existingNames = new Set(tableCheck.map((r: any) => r.name));
-        missingTables = requiredTables.filter((t) => !existingNames.has(t));
-      } else {
-        missingTables = requiredTables;
+    // 0. Only run raw SQLite DDL if in SQLite mode
+    if (!isMysql) {
+      try {
+        await prisma.$executeRawUnsafe(`
+          CREATE TABLE IF NOT EXISTS "ImportJob" (
+            "id" TEXT NOT NULL PRIMARY KEY,
+            "fileName" TEXT NOT NULL,
+            "fileSize" INTEGER NOT NULL DEFAULT 0,
+            "mimeType" TEXT,
+            "filePath" TEXT,
+            "status" TEXT NOT NULL DEFAULT 'PENDING',
+            "totalRows" INTEGER NOT NULL DEFAULT 0,
+            "processedRows" INTEGER NOT NULL DEFAULT 0,
+            "successCount" INTEGER NOT NULL DEFAULT 0,
+            "updatedCount" INTEGER NOT NULL DEFAULT 0,
+            "skippedCount" INTEGER NOT NULL DEFAULT 0,
+            "invalidCount" INTEGER NOT NULL DEFAULT 0,
+            "failedCount" INTEGER NOT NULL DEFAULT 0,
+            "duplicateStrategy" TEXT NOT NULL DEFAULT 'SKIP',
+            "mappings" TEXT,
+            "reportPath" TEXT,
+            "errorLog" TEXT,
+            "summary" TEXT,
+            "createdBy" TEXT,
+            "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+          );
+        `);
+        await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ImportJob_status_idx" ON "ImportJob"("status");`);
+        await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "ImportJob_createdAt_idx" ON "ImportJob"("createdAt");`);
+      } catch (e) {
+        console.warn('ImportJob table setup notice:', e);
       }
-    } catch {
-      missingTables = requiredTables;
+
+      try {
+        await ensureBlogPostTable();
+        await seedDefaultBlogPostsIfEmpty();
+      } catch (e) {
+        console.warn('BlogPost table setup notice:', e);
+      }
+    } else {
+      try {
+        await seedDefaultBlogPostsIfEmpty();
+      } catch (e) {}
     }
 
-    if (missingTables.length > 0) {
-      console.log(`⚡ Missing tables detected (${missingTables.join(', ')}). Auto-syncing schema additively without data loss...`);
+    // 1. Verify core database tables exist (database-agnostic: tests connection & query)
+    let tablesReady = false;
+    try {
+      await prisma.user.findFirst({ select: { id: true } });
+      tablesReady = true;
+    } catch {
+      tablesReady = false;
+    }
+
+    if (!tablesReady) {
+      console.log(`⚡ Core database tables not detected in ${isMysql ? 'MySQL' : 'SQLite'}. Auto-syncing schema additively without data loss...`);
       
       const projectRoot = findProjectRoot();
       const serverDir = fs.existsSync(path.join(projectRoot, 'server', 'prisma', 'schema.prisma'))
         ? path.join(projectRoot, 'server')
         : projectRoot;
       const schemaPath = path.join(serverDir, 'prisma', 'schema.prisma');
-      const paths = getPersistentStoragePaths();
-      const normalizedDbUrl = `file:${paths.databasePath.replace(/\\/g, '/')}`;
+      const activeDbUrl = isMysql
+        ? process.env.DATABASE_URL!
+        : `file:${getPersistentStoragePaths().databasePath.replace(/\\/g, '/')}`;
 
       const possiblePrismaBins = [
         path.join(serverDir, 'node_modules', 'prisma', 'build', 'index.js'),
@@ -350,13 +358,13 @@ const ensureDatabaseAndAdmin = async () => {
         if (prismaBin) {
           execSync(`node "${prismaBin}" db push --schema="${schemaPath}" --skip-generate --accept-data-loss=false`, {
             cwd: serverDir,
-            env: { ...process.env, DATABASE_URL: normalizedDbUrl },
+            env: { ...process.env, DATABASE_URL: activeDbUrl },
             stdio: 'inherit',
           });
         } else {
           execSync(`npx prisma db push --schema="${schemaPath}" --skip-generate --accept-data-loss=false`, {
             cwd: serverDir,
-            env: { ...process.env, DATABASE_URL: normalizedDbUrl },
+            env: { ...process.env, DATABASE_URL: activeDbUrl },
             stdio: 'inherit',
           });
         }
@@ -365,7 +373,7 @@ const ensureDatabaseAndAdmin = async () => {
         console.error('❌ [Database Push Error] Could not auto-sync schema:', pushErr?.message || pushErr);
       }
     } else {
-      console.log('✔ All core database tables verified in persistent database.');
+      console.log(`✔ All core database tables verified in ${isMysql ? 'MySQL production' : 'persistent SQLite'} database.`);
     }
 
     // 2. Ensure admin account exists (Strictly preserve existing credentials!)

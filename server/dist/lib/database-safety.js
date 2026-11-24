@@ -10,20 +10,23 @@ const prisma_1 = require("./prisma");
 const path_1 = __importDefault(require("path"));
 const fs_1 = __importDefault(require("fs"));
 const child_process_1 = require("child_process");
-// Strictly enforce SQLite DATABASE_URL override if environment provides a MySQL/PostgreSQL URL
-const initialPaths = (0, prisma_1.getPersistentStoragePaths)();
-const persistentSqliteUrl = `file:${initialPaths.databasePath.replace(/\\/g, '/')}`;
-if (!process.env.DATABASE_URL || !process.env.DATABASE_URL.startsWith('file:')) {
-    process.env.DATABASE_URL = persistentSqliteUrl;
+// Only enforce SQLite persistent path if MySQL is NOT configured
+if (!(0, prisma_1.isMysqlConfigured)()) {
+    const initialPaths = (0, prisma_1.getPersistentStoragePaths)();
+    const persistentSqliteUrl = `file:${initialPaths.databasePath.replace(/\\/g, '/')}`;
+    if (!process.env.DATABASE_URL || !process.env.DATABASE_URL.startsWith('file:')) {
+        process.env.DATABASE_URL = persistentSqliteUrl;
+    }
 }
 /**
  * Collect database audit metrics
  */
 async function auditDatabase() {
+    const isMysql = (0, prisma_1.isMysqlConfigured)();
     const paths = (0, prisma_1.getPersistentStoragePaths)();
-    const dbPath = paths.databasePath;
-    const size = fs_1.default.existsSync(dbPath) ? fs_1.default.statSync(dbPath).size : 0;
-    const headerOk = (0, prisma_1.verifySqliteHeader)(dbPath);
+    const dbPath = isMysql ? (process.env.DATABASE_URL || '').replace(/:[^:@]+@/, ':***@') : paths.databasePath;
+    const size = (!isMysql && fs_1.default.existsSync(paths.databasePath)) ? fs_1.default.statSync(paths.databasePath).size : 0;
+    const headerOk = isMysql ? true : (0, prisma_1.verifySqliteHeader)(paths.databasePath);
     const [users, candidates, employers, companies, jobsTotal, jobsPublished, jobsDraft, jobsPending, applications, adminSettings, blogPosts,] = await Promise.all([
         prisma_1.prisma.user.count().catch(() => 0),
         prisma_1.prisma.candidate.count().catch(() => 0),
@@ -271,11 +274,17 @@ if (require.main === module) {
                 console.log('📊 CAREER WINGS DATABASE AUDIT REPORT');
                 console.log('========================================');
                 console.log(`Timestamp:          ${report.timestamp}`);
-                console.log(`Database Path:      ${report.databasePath}`);
-                console.log(`Storage Dir:        ${report.storageDir}`);
-                console.log(`Stored Outside Git: ${report.isExternalToRepo ? 'YES (100% Protected from redeployments)' : 'NO (Using persistent_data)'}`);
-                console.log(`Database Size:      ${report.sizeKb} KB`);
-                console.log(`Integrity Header:   ${report.headerValid ? 'VALID (SQLite format 3)' : 'INVALID'}`);
+                console.log(`Database Dialect:   ${(0, prisma_1.isMysqlConfigured)() ? 'MySQL (Hostinger Production Server)' : 'SQLite (Local / Persistent File)'}`);
+                console.log(`Database Target:    ${report.databasePath}`);
+                if (!(0, prisma_1.isMysqlConfigured)()) {
+                    console.log(`Storage Dir:        ${report.storageDir}`);
+                    console.log(`Stored Outside Git: ${report.isExternalToRepo ? 'YES (100% Protected from redeployments)' : 'NO (Using persistent_data)'}`);
+                    console.log(`Database Size:      ${report.sizeKb} KB`);
+                    console.log(`Integrity Header:   ${report.headerValid ? 'VALID (SQLite format 3)' : 'INVALID'}`);
+                }
+                else {
+                    console.log(`Hostinger Managed:  YES (Independent MySQL server daemon; untouched by Git redeployments)`);
+                }
                 console.log('----------------------------------------');
                 console.log(`👥 Total Users:         ${report.counts.users}`);
                 console.log(`🎓 Candidates:          ${report.counts.candidates}`);

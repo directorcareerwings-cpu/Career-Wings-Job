@@ -12,8 +12,7 @@ const prisma_1 = require("../lib/prisma");
 const response_1 = require("../lib/response");
 const errors_1 = require("../lib/errors");
 const aiImport_service_1 = require("../services/aiImport.service");
-const prisma_2 = require("../lib/prisma");
-const persistentUploads = (0, prisma_2.getPersistentUploadsDir)();
+const persistentUploads = (0, prisma_1.getPersistentUploadsDir)();
 const importsDir = persistentUploads.imports;
 const reportsDir = persistentUploads.reports;
 // Ensure directories exist
@@ -25,6 +24,8 @@ const reportsDir = persistentUploads.reports;
  * Ensure ImportJob table exists in SQLite database (zero-dependency fail-safe)
  */
 const ensureImportJobTable = async () => {
+    if ((0, prisma_1.isMysqlConfigured)())
+        return;
     try {
         await prisma_1.prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "ImportJob" (
