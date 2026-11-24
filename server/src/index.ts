@@ -207,6 +207,25 @@ app.get('/api/health', async (req: Request, res: Response) => {
       service: 'Career Wings API',
     });
   } catch (err: any) {
+    // Auto-heal if MySQL tables were missing
+    if (isMysqlConfigured()) {
+      try {
+        console.log('⚡ Detected degraded DB in /api/health. Attempting auto-heal...');
+        await ensureMysqlDatabaseReady(true);
+        const retryUserCount = await prisma.user.count();
+        return res.status(200).json({
+          status: 'ok',
+          db: 'connected (auto-repaired)',
+          dialect: 'mysql',
+          counts: { users: retryUserCount },
+          timestamp: new Date().toISOString(),
+          service: 'Career Wings API',
+        });
+      } catch (repairErr: any) {
+        console.error('Auto-repair attempt failed:', repairErr?.message);
+      }
+    }
+
     res.status(200).json({
       status: 'degraded',
       db: 'error',
@@ -215,6 +234,60 @@ app.get('/api/health', async (req: Request, res: Response) => {
       service: 'Career Wings API',
     });
   }
+});
+
+// Explicit database setup / auto-provision endpoint (callable via browser or curl)
+app.all(['/api/setup-db', '/api/init-db'], async (req: Request, res: Response) => {
+  try {
+    const isMysql = isMysqlConfigured();
+    if (isMysql) {
+      await ensureMysqlDatabaseReady(true);
+    }
+    const [userCount, candidateCount, jobCount] = await Promise.all([
+      prisma.user.count().catch(() => 0),
+      prisma.candidate.count().catch(() => 0),
+      prisma.job.count().catch(() => 0),
+    ]);
+    const admin = await prisma.user.findFirst({
+      where: { role: 'ADMIN' },
+      select: { id: true, email: true, role: true },
+    }).catch(() => null);
+
+    res.status(200).json({
+      success: true,
+      message: 'Database schema and seed data successfully verified / initialized!',
+      dialect: isMysql ? 'mysql' : 'sqlite',
+      counts: { users: userCount, candidates: candidateCount, jobs: jobCount },
+      admin,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      success: false,
+      error: err?.message || String(err),
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// Database readiness middleware for all API routes: auto-provisions tables before handling requests
+let isDbReady = false;
+let dbInitPromise: Promise<void> | null = null;
+
+app.use('/api', async (req: Request, res: Response, next: NextFunction) => {
+  if (!isDbReady) {
+    if (!dbInitPromise) {
+      dbInitPromise = ensureDatabaseAndAdmin()
+        .then(() => {
+          isDbReady = true;
+        })
+        .catch((err) => {
+          console.error('Database auto-provision notice on request:', err?.message);
+        });
+    }
+    await dbInitPromise;
+  }
+  next();
 });
 
 // 5. Mount Public SEO Routes at Root & API (Robots.txt, Sitemap.xml, Sitemap-index.xml)
@@ -459,6 +532,9 @@ const ensureDatabaseAndAdmin = async () => {
     console.error('⚠️ [Database Notice during initialization]:', err);
   }
 };
+
+// Trigger asynchronous database initialization immediately on module load
+ensureDatabaseAndAdmin().catch((e) => console.warn('Early db init notice:', e));
 
 // 8. Server Initialization
 const server = app.listen(Number(PORT), '0.0.0.0', async () => {
