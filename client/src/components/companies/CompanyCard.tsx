@@ -10,6 +10,8 @@ interface CompanyCardProps {
 }
 
 export default function CompanyCard({ company }: CompanyCardProps) {
+  const openJobsCount = company._count?.jobs ?? company.totalJobs ?? company.jobs?.length ?? 0
+
   return (
     <Link to={`/companies/${company.slug}`}>
       <div className="bg-white rounded-xl border border-gray-100 hover:shadow-md hover:border-gray-200 transition-all duration-200 p-5">
@@ -39,7 +41,7 @@ export default function CompanyCard({ company }: CompanyCardProps) {
             <div className="flex items-center gap-1 mt-2">
               <Briefcase className="h-3.5 w-3.5 text-accent-500" />
               <span className="text-xs font-medium text-accent-600">
-                {company.totalJobs ?? 0} open job{(company.totalJobs ?? 0) !== 1 ? 's' : ''}
+                {openJobsCount} open job{openJobsCount !== 1 ? 's' : ''}
               </span>
             </div>
           </div>

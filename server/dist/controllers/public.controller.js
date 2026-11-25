@@ -80,6 +80,52 @@ const getFeaturedJobs = async (req, res, next) => {
     }
 };
 exports.getFeaturedJobs = getFeaturedJobs;
+const getCompanyActiveJobsWhere = (companyId) => ({
+    status: { in: ['PUBLISHED', 'FEATURED'] },
+    deletedAt: null,
+    OR: [
+        { companyId },
+        { companyId: null, employer: { companyId } },
+    ],
+});
+/**
+ * Computes accurate open-job counts per company, including jobs linked via the
+ * employer's companyId when Job.companyId was left null.
+ */
+const attachCompanyJobCounts = async (companies) => {
+    if (companies.length === 0)
+        return companies;
+    const companyIds = companies.map((c) => c.id);
+    const matchingJobs = await prisma_1.prisma.job.findMany({
+        where: {
+            status: { in: ['PUBLISHED', 'FEATURED'] },
+            deletedAt: null,
+            OR: [
+                { companyId: { in: companyIds } },
+                { companyId: null, employer: { companyId: { in: companyIds } } },
+            ],
+        },
+        select: {
+            companyId: true,
+            employer: { select: { companyId: true } },
+        },
+    });
+    const countMap = new Map();
+    for (const job of matchingJobs) {
+        const cid = job.companyId || job.employer?.companyId;
+        if (cid) {
+            countMap.set(cid, (countMap.get(cid) || 0) + 1);
+        }
+    }
+    return companies.map((comp) => {
+        const totalJobs = countMap.get(comp.id) ?? 0;
+        return {
+            ...comp,
+            totalJobs,
+            _count: { ...(comp._count || {}), jobs: totalJobs },
+        };
+    });
+};
 const getCompanies = async (req, res, next) => {
     try {
         const page = parseInt(req.query.page || '1', 10);
@@ -107,7 +153,8 @@ const getCompanies = async (req, res, next) => {
             }),
             prisma_1.prisma.company.count({ where }),
         ]);
-        (0, response_1.sendPaginated)(res, companies, total, page, limit);
+        const enrichedCompanies = await attachCompanyJobCounts(companies);
+        (0, response_1.sendPaginated)(res, enrichedCompanies, total, page, limit);
     }
     catch (error) {
         next(error);
@@ -128,7 +175,8 @@ const getTopCompanies = async (req, res, next) => {
             orderBy: [{ isFeatured: 'desc' }, { createdAt: 'desc' }],
             take: 8,
         });
-        (0, response_1.sendSuccess)(res, companies);
+        const enrichedCompanies = await attachCompanyJobCounts(companies);
+        (0, response_1.sendSuccess)(res, enrichedCompanies);
     }
     catch (error) {
         next(error);
@@ -139,18 +187,20 @@ const getCompanyBySlug = async (req, res, next) => {
     try {
         const company = await prisma_1.prisma.company.findUnique({
             where: { slug: req.params.slug },
-            include: {
-                jobs: {
-                    where: { status: { in: ['PUBLISHED', 'FEATURED'] }, deletedAt: null },
-                    include: { location: true, category: true },
-                    orderBy: { publishedAt: 'desc' },
-                },
-            },
         });
         if (!company || company.deletedAt) {
             throw new errors_1.AppError('Company not found', 404);
         }
-        (0, response_1.sendSuccess)(res, company);
+        const jobs = await prisma_1.prisma.job.findMany({
+            where: getCompanyActiveJobsWhere(company.id),
+            include: { location: true, category: true },
+            orderBy: { publishedAt: 'desc' },
+        });
+        (0, response_1.sendSuccess)(res, {
+            ...company,
+            totalJobs: jobs.length,
+            jobs,
+        });
     }
     catch (error) {
         next(error);
@@ -165,11 +215,7 @@ const getCompanyJobs = async (req, res, next) => {
         const page = parseInt(req.query.page || '1', 10);
         const limit = parseInt(req.query.limit || '10', 10);
         const skip = (page - 1) * limit;
-        const where = {
-            companyId: company.id,
-            status: { in: ['PUBLISHED', 'FEATURED'] },
-            deletedAt: null,
-        };
+        const where = getCompanyActiveJobsWhere(company.id);
         const [jobs, total] = await Promise.all([
             prisma_1.prisma.job.findMany({
                 where,

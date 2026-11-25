@@ -75,6 +75,56 @@ export const getFeaturedJobs = async (req: Request, res: Response, next: NextFun
   }
 };
 
+const getCompanyActiveJobsWhere = (companyId: string) => ({
+  status: { in: ['PUBLISHED', 'FEATURED'] },
+  deletedAt: null,
+  OR: [
+    { companyId },
+    { companyId: null, employer: { companyId } },
+  ],
+});
+
+/**
+ * Computes accurate open-job counts per company, including jobs linked via the
+ * employer's companyId when Job.companyId was left null.
+ */
+const attachCompanyJobCounts = async <T extends { id: string; _count?: Record<string, number> }>(companies: T[]) => {
+  if (companies.length === 0) return companies;
+
+  const companyIds = companies.map((c) => c.id);
+  const matchingJobs = await prisma.job.findMany({
+    where: {
+      status: { in: ['PUBLISHED', 'FEATURED'] },
+      deletedAt: null,
+      OR: [
+        { companyId: { in: companyIds } },
+        { companyId: null, employer: { companyId: { in: companyIds } } },
+      ],
+    },
+    select: {
+      companyId: true,
+      employer: { select: { companyId: true } },
+    },
+  });
+
+  const countMap = new Map<string, number>();
+  for (const job of matchingJobs) {
+    const cid = job.companyId || job.employer?.companyId;
+    if (cid) {
+      countMap.set(cid, (countMap.get(cid) || 0) + 1);
+    }
+  }
+
+  return companies.map((comp) => {
+    const totalJobs = countMap.get(comp.id) ?? 0;
+    return {
+      ...comp,
+      totalJobs,
+      _count: { ...(comp._count || {}), jobs: totalJobs },
+    };
+  });
+};
+
 export const getCompanies = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const page = parseInt(req.query.page as string || '1', 10);
@@ -103,7 +153,8 @@ export const getCompanies = async (req: Request, res: Response, next: NextFuncti
       prisma.company.count({ where }),
     ]);
 
-    sendPaginated(res, companies, total, page, limit);
+    const enrichedCompanies = await attachCompanyJobCounts(companies);
+    sendPaginated(res, enrichedCompanies, total, page, limit);
   } catch (error) {
     next(error);
   }
@@ -123,7 +174,8 @@ export const getTopCompanies = async (req: Request, res: Response, next: NextFun
       orderBy: [{ isFeatured: 'desc' }, { createdAt: 'desc' }],
       take: 8,
     });
-    sendSuccess(res, companies);
+    const enrichedCompanies = await attachCompanyJobCounts(companies);
+    sendSuccess(res, enrichedCompanies);
   } catch (error) {
     next(error);
   }
@@ -133,20 +185,23 @@ export const getCompanyBySlug = async (req: Request, res: Response, next: NextFu
   try {
     const company = await prisma.company.findUnique({
       where: { slug: req.params.slug },
-      include: {
-        jobs: {
-          where: { status: { in: ['PUBLISHED', 'FEATURED'] }, deletedAt: null },
-          include: { location: true, category: true },
-          orderBy: { publishedAt: 'desc' },
-        },
-      },
     });
 
     if (!company || company.deletedAt) {
       throw new AppError('Company not found', 404);
     }
 
-    sendSuccess(res, company);
+    const jobs = await prisma.job.findMany({
+      where: getCompanyActiveJobsWhere(company.id),
+      include: { location: true, category: true },
+      orderBy: { publishedAt: 'desc' },
+    });
+
+    sendSuccess(res, {
+      ...company,
+      totalJobs: jobs.length,
+      jobs,
+    });
   } catch (error) {
     next(error);
   }
@@ -161,11 +216,7 @@ export const getCompanyJobs = async (req: Request, res: Response, next: NextFunc
     const limit = parseInt(req.query.limit as string || '10', 10);
     const skip = (page - 1) * limit;
 
-    const where = {
-      companyId: company.id,
-      status: { in: ['PUBLISHED', 'FEATURED'] },
-      deletedAt: null,
-    };
+    const where = getCompanyActiveJobsWhere(company.id);
 
     const [jobs, total] = await Promise.all([
       prisma.job.findMany({
