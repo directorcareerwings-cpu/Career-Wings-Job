@@ -67,15 +67,15 @@ export const TARGET_FIELDS: ColumnMappingDefinition[] = [
   },
   {
     field: 'highestDegree',
-    label: 'Highest Qualification',
+    label: 'Highest Degree',
     description: 'E.g. B.Tech, MBA, B.Sc, Diploma, 12th',
-    synonyms: ['qualification', 'highestdegree', 'degree', 'course', 'stream', 'education', 'highestqualification', 'academicqualification', 'educationalqualification', 'qual'],
+    synonyms: ['highestdegree', 'degree', 'course', 'stream', 'highestqualification', 'academicqualification', 'educationalqualification', 'qualification', 'qual'],
   },
   {
     field: 'educationLevel',
     label: 'Education Level',
     description: 'Bachelor, Master, Doctorate, High School, Diploma',
-    synonyms: ['educationlevel', 'levelofeducation', 'gradlevel', 'edu_level'],
+    synonyms: ['education', 'educationlevel', 'levelofeducation', 'gradlevel', 'edu_level', 'qualificationlevel'],
   },
   {
     field: 'college',

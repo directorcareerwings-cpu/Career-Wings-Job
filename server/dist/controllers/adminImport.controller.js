@@ -366,6 +366,8 @@ async function runBatchImport(jobId, rawRows, mappings, duplicateStrategy, origi
                             updatePayload.currentCompany = data.currentCompany;
                         if (data.highestDegree && !existingCandidate.highestDegree)
                             updatePayload.highestDegree = data.highestDegree;
+                        if (data.educationLevel && !existingCandidate.educationLevel)
+                            updatePayload.educationLevel = data.educationLevel;
                         if (data.college && !existingCandidate.college)
                             updatePayload.college = data.college;
                         if (data.totalExperience && !existingCandidate.totalExperience)
@@ -439,6 +441,7 @@ async function runBatchImport(jobId, rawRows, mappings, duplicateStrategy, origi
                         currentRole: data.currentRole || data.jobAppliedFor || null,
                         currentCompany: data.currentCompany || null,
                         highestDegree: data.highestDegree || null,
+                        educationLevel: data.educationLevel || null,
                         college: data.college || null,
                         totalExperience: data.totalExperience || 0,
                         currentSalary: data.currentSalary || null,
