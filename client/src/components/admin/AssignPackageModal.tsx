@@ -62,8 +62,11 @@ export default function AssignPackageModal({
       if (preselectedUser) {
         setSelectedUser(preselectedUser)
         setUserType(preselectedUser.role === 'CANDIDATE' ? 'CANDIDATE' : 'EMPLOYER')
-      } else if (initialUserType) {
-        setUserType(initialUserType)
+      } else {
+        setSelectedUser(null)
+        if (initialUserType) {
+          setUserType(initialUserType)
+        }
       }
       if (preselectedPackageId) {
         setSelectedPackageId(preselectedPackageId)
@@ -185,8 +188,8 @@ export default function AssignPackageModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4 overflow-y-auto">
-      <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl space-y-6 my-8 relative border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-3 sm:p-4">
+      <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8 shadow-2xl space-y-6 relative border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
         {/* Close Button */}
         <button
           type="button"
@@ -206,7 +209,7 @@ export default function AssignPackageModal({
               Assign Package Manually
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
-              Instantly grant full subscription entitlements, job posting limits, and candidate search credits to an employer or job seeker.
+              Instantly grant new subscription limits and credits. Any previous active package on this account will be replaced.
             </p>
           </div>
         </div>

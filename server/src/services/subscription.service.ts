@@ -129,7 +129,7 @@ export const getActiveSubscription = async (userId: string) => {
         endDate: { gte: now },
       },
       include: { package: true },
-      orderBy: { endDate: 'desc' },
+      orderBy: { createdAt: 'desc' },
     });
   } catch (err: any) {
     console.warn('Notice querying active subscription, running sanitize:', err?.message);
@@ -142,7 +142,7 @@ export const getActiveSubscription = async (userId: string) => {
           endDate: { gte: now },
         },
         include: { package: true },
-        orderBy: { endDate: 'desc' },
+        orderBy: { createdAt: 'desc' },
       });
     } catch {
       activeSub = null;
@@ -308,7 +308,7 @@ export const consumeCredit = async (
 };
 
 /**
- * Activate or upgrade a package
+ * Activate or replace a user's subscription package on purchase/selection
  */
 export const activateSubscription = async (
   userId: string,
@@ -318,64 +318,33 @@ export const activateSubscription = async (
   const pkg = await prisma.package.findUnique({ where: { id: packageId } });
   if (!pkg) throw new AppError('Package not found', 404);
 
-  // Check if user currently has an active subscription of this package
-  const existingActive = await prisma.subscription.findFirst({
-    where: { userId, packageId, status: 'ACTIVE', endDate: { gte: new Date() } },
-    orderBy: { endDate: 'desc' },
-  });
+  const startDate = new Date();
+  const endDate = new Date();
+  endDate.setDate(endDate.getDate() + (pkg.durationDays || 30));
 
-  let startDate = new Date();
-  let endDate = new Date();
+  return prisma.$transaction(async (tx) => {
+    // Always replace any prior active/suspended package for this user
+    await tx.subscription.updateMany({
+      where: {
+        userId,
+        status: { in: ['ACTIVE', 'SUSPENDED'] },
+      },
+      data: { status: 'CANCELLED' },
+    });
 
-  if (existingActive) {
-    // Renewal: extend from existing end date
-    const baseDate = new Date(existingActive.endDate);
-    baseDate.setDate(baseDate.getDate() + pkg.durationDays);
-    endDate = baseDate;
-    startDate = existingActive.startDate;
-
-    // Update existing subscription
-    const updated = await prisma.subscription.update({
-      where: { id: existingActive.id },
+    return tx.subscription.create({
       data: {
-        endDate,
+        userId,
+        packageId,
         limitsSnapshot: pkg.limits,
-        paymentId: paymentId || existingActive.paymentId,
+        usageData: '{}',
+        status: 'ACTIVE',
+        startDate,
+        endDate,
+        paymentId: paymentId || null,
       },
       include: { package: true },
     });
-    return updated;
-  }
-
-  // Deactivate prior active subscriptions of same type
-  const existingSubs = await prisma.subscription.findMany({
-    where: { userId, status: 'ACTIVE' },
-    include: { package: true },
-  });
-
-  for (const s of existingSubs) {
-    if (s.package.type === pkg.type) {
-      await prisma.subscription.update({
-        where: { id: s.id },
-        data: { status: 'CANCELLED' },
-      });
-    }
-  }
-
-  endDate.setDate(endDate.getDate() + pkg.durationDays);
-
-  return prisma.subscription.create({
-    data: {
-      userId,
-      packageId,
-      limitsSnapshot: pkg.limits,
-      usageData: '{}',
-      status: 'ACTIVE',
-      startDate,
-      endDate,
-      paymentId: paymentId || null,
-    },
-    include: { package: true },
   });
 };
 

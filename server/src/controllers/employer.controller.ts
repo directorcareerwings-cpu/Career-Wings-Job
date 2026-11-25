@@ -1296,7 +1296,7 @@ export const bulkDownloadCandidates = async (req: AuthenticatedRequest, res: Res
     if (creditsNeeded > 0) {
       const sub = await prisma.subscription.findFirst({
         where: { userId: req.user!.id, status: 'ACTIVE', endDate: { gte: new Date() } },
-        orderBy: { endDate: 'desc' },
+        orderBy: { createdAt: 'desc' },
       });
 
       if (!sub) {

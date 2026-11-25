@@ -115,7 +115,7 @@ export const getAdminCandidates = async (req: AuthenticatedRequest, res: Respons
               subscriptions: {
                 where: { status: 'ACTIVE', endDate: { gte: new Date() } },
                 include: { package: true },
-                orderBy: { endDate: 'desc' },
+                orderBy: { createdAt: 'desc' },
                 take: 1,
               },
             },
@@ -179,7 +179,7 @@ export const getAdminEmployers = async (req: AuthenticatedRequest, res: Response
               subscriptions: {
                 where: { status: 'ACTIVE', endDate: { gte: new Date() } },
                 include: { package: true },
-                orderBy: { endDate: 'desc' },
+                orderBy: { createdAt: 'desc' },
                 take: 1,
               },
             },
@@ -798,14 +798,24 @@ export const assignPackageManually = async (req: Request, res: Response, next: N
 
     if (!targetUserId && employerId) {
       const employer = await prisma.employer.findUnique({ where: { id: employerId } });
-      if (!employer) throw new AppError('Employer not found', 404);
-      targetUserId = employer.userId;
+      if (employer) {
+        targetUserId = employer.userId;
+      } else {
+        const directUser = await prisma.user.findUnique({ where: { id: employerId } });
+        if (!directUser) throw new AppError('Employer not found', 404);
+        targetUserId = directUser.id;
+      }
     }
 
     if (!targetUserId && candidateId) {
       const candidate = await prisma.candidate.findUnique({ where: { id: candidateId } });
-      if (!candidate) throw new AppError('Candidate not found', 404);
-      targetUserId = candidate.userId;
+      if (candidate) {
+        targetUserId = candidate.userId;
+      } else {
+        const directUser = await prisma.user.findUnique({ where: { id: candidateId } });
+        if (!directUser) throw new AppError('Candidate not found', 404);
+        targetUserId = directUser.id;
+      }
     }
 
     if (!targetUserId) {
@@ -820,21 +830,6 @@ export const assignPackageManually = async (req: Request, res: Response, next: N
       },
     });
     if (!user) throw new AppError('Target user not found', 404);
-
-    // Cancel existing active subscriptions of this package type
-    const existingSubs = await prisma.subscription.findMany({
-      where: { userId: targetUserId, status: 'ACTIVE' },
-      include: { package: true },
-    });
-
-    for (const sub of existingSubs) {
-      if (sub.package.type === pkg.type) {
-        await prisma.subscription.update({
-          where: { id: sub.id },
-          data: { status: 'CANCELLED' },
-        });
-      }
-    }
 
     const validityDays = durationDays && parseInt(String(durationDays), 10) > 0
       ? parseInt(String(durationDays), 10)
@@ -863,20 +858,31 @@ export const assignPackageManually = async (req: Request, res: Response, next: N
       paymentRecordId = null;
     }
 
-    const subscription = await prisma.subscription.create({
-      data: {
-        userId: targetUserId,
-        packageId: pkg.id,
-        limitsSnapshot: pkg.limits,
-        usageData: '{}',
-        status: 'ACTIVE',
-        startDate,
-        endDate,
-        paymentId: paymentRecordId,
-      },
-      include: {
-        package: true,
-      },
+    // Atomically replace all prior active/suspended subscriptions for this user
+    const subscription = await prisma.$transaction(async (tx) => {
+      await tx.subscription.updateMany({
+        where: {
+          userId: targetUserId,
+          status: { in: ['ACTIVE', 'SUSPENDED'] },
+        },
+        data: { status: 'CANCELLED' },
+      });
+
+      return tx.subscription.create({
+        data: {
+          userId: targetUserId,
+          packageId: pkg.id,
+          limitsSnapshot: pkg.limits,
+          usageData: '{}',
+          status: 'ACTIVE',
+          startDate,
+          endDate,
+          paymentId: paymentRecordId,
+        },
+        include: {
+          package: true,
+        },
+      });
     });
 
     // Notify user

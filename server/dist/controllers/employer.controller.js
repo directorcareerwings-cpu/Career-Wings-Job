@@ -1211,7 +1211,7 @@ const bulkDownloadCandidates = async (req, res, next) => {
         if (creditsNeeded > 0) {
             const sub = await prisma_1.prisma.subscription.findFirst({
                 where: { userId: req.user.id, status: 'ACTIVE', endDate: { gte: new Date() } },
-                orderBy: { endDate: 'desc' },
+                orderBy: { createdAt: 'desc' },
             });
             if (!sub) {
                 throw new errors_1.AppError('No active subscription found. Please purchase a package to download candidate data.', 403);
