@@ -31,6 +31,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { cn } from '@/lib/utils'
+import { useEducationMaster } from '@/hooks/useEducationMaster'
 
 const WhatsAppIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
   <svg
@@ -380,6 +381,7 @@ const DEFAULT_CANDIDATES: CandidateRecord[] = [
 ]
 
 export default function CandidateDatabase() {
+  const { educationLevels, highestDegrees } = useEducationMaster()
   const [candidates, setCandidates] = useState<CandidateRecord[]>(DEFAULT_CANDIDATES)
   const [loading, setLoading] = useState(false)
   const [sub, setSub] = useState<any>(null)
@@ -1431,14 +1433,14 @@ export default function CandidateDatabase() {
                 onChange={(e) => setQualification(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-[#c9252c]"
               >
-                <option>All Qualifications</option>
-                <option>10th / High School</option>
-                <option>12th / Higher Secondary</option>
-                <option>Diploma / ITI</option>
-                <option>Graduate / Diploma</option>
-                <option>Graduate / Bachelor Degree</option>
-                <option>Post Graduate / Master Degree</option>
-                <option>Doctorate / Ph.D</option>
+                <option value="All Qualifications">All Qualifications</option>
+                {educationLevels
+                  .filter((lvl) => lvl !== 'Any qualification')
+                  .map((lvl) => (
+                    <option key={lvl} value={lvl}>
+                      {lvl}
+                    </option>
+                  ))}
               </select>
             </div>
 
@@ -1448,20 +1450,12 @@ export default function CandidateDatabase() {
                 onChange={(e) => setHighestDegree(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-[#c9252c]"
               >
-                <option>All Highest Degrees</option>
-                <option>B.A</option>
-                <option>B.Com</option>
-                <option>B.Sc</option>
-                <option>B.Tech / B.E</option>
-                <option>BBA</option>
-                <option>BCA</option>
-                <option>M.A</option>
-                <option>M.Com</option>
-                <option>M.Sc</option>
-                <option>MBA</option>
-                <option>MCA</option>
-                <option>MBBS</option>
-                <option>B.Pharm</option>
+                <option value="All Highest Degrees">All Highest Degrees</option>
+                {highestDegrees.map((deg) => (
+                  <option key={deg} value={deg}>
+                    {deg}
+                  </option>
+                ))}
               </select>
             </div>
 

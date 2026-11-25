@@ -39,7 +39,7 @@ export const getPublicPackages = async (req: Request, res: Response, next: NextF
       });
     } catch (dbErr: any) {
       if (dbErr?.message?.includes('invalid datetime') || dbErr?.message?.includes('Value out of range')) {
-        await sanitizeMysqlDatetimes().catch(() => {});
+        await sanitizeMysqlDatetimes().catch(() => { });
         packages = await prisma.package.findMany({
           where,
           orderBy: { sortOrder: 'asc' },
