@@ -1073,8 +1073,37 @@ const searchCandidates = async (req, res, next) => {
                 where,
                 include: {
                     user: { select: { email: true } },
-                    candidateSkills: { include: { skill: { select: { name: true } } }, take: 5 },
-                    education: { take: 1, orderBy: { startYear: 'desc' }, select: { degree: true, institution: true } },
+                    candidateSkills: { include: { skill: { select: { name: true } } }, take: 8 },
+                    education: {
+                        take: 5,
+                        orderBy: { startYear: 'desc' },
+                        select: { id: true, degree: true, fieldOfStudy: true, institution: true, startYear: true, endYear: true, grade: true },
+                    },
+                    experience: {
+                        take: 5,
+                        orderBy: { startDate: 'desc' },
+                        select: { id: true, title: true, company: true, location: true, isCurrent: true },
+                    },
+                    applications: {
+                        take: 10,
+                        orderBy: { appliedAt: 'desc' },
+                        select: {
+                            id: true,
+                            status: true,
+                            appliedAt: true,
+                            job: {
+                                select: {
+                                    id: true,
+                                    title: true,
+                                    city: true,
+                                    district: true,
+                                    state: true,
+                                    jobType: true,
+                                    company: { select: { name: true } },
+                                },
+                            },
+                        },
+                    },
                 },
                 orderBy: { updatedAt: 'desc' },
                 skip,
@@ -1088,16 +1117,52 @@ const searchCandidates = async (req, res, next) => {
             const maskedEmail = rawEmail.replace(/^(..)(.*)(@.*)$/, (_, a, b, c) => a + '***' + c);
             const rawPhone = cand.phone || '+91 98765 43210';
             const maskedPhone = '📱 -';
+            // Extract Job Applied For from imported summary/headline if present
+            let jobAppliedFor = null;
+            if (cand.summary && cand.summary.includes('Job Applied For:')) {
+                const match = cand.summary.match(/Job Applied For:\s*([^|\n]+)/i);
+                if (match && match[1])
+                    jobAppliedFor = match[1].trim();
+            }
+            else if (cand.headline && cand.headline.startsWith('Applied for:')) {
+                jobAppliedFor = cand.headline.replace(/^Applied for:\s*/i, '').trim();
+            }
+            const appliedJobs = (cand.applications || []).map((app) => ({
+                id: app.id,
+                status: app.status,
+                appliedAt: app.appliedAt,
+                jobId: app.job?.id,
+                jobTitle: app.job?.title,
+                companyName: app.job?.company?.name || null,
+                location: [app.job?.city, app.job?.district, app.job?.state].filter(Boolean).join(', ') || null,
+                jobType: app.job?.jobType || null,
+            }));
             return {
                 id: cand.id,
                 firstName: cand.firstName,
                 lastName: cand.lastName,
                 headline: cand.headline || 'Active Job Seeker',
                 currentLocation: cand.currentLocation || 'Guwahati, Assam',
+                city: cand.city || null,
+                state: cand.state || null,
                 educationLevel: cand.educationLevel || 'Graduate / Diploma',
                 highestDegree: cand.highestDegree || 'B.A',
+                college: cand.college || cand.education?.[0]?.institution || null,
                 totalExperience: cand.totalExperience ?? 2,
                 gender: cand.gender || 'Not specified',
+                dateOfBirth: cand.dateOfBirth || null,
+                currentRole: cand.currentRole || null,
+                currentCompany: cand.currentCompany || null,
+                currentSalary: cand.currentSalary ?? null,
+                expectedSalaryMin: cand.expectedSalaryMin ?? null,
+                expectedSalaryMax: cand.expectedSalaryMax ?? null,
+                noticePeriod: cand.noticePeriod || null,
+                preferredLocations: cand.preferredLocations || null,
+                summary: cand.summary || null,
+                jobAppliedFor,
+                appliedJobs,
+                education: cand.education || [],
+                experience: cand.experience || [],
                 profilePhoto: cand.profilePhoto,
                 resumeFile: cand.resumeFile,
                 resumeFileName: cand.resumeFileName || (cand.resumeFile ? 'Verified_Resume.pdf' : null),

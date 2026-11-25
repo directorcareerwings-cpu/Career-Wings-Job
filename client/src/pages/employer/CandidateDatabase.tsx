@@ -68,6 +68,42 @@ interface CandidateRecord {
   isVerifiedResume: boolean
   isUnlocked: boolean
   skills: string[]
+  currentRole?: string | null
+  currentCompany?: string | null
+  college?: string | null
+  currentSalary?: number | null
+  expectedSalaryMin?: number | null
+  noticePeriod?: string | null
+  preferredLocations?: string | null
+  summary?: string | null
+  dateOfBirth?: string | null
+  jobAppliedFor?: string | null
+  appliedJobs?: {
+    id: string
+    status: string
+    appliedAt: string
+    jobId?: string
+    jobTitle?: string
+    companyName?: string | null
+    location?: string | null
+    jobType?: string | null
+  }[]
+  education?: {
+    id?: string
+    degree: string
+    fieldOfStudy?: string | null
+    institution: string
+    startYear?: number | null
+    endYear?: number | null
+    grade?: string | null
+  }[]
+  experience?: {
+    id?: string
+    title: string
+    company: string
+    location?: string | null
+    isCurrent?: boolean
+  }[]
   updatedAt?: string | Date
   createdAt?: string | Date
 }
@@ -459,7 +495,7 @@ export default function CandidateDatabase() {
         const arr = JSON.stringify([...next])
         sessionStorage.setItem('employer_viewed_candidates', arr)
         localStorage.setItem('employer_viewed_candidates', arr)
-      } catch {}
+      } catch { }
       return next
     })
   }
@@ -480,7 +516,7 @@ export default function CandidateDatabase() {
         const arr = JSON.stringify([...next])
         sessionStorage.setItem('employer_viewed_candidates', arr)
         localStorage.setItem('employer_viewed_candidates', arr)
-      } catch {}
+      } catch { }
       return next
     })
   }
@@ -591,6 +627,19 @@ export default function CandidateDatabase() {
             'Job Search Readiness',
             'Industry Domain',
           ],
+          currentRole: c.currentRole || null,
+          currentCompany: c.currentCompany || null,
+          college: c.college || null,
+          currentSalary: c.currentSalary ?? null,
+          expectedSalaryMin: c.expectedSalaryMin ?? null,
+          noticePeriod: c.noticePeriod || null,
+          preferredLocations: c.preferredLocations || null,
+          summary: c.summary || null,
+          dateOfBirth: c.dateOfBirth || null,
+          jobAppliedFor: c.jobAppliedFor || null,
+          appliedJobs: Array.isArray(c.appliedJobs) ? c.appliedJobs : [],
+          education: Array.isArray(c.education) ? c.education : [],
+          experience: Array.isArray(c.experience) ? c.experience : [],
           updatedAt: c.updatedAt || new Date().toISOString(),
           createdAt: c.createdAt || new Date().toISOString(),
         }))
@@ -616,7 +665,8 @@ export default function CandidateDatabase() {
   // ─── Filter Logic ──────────────────────────────────────────────────────────
   const filteredCandidates = useMemo(() => {
     return candidates.filter((c) => {
-      const fullText = `${c.firstName} ${c.lastName} ${c.headline} ${c.email} ${c.realEmail}`.toLowerCase()
+      const appliedText = (c.appliedJobs || []).map((a) => `${a.jobTitle || ''} ${a.companyName || ''}`).join(' ')
+      const fullText = `${c.firstName} ${c.lastName} ${c.headline} ${c.jobAppliedFor || ''} ${c.currentRole || ''} ${c.currentCompany || ''} ${appliedText} ${c.email} ${c.realEmail}`.toLowerCase()
       if (keyword.trim() && !fullText.includes(keyword.toLowerCase().trim())) {
         return false
       }
@@ -802,11 +852,11 @@ export default function CandidateDatabase() {
         prev.map((c) =>
           c.id === cand.id
             ? {
-                ...c,
-                isUnlocked: true,
-                email: c.realEmail,
-                phone: c.realPhone,
-              }
+              ...c,
+              isUnlocked: true,
+              email: c.realEmail,
+              phone: c.realPhone,
+            }
             : c
         )
       )
@@ -1610,31 +1660,28 @@ export default function CandidateDatabase() {
                 <button
                   type="button"
                   onClick={() => setViewFilter('all')}
-                  className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition ${
-                    viewFilter === 'all'
+                  className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition ${viewFilter === 'all'
                       ? 'bg-white text-slate-800 shadow-sm'
                       : 'text-slate-500 hover:text-slate-700'
-                  }`}
+                    }`}
                 >
                   All ({candidates.length})
                 </button>
                 <button
                   type="button"
                   onClick={() => setViewFilter('not-viewed')}
-                  className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition flex items-center gap-1.5 ${
-                    viewFilter === 'not-viewed'
+                  className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition flex items-center gap-1.5 ${viewFilter === 'not-viewed'
                       ? 'bg-white text-blue-700 shadow-sm'
                       : 'text-slate-500 hover:text-slate-700'
-                  }`}
+                    }`}
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />
                   Not Viewed Yet
                   <span
-                    className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
-                      viewFilter === 'not-viewed'
+                    className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${viewFilter === 'not-viewed'
                         ? 'bg-blue-100 text-blue-700'
                         : 'bg-slate-200/90 text-slate-600'
-                    }`}
+                      }`}
                   >
                     {candidates.filter((c) => !viewedIds.has(c.id)).length}
                   </span>
@@ -1642,20 +1689,18 @@ export default function CandidateDatabase() {
                 <button
                   type="button"
                   onClick={() => setViewFilter('viewed')}
-                  className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition flex items-center gap-1.5 ${
-                    viewFilter === 'viewed'
+                  className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition flex items-center gap-1.5 ${viewFilter === 'viewed'
                       ? 'bg-white text-emerald-700 shadow-sm'
                       : 'text-slate-500 hover:text-slate-700'
-                  }`}
+                    }`}
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
                   Already Viewed
                   <span
-                    className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
-                      viewFilter === 'viewed'
+                    className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${viewFilter === 'viewed'
                         ? 'bg-emerald-100 text-emerald-700'
                         : 'bg-slate-200/90 text-slate-600'
-                    }`}
+                      }`}
                   >
                     {candidates.filter((c) => viewedIds.has(c.id)).length}
                   </span>
@@ -1846,13 +1891,12 @@ export default function CandidateDatabase() {
             return (
               <div
                 key={cand.id}
-                className={`bg-white rounded-2xl p-5 border transition-all ${
-                  isPremium
+                className={`bg-white rounded-2xl p-5 border transition-all ${isPremium
                     ? 'border-amber-300/80 shadow-xs hover:border-amber-400'
                     : isSelected
-                    ? 'border-red-300 shadow-xs'
-                    : 'border-slate-200/80 hover:border-slate-300'
-                }`}
+                      ? 'border-red-300 shadow-xs'
+                      : 'border-slate-200/80 hover:border-slate-300'
+                  }`}
               >
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                   {/* Left Checkbox + Avatar + Info */}
@@ -2211,6 +2255,211 @@ export default function CandidateDatabase() {
                 </div>
               </div>
             </div>
+
+            {/* ─── Box 1B: Job Applied For & Career Details ────────────── */}
+            {(selectedCandidate.jobAppliedFor ||
+              (selectedCandidate.appliedJobs && selectedCandidate.appliedJobs.length > 0)) && (
+                <div className="mt-5">
+                  <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                    <Briefcase className="w-3.5 h-3.5 text-[#c9252c]" />
+                    Job Applied For
+                  </h3>
+                  <div className="bg-red-50/50 rounded-2xl p-4 border border-red-100 space-y-2.5">
+                    {selectedCandidate.jobAppliedFor && (
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <span className="text-[10px] font-bold text-red-500 uppercase tracking-wider block">
+                            Applied Position (Database / Import)
+                          </span>
+                          <span className="text-sm font-bold text-slate-900">
+                            {selectedCandidate.jobAppliedFor}
+                          </span>
+                        </div>
+                        <span className="px-2.5 py-0.5 rounded-full bg-red-100 text-[#c9252c] text-[10px] font-bold">
+                          Applied For
+                        </span>
+                      </div>
+                    )}
+
+                    {selectedCandidate.appliedJobs && selectedCandidate.appliedJobs.length > 0 && (
+                      <div className="space-y-2 pt-1">
+                        {selectedCandidate.appliedJobs.map((app) => (
+                          <div
+                            key={app.id}
+                            className="flex flex-wrap items-center justify-between gap-2 bg-white rounded-xl px-3.5 py-2.5 border border-red-100/80 shadow-2xs"
+                          >
+                            <div>
+                              <div className="text-xs font-bold text-slate-900">
+                                {app.jobTitle || 'Job Application'}
+                              </div>
+                              <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-2 mt-0.5">
+                                {app.companyName && <span>🏢 {app.companyName}</span>}
+                                {app.location && <span>📍 {app.location}</span>}
+                                {app.appliedAt && (
+                                  <span>📅 Applied {new Date(app.appliedAt).toLocaleDateString()}</span>
+                                )}
+                              </div>
+                            </div>
+                            <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-[10px] font-bold uppercase border border-blue-100">
+                              {app.status || 'APPLIED'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+            {/* ─── Box 1C: Other Career, Education & Profile Details ───── */}
+            {(selectedCandidate.currentRole ||
+              selectedCandidate.currentCompany ||
+              selectedCandidate.college ||
+              selectedCandidate.noticePeriod ||
+              selectedCandidate.currentSalary ||
+              selectedCandidate.expectedSalaryMin ||
+              selectedCandidate.preferredLocations ||
+              selectedCandidate.summary ||
+              (selectedCandidate.education && selectedCandidate.education.length > 0) ||
+              (selectedCandidate.experience && selectedCandidate.experience.length > 0)) && (
+                <div className="mt-5">
+                  <h3 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2.5">
+                    Other Profile & Job Details
+                  </h3>
+                  <div className="bg-slate-50/90 rounded-2xl p-4 sm:p-5 border border-slate-200/70 space-y-4 text-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      {selectedCandidate.currentRole && (
+                        <div>
+                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            Current Role / Designation
+                          </div>
+                          <div className="font-semibold text-slate-800 mt-0.5">
+                            {selectedCandidate.currentRole}
+                          </div>
+                        </div>
+                      )}
+                      {selectedCandidate.currentCompany && (
+                        <div>
+                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            Current Company
+                          </div>
+                          <div className="font-semibold text-slate-800 mt-0.5">
+                            {selectedCandidate.currentCompany}
+                          </div>
+                        </div>
+                      )}
+                      {selectedCandidate.college && (
+                        <div>
+                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            College / Institute
+                          </div>
+                          <div className="font-semibold text-slate-800 mt-0.5">
+                            {selectedCandidate.college}
+                          </div>
+                        </div>
+                      )}
+                      {selectedCandidate.noticePeriod && (
+                        <div>
+                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            Notice Period
+                          </div>
+                          <div className="font-semibold text-slate-800 mt-0.5">
+                            {selectedCandidate.noticePeriod}
+                          </div>
+                        </div>
+                      )}
+                      {(selectedCandidate.currentSalary || selectedCandidate.expectedSalaryMin) && (
+                        <div>
+                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            Compensation (Current / Expected)
+                          </div>
+                          <div className="font-semibold text-slate-800 mt-0.5">
+                            {selectedCandidate.currentSalary
+                              ? `Current: ₹${Number(selectedCandidate.currentSalary).toLocaleString('en-IN')}`
+                              : ''}
+                            {selectedCandidate.currentSalary && selectedCandidate.expectedSalaryMin ? ' • ' : ''}
+                            {selectedCandidate.expectedSalaryMin
+                              ? `Expected: ₹${Number(selectedCandidate.expectedSalaryMin).toLocaleString('en-IN')}`
+                              : ''}
+                          </div>
+                        </div>
+                      )}
+                      {selectedCandidate.preferredLocations && (
+                        <div>
+                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            Preferred Locations
+                          </div>
+                          <div className="font-semibold text-slate-800 mt-0.5">
+                            {(() => {
+                              try {
+                                const parsed = JSON.parse(selectedCandidate.preferredLocations)
+                                return Array.isArray(parsed) ? parsed.join(', ') : selectedCandidate.preferredLocations
+                              } catch {
+                                return selectedCandidate.preferredLocations
+                              }
+                            })()}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {selectedCandidate.summary && (
+                      <div className="pt-2 border-t border-slate-200/70">
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                          Profile Summary
+                        </div>
+                        <p className="text-slate-700 leading-relaxed whitespace-pre-line">
+                          {selectedCandidate.summary}
+                        </p>
+                      </div>
+                    )}
+
+                    {selectedCandidate.education && selectedCandidate.education.length > 0 && (
+                      <div className="pt-2 border-t border-slate-200/70">
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                          Education History
+                        </div>
+                        <div className="space-y-1.5">
+                          {selectedCandidate.education.map((edu, i) => (
+                            <div key={edu.id || i} className="text-slate-700 flex flex-wrap items-center gap-1.5">
+                              <span className="font-bold text-slate-800">{edu.degree}</span>
+                              {edu.fieldOfStudy && <span>({edu.fieldOfStudy})</span>}
+                              <span>— {edu.institution}</span>
+                              {(edu.startYear || edu.endYear) && (
+                                <span className="text-slate-400">
+                                  [{edu.startYear || ''}{edu.startYear && edu.endYear ? '–' : ''}{edu.endYear || ''}]
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedCandidate.experience && selectedCandidate.experience.length > 0 && (
+                      <div className="pt-2 border-t border-slate-200/70">
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                          Work Experience
+                        </div>
+                        <div className="space-y-1.5">
+                          {selectedCandidate.experience.map((exp, i) => (
+                            <div key={exp.id || i} className="text-slate-700">
+                              <span className="font-bold text-slate-800">{exp.title}</span> at{' '}
+                              <span className="font-medium">{exp.company}</span>
+                              {exp.location && <span className="text-slate-400"> ({exp.location})</span>}
+                              {exp.isCurrent && (
+                                <span className="ml-1.5 px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold">
+                                  Current
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
             {/* ─── Box 2: Key Skills ───────────────────────── */}
             <div className="mt-5">
