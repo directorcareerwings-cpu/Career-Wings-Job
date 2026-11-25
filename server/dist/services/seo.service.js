@@ -390,47 +390,7 @@ const syncAllPublicPagesToCatalog = async () => {
         const defaultTitle = job.seoTitle || `${job.title} at ${companyName} — Jobs in ${locationCity}, ${locationState}`;
         const defaultDesc = job.seoDescription ||
             `Apply for ${job.title} vacancy at ${companyName} in ${locationCity}, ${locationState}. ${job.experienceMin !== null && job.experienceMin !== undefined ? `${job.experienceMin}+ yrs experience.` : ''} Apply online on Career Wings.`;
-        // JobPosting Schema.org JSON-LD
-        const jobSchema = {
-            '@context': 'https://schema.org',
-            '@type': 'JobPosting',
-            title: job.title,
-            description: job.description,
-            datePosted: job.publishedAt ? job.publishedAt.toISOString() : job.createdAt.toISOString(),
-            validThrough: job.applicationDeadline ? job.applicationDeadline.toISOString() : undefined,
-            employmentType: (job.jobType || 'FULL_TIME').replace('_', '-'),
-            hiringOrganization: {
-                '@type': 'Organization',
-                name: companyName,
-                sameAs: job.company?.website || undefined,
-                logo: job.company?.logo ? `${siteUrl}${job.company.logo}` : undefined,
-            },
-            jobLocation: {
-                '@type': 'Place',
-                address: {
-                    '@type': 'PostalAddress',
-                    addressLocality: locationCity,
-                    addressRegion: locationState,
-                    addressCountry: 'IN',
-                },
-            },
-            ...(job.showSalary && job.salaryMin
-                ? {
-                    baseSalary: {
-                        '@type': 'MonetaryAmount',
-                        currency: job.salaryCurrency || 'INR',
-                        value: {
-                            '@type': 'QuantitativeValue',
-                            minValue: job.salaryMin,
-                            maxValue: job.salaryMax || job.salaryMin,
-                            unitText: job.salaryPeriod || 'MONTHLY',
-                        },
-                    },
-                }
-                : {}),
-            directApply: true,
-            url: `${siteUrl}${jobUrl}`,
-        };
+        const jobSchema = (0, exports.buildJobPostingSchema)(job, siteUrl);
         const audit = (0, exports.calculatePageSeoAudit)({
             url: jobUrl,
             seoTitle: defaultTitle,
@@ -738,13 +698,16 @@ const mapEmploymentTypeToSchema = (type) => {
 exports.mapEmploymentTypeToSchema = mapEmploymentTypeToSchema;
 const cleanJobDescriptionForSchema = (raw) => {
     if (!raw)
-        return '<p>Detailed job description available on Career Wings application portal.</p>';
+        return '';
     let cleaned = raw
         .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
         .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+        .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+        .replace(/<noscript\b[^<]*(?:(?!<\/noscript>)<[^<]*)*<\/noscript>/gi, '')
         .trim();
-    // If plain text without tags, wrap paragraphs cleanly
-    if (!cleaned.includes('<p>') && !cleaned.includes('<div>') && !cleaned.includes('<br>')) {
+    if (!cleaned)
+        return '';
+    if (!/<(p|div|ul|ol|li|br|h[1-6])\b/i.test(cleaned)) {
         cleaned = cleaned
             .split(/\n\n+/)
             .map((p) => `<p>${p.replace(/\n/g, '<br/>')}</p>`)
@@ -753,26 +716,58 @@ const cleanJobDescriptionForSchema = (raw) => {
     return cleaned;
 };
 exports.cleanJobDescriptionForSchema = cleanJobDescriptionForSchema;
+const mapSalaryUnitToSchema = (period) => {
+    const p = (period || 'MONTHLY').toUpperCase();
+    if (p === 'YEARLY' || p === 'ANNUAL' || p === 'ANNUALLY')
+        return 'YEAR';
+    if (p === 'HOURLY')
+        return 'HOUR';
+    if (p === 'WEEKLY')
+        return 'WEEK';
+    if (p === 'DAILY')
+        return 'DAY';
+    return 'MONTH';
+};
 const buildJobPostingSchema = (job, siteUrl) => {
     const companyName = job.company?.name || 'Career Wings Verified Employer';
+    const companyProfileUrl = job.company?.slug ? `${siteUrl}/companies/${job.company.slug}` : siteUrl;
     const locationCity = job.city || job.location?.city || 'Guwahati';
     const locationState = job.state || job.location?.state || 'Assam';
-    const datePosted = job.publishedAt ? new Date(job.publishedAt).toISOString() : new Date(job.createdAt).toISOString();
+    const streetAddress = job.locationText || `${locationCity}, ${locationState}, India`;
+    const datePosted = job.publishedAt
+        ? new Date(job.publishedAt).toISOString()
+        : new Date(job.createdAt || Date.now()).toISOString();
     const validThrough = job.applicationDeadline
         ? new Date(job.applicationDeadline).toISOString()
-        : new Date(new Date(datePosted).getTime() + 60 * 24 * 60 * 60 * 1000).toISOString();
+        : job.expiresAt
+            ? new Date(job.expiresAt).toISOString()
+            : new Date(new Date(datePosted).getTime() + 60 * 24 * 60 * 60 * 1000).toISOString();
     const logoUrl = job.company?.logo
         ? (job.company.logo.startsWith('http') ? job.company.logo : `${siteUrl}${job.company.logo}`)
-        : undefined;
+        : `${siteUrl}/images/logo.png`;
+    const descriptionParts = [];
+    const mainDesc = (0, exports.cleanJobDescriptionForSchema)(job.description);
+    if (mainDesc)
+        descriptionParts.push(mainDesc);
+    const respHtml = (0, exports.cleanJobDescriptionForSchema)(job.responsibilities);
+    if (respHtml)
+        descriptionParts.push(`<p><strong>Responsibilities:</strong></p>${respHtml}`);
+    const reqHtml = (0, exports.cleanJobDescriptionForSchema)(job.requirements);
+    if (reqHtml)
+        descriptionParts.push(`<p><strong>Requirements:</strong></p>${reqHtml}`);
+    const benHtml = (0, exports.cleanJobDescriptionForSchema)(job.benefits);
+    if (benHtml)
+        descriptionParts.push(`<p><strong>Benefits:</strong></p>${benHtml}`);
+    const fullDescription = descriptionParts.join('') || '<p>Detailed job description and online application available on Career Wings.</p>';
     const schema = {
         '@context': 'https://schema.org',
         '@type': 'JobPosting',
         title: job.title,
-        description: (0, exports.cleanJobDescriptionForSchema)(job.description),
+        description: fullDescription,
         identifier: {
             '@type': 'PropertyValue',
             name: 'Career Wings',
-            value: job.id,
+            value: String(job.id || job.slug),
         },
         datePosted,
         validThrough,
@@ -780,13 +775,17 @@ const buildJobPostingSchema = (job, siteUrl) => {
         hiringOrganization: {
             '@type': 'Organization',
             name: companyName,
-            sameAs: job.company?.website || undefined,
+            sameAs: job.company?.website || companyProfileUrl,
             logo: logoUrl,
         },
         url: `${siteUrl}/jobs/${job.slug}`,
     };
+    if (job.category?.name) {
+        schema.occupationalCategory = job.category.name;
+    }
     // Location logic
-    if (job.workMode === 'REMOTE') {
+    const workMode = (job.workMode || '').toUpperCase();
+    if (workMode === 'REMOTE') {
         schema.jobLocationType = 'TELECOMMUTE';
         schema.applicantLocationRequirements = {
             '@type': 'Country',
@@ -798,21 +797,27 @@ const buildJobPostingSchema = (job, siteUrl) => {
             '@type': 'Place',
             address: {
                 '@type': 'PostalAddress',
+                streetAddress,
                 addressLocality: locationCity,
                 addressRegion: locationState,
                 addressCountry: 'IN',
             },
         };
-        if (job.workMode === 'HYBRID') {
+        if (workMode === 'HYBRID') {
             schema.jobLocationType = 'TELECOMMUTE';
+            schema.applicantLocationRequirements = {
+                '@type': 'Country',
+                name: 'India',
+            };
         }
     }
     // Salary logic
-    if (job.showSalary !== false && (job.salaryMin || job.salaryMax)) {
-        const min = job.salaryMin || job.salaryMax;
-        const max = job.salaryMax || job.salaryMin;
-        const period = (job.salaryPeriod || 'MONTHLY').toUpperCase();
-        const unitText = period === 'YEARLY' ? 'YEAR' : period === 'HOURLY' ? 'HOUR' : 'MONTH';
+    const minSal = Number(job.salaryMin ?? 0);
+    const maxSal = Number(job.salaryMax ?? 0);
+    if (job.showSalary !== false && (minSal > 0 || maxSal > 0)) {
+        const min = minSal > 0 ? minSal : maxSal;
+        const max = maxSal > 0 ? maxSal : minSal;
+        const unitText = mapSalaryUnitToSchema(job.salaryPeriod);
         const quantValue = {
             '@type': 'QuantitativeValue',
             unitText,
@@ -821,8 +826,8 @@ const buildJobPostingSchema = (job, siteUrl) => {
             quantValue.value = min;
         }
         else {
-            quantValue.minValue = min;
-            quantValue.maxValue = max;
+            quantValue.minValue = Math.min(min, max);
+            quantValue.maxValue = Math.max(min, max);
         }
         schema.baseSalary = {
             '@type': 'MonetaryAmount',
@@ -830,13 +835,7 @@ const buildJobPostingSchema = (job, siteUrl) => {
             value: quantValue,
         };
     }
-    // Application logic
-    if (job.applicationMethod === 'PORTAL') {
-        schema.directApply = true;
-    }
-    else if (job.applicationMethod === 'EXTERNAL' && job.applicationUrl) {
-        schema.directApply = false;
-    }
+    schema.directApply = job.applicationMethod === 'PORTAL' || !job.applicationUrl;
     return schema;
 };
 exports.buildJobPostingSchema = buildJobPostingSchema;

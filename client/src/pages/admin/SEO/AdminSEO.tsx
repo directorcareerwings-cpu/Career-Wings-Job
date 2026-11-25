@@ -1781,64 +1781,69 @@ export default function AdminSEO() {
 
               {/* Sitemaps List */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-5">
-                {[
-                  {
-                    title: 'Sitemap Index',
-                    file: 'sitemap-index.xml',
-                    url: 'http://localhost:5000/sitemap-index.xml',
-                    desc: 'Master sitemap index linking all sub-sitemaps for search engine spiders.',
-                    type: 'INDEX',
-                  },
-                  {
-                    title: 'Master Sitemap',
-                    file: 'sitemap.xml',
-                    url: 'http://localhost:5000/sitemap.xml',
-                    desc: 'Standard entry-point XML sitemap referenced in robots.txt.',
-                    type: 'MASTER',
-                  },
-                  {
-                    title: 'Jobs Sitemap',
-                    file: 'sitemap-jobs.xml',
-                    url: 'http://localhost:5000/sitemap-jobs.xml',
-                    desc: 'Live published job vacancies with hourly/daily priority tags.',
-                    type: 'JOBS',
-                  },
-                  {
-                    title: 'Companies Sitemap',
-                    file: 'sitemap-companies.xml',
-                    url: 'http://localhost:5000/sitemap-companies.xml',
-                    desc: 'Hiring employers and verified corporate profile pages.',
-                    type: 'COMPANIES',
-                  },
-                  {
-                    title: 'Locations Sitemap',
-                    file: 'sitemap-locations.xml',
-                    url: 'http://localhost:5000/sitemap-locations.xml',
-                    desc: 'City & regional job landing pages (Guwahati, Assam, etc.).',
-                    type: 'LOCATIONS',
-                  },
-                  {
-                    title: 'Categories Sitemap',
-                    file: 'sitemap-categories.xml',
-                    url: 'http://localhost:5000/sitemap-categories.xml',
-                    desc: 'Sector & industry job directories.',
-                    type: 'CATEGORIES',
-                  },
-                  {
-                    title: 'Pages & Static Content',
-                    file: 'sitemap-pages.xml',
-                    url: 'http://localhost:5000/sitemap-pages.xml',
-                    desc: 'Homepage, About, Contact, Pricing, and legal policies.',
-                    type: 'PAGES',
-                  },
-                  {
-                    title: 'SEO Landing Pages',
-                    file: 'sitemap-blog.xml',
-                    url: 'http://localhost:5000/sitemap-blog.xml',
-                    desc: 'Specialized landing pages (/jobs-in-guwahati, /jobs-in-assam).',
-                    type: 'LANDING',
-                  },
-                ].map((s) => (
+                {(() => {
+                  const baseSiteUrl = (stats?.sitemap?.masterUrl || 'https://careerwings.in/sitemap.xml')
+                    .replace(/\/sitemap\.xml$/i, '')
+                    .replace(/\/+$/, '');
+                  return [
+                    {
+                      title: 'Sitemap Index',
+                      file: 'sitemap-index.xml',
+                      url: `${baseSiteUrl}/sitemap-index.xml`,
+                      desc: 'Master sitemap index linking all sub-sitemaps for search engine spiders.',
+                      type: 'INDEX',
+                    },
+                    {
+                      title: 'Master Sitemap',
+                      file: 'sitemap.xml',
+                      url: `${baseSiteUrl}/sitemap.xml`,
+                      desc: 'Standard entry-point XML sitemap referenced in robots.txt.',
+                      type: 'MASTER',
+                    },
+                    {
+                      title: 'Jobs Sitemap',
+                      file: 'sitemap-jobs.xml',
+                      url: `${baseSiteUrl}/sitemap-jobs.xml`,
+                      desc: 'Live published job vacancies with hourly/daily priority tags.',
+                      type: 'JOBS',
+                    },
+                    {
+                      title: 'Companies Sitemap',
+                      file: 'sitemap-companies.xml',
+                      url: `${baseSiteUrl}/sitemap-companies.xml`,
+                      desc: 'Hiring employers and verified corporate profile pages.',
+                      type: 'COMPANIES',
+                    },
+                    {
+                      title: 'Locations Sitemap',
+                      file: 'sitemap-locations.xml',
+                      url: `${baseSiteUrl}/sitemap-locations.xml`,
+                      desc: 'City & regional job landing pages (Guwahati, Assam, etc.).',
+                      type: 'LOCATIONS',
+                    },
+                    {
+                      title: 'Categories Sitemap',
+                      file: 'sitemap-categories.xml',
+                      url: `${baseSiteUrl}/sitemap-categories.xml`,
+                      desc: 'Sector & industry job directories.',
+                      type: 'CATEGORIES',
+                    },
+                    {
+                      title: 'Pages & Static Content',
+                      file: 'sitemap-pages.xml',
+                      url: `${baseSiteUrl}/sitemap-pages.xml`,
+                      desc: 'Homepage, About, Contact, Pricing, and legal policies.',
+                      type: 'PAGES',
+                    },
+                    {
+                      title: 'Blog & SEO Landing Pages',
+                      file: 'sitemap-blog.xml',
+                      url: `${baseSiteUrl}/sitemap-blog.xml`,
+                      desc: 'Published blog articles and regional SEO landing pages (/jobs-in-guwahati, /jobs-in-assam).',
+                      type: 'LANDING',
+                    },
+                  ];
+                })().map((s) => (
                   <div key={s.file} className="p-4 rounded-xl border border-slate-100 bg-slate-50/60 flex flex-col justify-between gap-3">
                     <div>
                       <div className="flex items-center justify-between">

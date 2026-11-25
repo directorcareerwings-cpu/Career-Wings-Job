@@ -173,12 +173,28 @@ export default function Jobs() {
     ? `${debouncedKeyword} Jobs in Assam & Northeast`
     : 'Jobs in Guwahati & Northeast India | Career Wings'
 
+  const jobListSchema =
+    jobs.length > 0
+      ? {
+          '@context': 'https://schema.org',
+          '@type': 'ItemList',
+          name: seoTitle,
+          itemListElement: jobs.slice(0, 20).map((job, idx) => ({
+            '@type': 'ListItem',
+            position: idx + 1,
+            url: `https://careerwings.in/jobs/${job.slug}`,
+            name: job.title,
+          })),
+        }
+      : undefined
+
   return (
     <div className="min-h-screen flex flex-col bg-[#F8FAFC] font-sans">
       <SEOMeta
         title={seoTitle}
         description={`Find ${debouncedKeyword || ''} verified jobs across Guwahati, Assam and Northeast India on Career Wings. ${total} openings active today.`}
         canonical="/jobs"
+        schema={jobListSchema}
       />
       <Header />
 

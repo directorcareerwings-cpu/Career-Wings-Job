@@ -187,7 +187,8 @@ export const renderSeoHtmlForPath = async (
     } else {
       const isExpired =
         (job.status !== 'PUBLISHED' && job.status !== 'FEATURED') ||
-        Boolean(job.applicationDeadline && new Date(job.applicationDeadline).getTime() < Date.now());
+        Boolean(job.applicationDeadline && new Date(job.applicationDeadline).getTime() < Date.now()) ||
+        Boolean(job.expiresAt && new Date(job.expiresAt).getTime() < Date.now());
       const companyName = job.company?.name || 'Career Wings Employer';
       const city = job.city || job.location?.city || 'Guwahati';
       const state = job.state || job.location?.state || 'Assam';
@@ -387,7 +388,7 @@ export const renderSeoHtmlForPath = async (
 
   // Strip baseline meta/title/canonical/schema tags before injecting route-accurate metadata
   html = html
-    .replace(/<title>[\s\S]*?<\/title>/i, `<title>${safeTitle}</title>`)
+    .replace(/<title>[\s\S]*?<\/title>/i, `<title data-rh="true">${safeTitle}</title>`)
     .replace(/<meta\s+name="description"[^>]*>/gi, '')
     .replace(/<meta\s+name="robots"[^>]*>/gi, '')
     .replace(/<link\s+rel="canonical"[^>]*>/gi, '')
@@ -397,22 +398,25 @@ export const renderSeoHtmlForPath = async (
     .replace(/<script\s+type="application\/ld\+json">[\s\S]*?<\/script>/gi, '');
 
   const schemaScripts = resolved.schemas
-    .map((s) => `<script type="application/ld+json">${JSON.stringify(s).replace(/<\/script/gi, '<\\/script')}</script>`)
+    .map(
+      (s) =>
+        `<script data-rh="true" type="application/ld+json">${JSON.stringify(s).replace(/<\/script/gi, '<\\/script')}</script>`
+    )
     .join('\n    ');
 
   const injectedTags = [
-    `<meta name="description" content="${safeDesc}" />`,
-    `<meta name="robots" content="${safeRobots}" />`,
-    `<link rel="canonical" href="${safeCanonical}" />`,
-    verificationToken ? `<meta name="google-site-verification" content="${escapeHtml(verificationToken)}" />` : '',
-    `<meta property="og:title" content="${safeTitle}" />`,
-    `<meta property="og:description" content="${safeDesc}" />`,
-    `<meta property="og:type" content="${resolved.ogType}" />`,
-    `<meta property="og:url" content="${safeCanonical}" />`,
-    `<meta property="og:image" content="${safeImage}" />`,
-    `<meta name="twitter:title" content="${safeTitle}" />`,
-    `<meta name="twitter:description" content="${safeDesc}" />`,
-    `<meta name="twitter:image" content="${safeImage}" />`,
+    `<meta data-rh="true" name="description" content="${safeDesc}" />`,
+    `<meta data-rh="true" name="robots" content="${safeRobots}" />`,
+    `<link data-rh="true" rel="canonical" href="${safeCanonical}" />`,
+    verificationToken ? `<meta data-rh="true" name="google-site-verification" content="${escapeHtml(verificationToken)}" />` : '',
+    `<meta data-rh="true" property="og:title" content="${safeTitle}" />`,
+    `<meta data-rh="true" property="og:description" content="${safeDesc}" />`,
+    `<meta data-rh="true" property="og:type" content="${resolved.ogType}" />`,
+    `<meta data-rh="true" property="og:url" content="${safeCanonical}" />`,
+    `<meta data-rh="true" property="og:image" content="${safeImage}" />`,
+    `<meta data-rh="true" name="twitter:title" content="${safeTitle}" />`,
+    `<meta data-rh="true" name="twitter:description" content="${safeDesc}" />`,
+    `<meta data-rh="true" name="twitter:image" content="${safeImage}" />`,
     schemaScripts,
   ]
     .filter(Boolean)
