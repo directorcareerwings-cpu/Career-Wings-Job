@@ -6,7 +6,7 @@ import { SEOMeta } from '@/components/seo/SEOMeta'
 import { User, MapPin, Briefcase, GraduationCap, Download, Bookmark, Phone, Mail, ArrowLeft, Award, Eye } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { Candidate } from '@/types'
-import { downloadProfessionalCandidatePDF } from '@/lib/resumePdfBuilder'
+import { downloadProfessionalCandidatePDF, getEnrichedCandidateSkills } from '@/lib/resumePdfBuilder'
 
 export default function CandidateDetail() {
   const { id } = useParams<{ id: string }>()
@@ -225,19 +225,14 @@ export default function CandidateDetail() {
               <Award className="w-4 h-4 text-orange-500" /> Core Skills
             </h3>
             <div className="flex flex-wrap gap-2">
-              {candidate.candidateSkills
-                ?.filter((cs: any) => {
-                  const s = String(cs.skill?.name || cs.name || '').toLowerCase().trim()
-                  return !s.includes('apna') && !s.includes('4767') && !s.includes('1874') && !s.includes('http') && !s.includes('competenc') && !s.includes('key skills') && !/^\d+$/.test(s)
-                })
-                .map((cs: any) => (
-                  <span
-                    key={cs.id || cs.skill?.name}
-                    className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-semibold"
-                  >
-                    {cs.skill?.name || cs.name}
-                  </span>
-                ))}
+              {getEnrichedCandidateSkills(candidate as any).map((sk, idx) => (
+                <span
+                  key={`${sk}-${idx}`}
+                  className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-semibold"
+                >
+                  {sk}
+                </span>
+              ))}
             </div>
           </div>
 

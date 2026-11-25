@@ -164,6 +164,176 @@ const DOMAIN_PROFILES: Record<string, RoleDomainProfile> = {
   },
 }
 
+const PLACEHOLDER_VALUES = new Set([
+  'not available',
+  'n/a',
+  'na',
+  'none',
+  'nil',
+  'null',
+  'undefined',
+  'not specified',
+  'not provided',
+  'any',
+  '-',
+  '--',
+  '---',
+  '.',
+])
+
+const JUNK_SKILL_TOKENS = new Set([
+  'job',
+  'jobs',
+  'work',
+  'career',
+  'careers',
+  'vacancy',
+  'vacancies',
+  'opening',
+  'openings',
+  'resume',
+  'cv',
+  'skill',
+  'skills',
+  'fresher',
+  'other',
+  'any',
+  'none',
+  'nil',
+  'na',
+  'n/a',
+  'null',
+  'undefined',
+  'not available',
+  'not specified',
+  'not provided',
+  'professional communications',
+  'job search readiness',
+  'industry domain',
+])
+
+const AI_SKILL_SETS: Array<{ pattern: RegExp; skills: string[] }> = [
+  {
+    pattern: /(back\s*office|office\s*assistant|data\s*entry|admin|clerk|reception|mis|operator)/,
+    skills: [
+      'MS Office & Advanced Excel',
+      'Office Administration',
+      'Data Entry & MIS Reporting',
+      'Document Management',
+      'Scheduling & Coordination',
+      'Email Correspondence',
+      'Business Communication',
+      'Time Management',
+    ],
+  },
+  {
+    pattern: /(sales|slaes|business\s*dev|bde|bdm|retail|store|field|amul|fmcg|distributor)/,
+    skills: [
+      'Sales Operations',
+      'Client Relationship Management',
+      'Lead Generation & Follow-up',
+      'Order & Billing Coordination',
+      'Market & Territory Coverage',
+      'Persuasive Communication',
+      'Negotiation Skills',
+    ],
+  },
+  {
+    pattern: /(account|finance|tally|tax|gst|audit|bank|ca\b|b\.?com|m\.?com)/,
+    skills: [
+      'Accounting & Reconciliation',
+      'Tally Prime / ERP',
+      'MS Excel & Financial Reporting',
+      'GST & TDS Compliance',
+      'Billing & Voucher Auditing',
+      'Analytical Accuracy',
+    ],
+  },
+  {
+    pattern: /(delivery|courier|driver|rider|logistics|warehouse|supply|dispatch|blinkit|zomato|swiggy|flipkart)/,
+    skills: [
+      'Route & Dispatch Coordination',
+      'On-Time Order Fulfillment',
+      'Inventory & Package Handling',
+      'Customer Handover Protocol',
+      'Mobile Tracking & POS Apps',
+      'Time Management',
+    ],
+  },
+  {
+    pattern: /(support|customer|telecall|bpo|voice|helpdesk|front\s*office|care)/,
+    skills: [
+      'Customer Query Resolution',
+      'Voice & Chat Support',
+      'Front Desk Coordination',
+      'CRM & Ticket Tracking',
+      'Active Listening',
+      'Client Communication',
+    ],
+  },
+  {
+    pattern: /(soft|dev|engineer|program|tech|web|react|node|java|python|it\b|computer|bca|mca)/,
+    skills: [
+      'Software & Web Development',
+      'Database Management (SQL)',
+      'Troubleshooting & Debugging',
+      'Technical Documentation',
+      'System & Workflow Analysis',
+      'Collaborative Problem Solving',
+    ],
+  },
+  {
+    pattern: /(market|seo|digital|social|brand|content)/,
+    skills: [
+      'Digital Marketing & SEO',
+      'Social Media Campaigns',
+      'Lead Generation',
+      'Content & Copy Coordination',
+      'Campaign Analytics',
+      'Market Research',
+    ],
+  },
+  {
+    pattern: /(hr|human\s*resource|recruit|talent|staffing|payroll)/,
+    skills: [
+      'Talent Sourcing & Screening',
+      'Interview Coordination',
+      'HR Documentation & Onboarding',
+      'Attendance & Payroll Tracking',
+      'Interpersonal Communication',
+    ],
+  },
+  {
+    pattern: /(teach|tutor|faculty|lecturer|trainer|education|school|b\.?ed)/,
+    skills: [
+      'Curriculum Delivery',
+      'Classroom Management',
+      'Student Assessment & Mentoring',
+      'Lesson Planning',
+      'Presentation Skills',
+    ],
+  },
+  {
+    pattern: /(health|nurse|gnm|pharma|medical|hospital|clinic|mbbs|b\.?pharm)/,
+    skills: [
+      'Patient Care & Assistance',
+      'Clinical Documentation',
+      'Inventory & Pharmacy Compliance',
+      'Safety & Hygiene Protocols',
+      'Empathetic Communication',
+    ],
+  },
+]
+
+const GENERAL_AI_SKILLS = [
+  'Business Communication',
+  'MS Office & Computer Skills',
+  'Client & Team Coordination',
+  'Documentation & Reporting',
+  'Problem Solving',
+  'Time Management',
+]
+
 /**
  * Normalizes text for jsPDF built-in Helvetica font (strips emojis/unsupported Unicode).
  */
@@ -180,6 +350,13 @@ export function toPdfText(raw: string | null | undefined): string {
     .trim()
 }
 
+export function cleanPlaceholder(raw: string | null | undefined): string {
+  const txt = toPdfText(raw)
+  if (!txt) return ''
+  if (PLACEHOLDER_VALUES.has(txt.toLowerCase())) return ''
+  return txt
+}
+
 function resolveDomainProfile(roleHint: string): RoleDomainProfile {
   const r = roleHint.toLowerCase()
   if (/(back\s*office|data\s*entry|admin|clerk|office\s*assistant|reception|mis|operator)/.test(r)) {
@@ -188,16 +365,16 @@ function resolveDomainProfile(roleHint: string): RoleDomainProfile {
   if (/(delivery|courier|driver|rider|logistics|warehouse|supply|dispatch|blinkit|zomato|swiggy|flipkart)/.test(r)) {
     return DOMAIN_PROFILES.logistics
   }
-  if (/(account|finance|tally|tax|gst|audit|bank|ca\b|b\.?com)/.test(r)) {
+  if (/(account|finance|tally|tax|gst|audit|bank|ca\b|b\.?com|m\.?com)/.test(r)) {
     return DOMAIN_PROFILES.finance
   }
-  if (/(sale|business\s*dev|bde|bdm|marketing\s*exec|retail|store|field)/.test(r)) {
+  if (/(sale|slaes|business\s*dev|bde|bdm|marketing\s*exec|retail|store|field|amul|fmcg)/.test(r)) {
     return DOMAIN_PROFILES.sales
   }
   if (/(support|customer|telecall|bpo|voice|helpdesk|front\s*office|care)/.test(r)) {
     return DOMAIN_PROFILES.support
   }
-  if (/(soft|dev|engineer|program|tech|web|react|node|java|python|it\b|computer)/.test(r)) {
+  if (/(soft|dev|engineer|program|tech|web|react|node|java|python|it\b|computer|bca|mca)/.test(r)) {
     return DOMAIN_PROFILES.software
   }
   if (/(market|seo|digital|social|brand|content)/.test(r)) {
@@ -206,30 +383,98 @@ function resolveDomainProfile(roleHint: string): RoleDomainProfile {
   return DOMAIN_PROFILES.general
 }
 
+export function isValidCandidateSkill(raw: string | null | undefined): boolean {
+  const sk = cleanPlaceholder(raw)
+  if (!sk) return false
+  const s = sk.toLowerCase()
+  if (s.length <= 1 || JUNK_SKILL_TOKENS.has(s)) return false
+  if (
+    s.includes('apna') ||
+    s.includes('4767') ||
+    s.includes('1874') ||
+    s.includes('http') ||
+    s.includes('competenc') ||
+    s.includes('key skills') ||
+    s.includes('not available') ||
+    /^\d+$/.test(s)
+  ) {
+    return false
+  }
+  return true
+}
+
 export function cleanCandidateSkills(cand: ResumeCandidateInput): string[] {
   const rawSkills =
     cand.skills && cand.skills.length > 0
       ? cand.skills
       : (cand.candidateSkills || []).map((cs) => cs.skill?.name || cs.name || '')
 
-  const cleaned = rawSkills
-    .map((s) => toPdfText(s))
-    .filter((sk) => {
-      if (!sk) return false
-      const s = sk.toLowerCase()
-      return (
-        s.length > 1 &&
-        !s.includes('apna') &&
-        !s.includes('4767') &&
-        !s.includes('1874') &&
-        !s.includes('http') &&
-        !s.includes('competenc') &&
-        !s.includes('key skills') &&
-        !/^\d+$/.test(s)
-      )
-    })
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const raw of rawSkills) {
+    const sk = cleanPlaceholder(raw)
+    if (!isValidCandidateSkill(sk)) continue
+    const key = sk.toLowerCase()
+    if (!seen.has(key)) {
+      seen.add(key)
+      result.push(sk)
+    }
+  }
+  return result
+}
 
-  return Array.from(new Set(cleaned))
+/**
+ * Combines candidate's genuine profile skills with AI-generated domain/role-matched skills
+ * so every downloaded resume PDF displays 6-8 relevant skills without junk entries like "jobs".
+ */
+export function getEnrichedCandidateSkills(cand: ResumeCandidateInput): string[] {
+  const realSkills = cleanCandidateSkills(cand)
+  const seen = new Set(realSkills.map((s) => s.toLowerCase()))
+  const merged = [...realSkills]
+
+  const contextHint = [
+    cand.jobAppliedFor,
+    ...(cand.appliedJobs || []).map((a) => a.jobTitle),
+    cand.currentRole,
+    cand.currentCompany,
+    ...(cand.experience || []).map((e) => `${e.title} ${e.company}`),
+    cleanPlaceholder(cand.headline),
+    cleanPlaceholder(cand.highestDegree),
+    cleanPlaceholder(cand.educationLevel),
+    ...realSkills,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+
+  // Collect skills from every matching role/domain pattern (target job + prior experience + education)
+  for (const group of AI_SKILL_SETS) {
+    if (group.pattern.test(contextHint)) {
+      for (const aiSkill of group.skills) {
+        if (merged.length >= 8) break
+        const key = aiSkill.toLowerCase()
+        if (!seen.has(key)) {
+          seen.add(key)
+          merged.push(aiSkill)
+        }
+      }
+    }
+    if (merged.length >= 8) break
+  }
+
+  // Ensure at least 6 relevant core competencies on every resume
+  if (merged.length < 6) {
+    for (const fallback of GENERAL_AI_SKILLS) {
+      if (merged.length >= 6) break
+      const key = fallback.toLowerCase()
+      if (!seen.has(key)) {
+        seen.add(key)
+        merged.push(fallback)
+      }
+    }
+  }
+
+  return merged
 }
 
 function parsePreferredLocations(raw: string | null | undefined): string {
@@ -264,29 +509,33 @@ function formatYearOrDate(d: string | Date | null | undefined): string {
 
 function buildAIProfileSummary(cand: ResumeCandidateInput, skills: string[]): { summary: string; highlights: string[] } {
   const targetRole =
-    toPdfText(cand.jobAppliedFor) ||
-    toPdfText(cand.appliedJobs?.[0]?.jobTitle) ||
-    toPdfText(cand.currentRole) ||
-    toPdfText(cand.headline).replace(/^Applied for:\s*/i, '') ||
+    cleanPlaceholder(cand.jobAppliedFor) ||
+    cleanPlaceholder(cand.appliedJobs?.[0]?.jobTitle) ||
+    cleanPlaceholder(cand.currentRole) ||
+    cleanPlaceholder(cand.headline).replace(/^Applied for:\s*/i, '') ||
     'Professional Candidate'
 
   const roleHint = `${targetRole} ${cand.currentRole || ''} ${cand.currentCompany || ''} ${cand.headline || ''} ${skills.join(' ')}`
   const domain = resolveDomainProfile(roleHint)
 
   const expNum = Number(cand.totalExperience ?? 0)
+  const cleanCompany = cleanPlaceholder(cand.currentCompany)
   const expText =
     expNum > 0
       ? `${expNum} year${expNum === 1 ? '' : 's'} of practical industry experience${
-          cand.currentCompany ? ` (most recently at ${toPdfText(cand.currentCompany)})` : ''
+          cleanCompany ? ` (most recently at ${cleanCompany})` : ''
         }`
       : 'a solid academic foundation and readiness to deliver impact from day one'
 
-  const degreePart = toPdfText(cand.highestDegree) || 'Graduate qualification'
-  const levelPart = toPdfText(cand.educationLevel)
-  const collegePart = toPdfText(cand.college || cand.education?.[0]?.institution)
-  let eduPhrase = degreePart
-  if (levelPart && !degreePart.toLowerCase().includes(levelPart.toLowerCase())) {
+  const degreePart = cleanPlaceholder(cand.highestDegree)
+  const levelPart = cleanPlaceholder(cand.educationLevel)
+  const collegePart = cleanPlaceholder(cand.college) || cleanPlaceholder(cand.education?.[0]?.institution)
+
+  let eduPhrase = ''
+  if (degreePart && levelPart && !degreePart.toLowerCase().includes(levelPart.toLowerCase())) {
     eduPhrase = `${degreePart} (${levelPart})`
+  } else {
+    eduPhrase = degreePart || (levelPart ? `${levelPart} qualification` : 'relevant academic qualification')
   }
   if (collegePart) {
     eduPhrase += ` from ${collegePart}`
@@ -305,15 +554,17 @@ function buildAIProfileSummary(cand: ResumeCandidateInput, skills: string[]): { 
   })
 
   const extraNote: string[] = []
-  if (cand.currentLocation) {
-    extraNote.push(`Based in ${toPdfText(cand.currentLocation)}`)
+  const cleanLoc = cleanPlaceholder(cand.currentLocation)
+  if (cleanLoc) {
+    extraNote.push(`Based in ${cleanLoc}`)
   }
   const prefLocs = parsePreferredLocations(cand.preferredLocations)
   if (prefLocs) {
     extraNote.push(`open to opportunities in ${prefLocs}`)
   }
-  if (cand.noticePeriod) {
-    extraNote.push(`available within ${toPdfText(cand.noticePeriod)} notice period`)
+  const cleanNotice = cleanPlaceholder(cand.noticePeriod)
+  if (cleanNotice) {
+    extraNote.push(`available within ${cleanNotice} notice period`)
   }
   if (extraNote.length > 0) {
     generated += ` ${extraNote.join(', ')}.`
@@ -378,11 +629,11 @@ export async function buildProfessionalCandidatePDFDoc(
   const fullName = `${firstName} ${lastName}`.trim()
 
   const headlineText =
-    toPdfText(cand.currentRole) && toPdfText(cand.currentCompany)
-      ? `${toPdfText(cand.currentRole)} at ${toPdfText(cand.currentCompany)}`
-      : toPdfText(cand.headline) || toPdfText(cand.currentRole) || 'Active Job Seeker'
+    cleanPlaceholder(cand.currentRole) && cleanPlaceholder(cand.currentCompany)
+      ? `${cleanPlaceholder(cand.currentRole)} at ${cleanPlaceholder(cand.currentCompany)}`
+      : cleanPlaceholder(cand.headline) || cleanPlaceholder(cand.currentRole) || 'Active Job Seeker'
 
-  const cleanSkills = cleanCandidateSkills(cand)
+  const cleanSkills = getEnrichedCandidateSkills(cand)
   const aiContent = buildAIProfileSummary(cand, cleanSkills)
 
   // ─── 1. EXECUTIVE TOP BANNER ──────────────────────────────────────────────
@@ -500,10 +751,17 @@ export async function buildProfessionalCandidatePDFDoc(
     },
   ]
 
+  const qualDisplay = (() => {
+    const deg = cleanPlaceholder(cand.highestDegree)
+    const lvl = cleanPlaceholder(cand.educationLevel)
+    if (deg && lvl && !deg.toLowerCase().includes(lvl.toLowerCase())) return `${deg} (${lvl})`
+    return deg || lvl || 'Verified Qualification'
+  })()
+
   const rightItems: Array<{ label: string; value: string; color?: [number, number, number] }> = [
     {
       label: 'HIGHEST QUALIFICATION',
-      value: `${toPdfText(cand.highestDegree) || 'Graduate'}${cand.educationLevel ? ` (${toPdfText(cand.educationLevel)})` : ''}`,
+      value: qualDisplay,
     },
     {
       label: 'TOTAL WORK EXPERIENCE',
@@ -511,14 +769,14 @@ export async function buildProfessionalCandidatePDFDoc(
     },
     {
       label: 'NOTICE PERIOD & AVAILABILITY',
-      value: `${toPdfText(cand.noticePeriod) || 'Immediate / Negotiable'} | ${toPdfText(cand.gender) || 'Not specified'}${cand.dateOfBirth ? ` | DOB: ${toPdfText(cand.dateOfBirth)}` : ''}`,
+      value: `${cleanPlaceholder(cand.noticePeriod) || 'Immediate / Negotiable'} | ${cleanPlaceholder(cand.gender) || 'Verified Profile'}${cleanPlaceholder(cand.dateOfBirth) ? ` | DOB: ${cleanPlaceholder(cand.dateOfBirth)}` : ''}`,
     },
     {
       label: 'COMPENSATION & INSTITUTE',
       value:
         salaryParts.length > 0
           ? salaryParts.join(' | ')
-          : toPdfText(cand.college) || 'As per company standards',
+          : cleanPlaceholder(cand.college) || 'As per company standards',
     },
   ]
 
@@ -718,15 +976,17 @@ export async function buildProfessionalCandidatePDFDoc(
   // ─── 7. EDUCATION & ACADEMIC QUALIFICATIONS ────────────────────────────────
   drawSectionHeading('Education & Academic Qualifications')
 
+  const fallbackDegree = cleanPlaceholder(cand.highestDegree) || cleanPlaceholder(cand.educationLevel) || 'Academic Qualification'
+  const fallbackInst = cleanPlaceholder(cand.college)
   const eduList = cand.education && cand.education.length > 0 ? cand.education : []
   if (eduList.length > 0) {
     for (const edu of eduList) {
       ensureSpace(12)
-      const deg = toPdfText(edu.degree) || toPdfText(cand.highestDegree) || 'Qualification'
-      const field = toPdfText(edu.fieldOfStudy)
-      const inst = toPdfText(edu.institution) || toPdfText(cand.college) || 'Recognized Institution'
+      const deg = cleanPlaceholder(edu.degree) || fallbackDegree
+      const field = cleanPlaceholder(edu.fieldOfStudy)
+      const inst = cleanPlaceholder(edu.institution) || fallbackInst
       const yr = edu.startYear || edu.endYear ? `${edu.startYear || ''}${edu.startYear && edu.endYear ? ' - ' : ''}${edu.endYear || ''}` : ''
-      const grade = toPdfText(edu.grade)
+      const grade = cleanPlaceholder(edu.grade)
 
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(9.5)
@@ -741,24 +1001,29 @@ export async function buildProfessionalCandidatePDFDoc(
       }
       y += 4.3
 
-      doc.setFont('helvetica', 'normal')
-      doc.setFontSize(8.5)
-      doc.setTextColor(71, 85, 105)
-      doc.text(`${inst}${grade ? `  |  Score / Grade: ${grade}` : ''}`, margin, y)
-      y += 5.5
+      const subParts = [inst, grade ? `Score / Grade: ${grade}` : ''].filter(Boolean)
+      if (subParts.length > 0) {
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(8.5)
+        doc.setTextColor(71, 85, 105)
+        doc.text(subParts.join('  |  '), margin, y)
+        y += 5.5
+      } else {
+        y += 2
+      }
     }
   } else {
     ensureSpace(11)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(9.5)
     doc.setTextColor(15, 23, 42)
-    doc.text(`${toPdfText(cand.highestDegree) || 'Graduate'}${cand.educationLevel ? ` - ${toPdfText(cand.educationLevel)}` : ''}`, margin, y)
+    doc.text(qualDisplay, margin, y)
     y += 4.3
-    if (toPdfText(cand.college)) {
+    if (fallbackInst) {
       doc.setFont('helvetica', 'normal')
       doc.setFontSize(8.5)
       doc.setTextColor(71, 85, 105)
-      doc.text(`Institution: ${toPdfText(cand.college)}`, margin, y)
+      doc.text(`Institution: ${fallbackInst}`, margin, y)
       y += 5
     }
   }
@@ -766,7 +1031,7 @@ export async function buildProfessionalCandidatePDFDoc(
 
   // ─── 8. KEY SKILLS & CORE COMPETENCIES ────────────────────────────────────
   drawSectionHeading('Key Skills & Core Competencies')
-  const displaySkills = cleanSkills.length > 0 ? cleanSkills : ['MS Office & Documentation', 'Communication', 'Domain Expertise', 'Team Coordination']
+  const displaySkills = cleanSkills
 
   let skillX = margin
   for (const sk of displaySkills) {

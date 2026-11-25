@@ -36,6 +36,7 @@ import {
   downloadProfessionalCandidatePDF,
   buildProfessionalCandidatePDFDoc,
   createZipArchiveBlob,
+  getEnrichedCandidateSkills,
 } from '@/lib/resumePdfBuilder'
 
 const WhatsAppIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
@@ -2303,21 +2304,7 @@ export default function CandidateDatabase() {
                 Key Skills
               </h3>
               <div className="flex flex-wrap gap-2">
-                {selectedCandidate.skills
-                  ?.filter((skill) => {
-                    if (!skill) return false
-                    const s = skill.toLowerCase().trim()
-                    return (
-                      !s.includes('apna') &&
-                      !s.includes('4767') &&
-                      !s.includes('1874') &&
-                      !s.includes('http') &&
-                      !s.includes('competenc') &&
-                      !s.includes('key skills') &&
-                      !/^\d+$/.test(s)
-                    )
-                  })
-                  .map((skill, idx) => (
+                {getEnrichedCandidateSkills(selectedCandidate).map((skill, idx) => (
                     <span
                       key={idx}
                       className="px-3 py-1.5 rounded-full border border-slate-200 bg-white text-slate-700 text-xs font-medium shadow-2xs"
