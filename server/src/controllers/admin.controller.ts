@@ -6,7 +6,7 @@ import { AuthenticatedRequest } from '../middleware/auth';
 import slugify from 'slugify';
 import { getRazorpayConfig, saveRazorpayConfig, testRazorpayConnection } from '../services/payment.service';
 import { onJobPublished } from '../services/seo.service';
-import { extendSubscription, updateSubscriptionStatus } from '../services/subscription.service';
+import { createInitialUsageData, extendSubscription, updateSubscriptionStatus } from '../services/subscription.service';
 import {
   sendPackageAssignedEmail,
   sendJobApprovedEmail,
@@ -873,7 +873,7 @@ export const assignPackageManually = async (req: Request, res: Response, next: N
           userId: targetUserId,
           packageId: pkg.id,
           limitsSnapshot: pkg.limits,
-          usageData: '{}',
+          usageData: createInitialUsageData(),
           status: 'ACTIVE',
           startDate,
           endDate,

@@ -843,7 +843,7 @@ const assignPackageManually = async (req, res, next) => {
                     userId: targetUserId,
                     packageId: pkg.id,
                     limitsSnapshot: pkg.limits,
-                    usageData: '{}',
+                    usageData: (0, subscription_service_1.createInitialUsageData)(),
                     status: 'ACTIVE',
                     startDate,
                     endDate,

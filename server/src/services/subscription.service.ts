@@ -7,8 +7,19 @@ interface LimitsConfig {
 }
 
 interface UsageData {
-  [key: string]: number;
+  [key: string]: any;
 }
+
+export const createInitialUsageData = (): string =>
+  JSON.stringify({ featuredJobs: 0, featuredJobIds: [] });
+
+const parseUsageData = (raw?: string | null): UsageData => {
+  try {
+    return JSON.parse(raw || '{}');
+  } catch {
+    return {};
+  }
+};
 
 /**
  * Get user role helper
@@ -55,7 +66,7 @@ export const autoEnrollFreePackage = async (userId: string) => {
         userId,
         packageId: freePkg.id,
         limitsSnapshot: freePkg.limits,
-        usageData: '{}',
+        usageData: createInitialUsageData(),
         status: 'ACTIVE',
         startDate: new Date(),
         endDate,
@@ -221,9 +232,15 @@ export const hasPackageLimitRemaining = async (
   }
 
   const limits: LimitsConfig = JSON.parse(sub.limitsSnapshot || '{}');
-  const usage: UsageData = JSON.parse(sub.usageData || '{}');
+  const usage: UsageData = parseUsageData(sub.usageData);
   const limit = limits[featureKey];
-  const used = usage[featureKey] || 0;
+  let used = usage[featureKey] || 0;
+  if (featureKey === 'featuredJobs' && typeof usage.featuredJobs !== 'number') {
+    const employer = await prisma.employer.findUnique({ where: { userId }, select: { id: true } }).catch(() => null);
+    if (employer) {
+      used = await getSubscriptionFeaturedJobsUsed(sub, employer.id);
+    }
+  }
 
   if (limit === undefined || limit === null) {
     return { allowed: true, remaining: null, limit: null, used };
@@ -337,7 +354,7 @@ export const activateSubscription = async (
         userId,
         packageId,
         limitsSnapshot: pkg.limits,
-        usageData: '{}',
+        usageData: createInitialUsageData(),
         status: 'ACTIVE',
         startDate,
         endDate,
@@ -437,6 +454,106 @@ export const expireSubscriptions = async (): Promise<void> => {
 };
 
 /**
+ * Computes featured job slots used within the scope of the given subscription.
+ * Prioritizes explicit per-subscription tracking in `usageData.featuredJobs`;
+ * falls back to active featured jobs created since `sub.startDate` for legacy rows.
+ */
+export const getSubscriptionFeaturedJobsUsed = async (
+  sub: any,
+  employerId?: string
+): Promise<number> => {
+  if (!sub) return 0;
+
+  const usage = parseUsageData(sub.usageData);
+  if (typeof usage.featuredJobs === 'number') {
+    return Math.max(0, usage.featuredJobs);
+  }
+
+  if (!employerId) return 0;
+
+  try {
+    return await prisma.job.count({
+      where: {
+        employerId,
+        isFeatured: true,
+        deletedAt: null,
+        status: { notIn: ['CLOSED', 'EXPIRED'] },
+        ...(sub.startDate ? { createdAt: { gte: new Date(sub.startDate) } } : {}),
+      },
+    });
+  } catch {
+    return 0;
+  }
+};
+
+/**
+ * Consumes or releases a featured job credit on the user's current active subscription
+ * without counting jobs featured under previous packages.
+ */
+export const syncFeaturedJobSlot = async (
+  userId: string,
+  jobId: string,
+  action: 'CONSUME' | 'RELEASE'
+): Promise<void> => {
+  const sub = await getActiveSubscription(userId);
+  if (!sub) return;
+
+  const usage = parseUsageData(sub.usageData);
+  const wasInitialized = typeof usage.featuredJobs === 'number';
+  let featuredIds: string[] = Array.isArray(usage.featuredJobIds)
+    ? usage.featuredJobIds.filter((id: unknown): id is string => typeof id === 'string')
+    : [];
+
+  if (!wasInitialized) {
+    try {
+      const employer = await prisma.employer.findUnique({ where: { userId }, select: { id: true } });
+      if (employer) {
+        const subJobs = await prisma.job.findMany({
+          where: {
+            employerId: employer.id,
+            isFeatured: true,
+            deletedAt: null,
+            status: { notIn: ['CLOSED', 'EXPIRED'] },
+            ...(sub.startDate ? { createdAt: { gte: new Date(sub.startDate) } } : {}),
+          },
+          select: { id: true },
+        });
+        featuredIds = subJobs.map((j) => j.id);
+      }
+    } catch {}
+
+    if (action === 'CONSUME' && !featuredIds.includes(jobId)) {
+      featuredIds.push(jobId);
+    } else if (action === 'RELEASE') {
+      featuredIds = featuredIds.filter((id) => id !== jobId);
+    }
+
+    usage.featuredJobs = featuredIds.length;
+    usage.featuredJobIds = featuredIds;
+  } else if (action === 'CONSUME') {
+    if (!featuredIds.includes(jobId)) {
+      featuredIds.push(jobId);
+      usage.featuredJobs = Math.max(0, Number(usage.featuredJobs) + 1);
+    }
+    usage.featuredJobIds = featuredIds;
+  } else {
+    // RELEASE only frees a slot if this job consumed one in the active subscription
+    if (featuredIds.includes(jobId)) {
+      featuredIds = featuredIds.filter((id) => id !== jobId);
+      usage.featuredJobs = Math.max(0, Number(usage.featuredJobs) - 1);
+      usage.featuredJobIds = featuredIds;
+    } else {
+      return;
+    }
+  }
+
+  await prisma.subscription.update({
+    where: { id: sub.id },
+    data: { usageData: JSON.stringify(usage) },
+  });
+};
+
+/**
  * Comprehensive Subscription Summary for dashboard display
  */
 export const getSubscriptionSummary = async (userId: string) => {
@@ -478,30 +595,24 @@ export const getSubscriptionSummary = async (userId: string) => {
   try { usage = JSON.parse(sub.usageData || '{}'); } catch {}
   try { features = JSON.parse(sub.package.features || '[]'); } catch {}
 
-  // Sync live featured jobs count for employer
+  // Resolve per-subscription featured job usage for employer
   if (role === 'EMPLOYER') {
     try {
       const employer = await prisma.employer.findUnique({ where: { userId }, select: { id: true } });
       if (employer) {
-        const activeFeaturedCount = await prisma.job.count({
-          where: {
-            employerId: employer.id,
-            isFeatured: true,
-            deletedAt: null,
-            status: { notIn: ['CLOSED', 'EXPIRED'] },
-          },
-        });
-        usage.featuredJobs = activeFeaturedCount;
+        usage.featuredJobs = await getSubscriptionFeaturedJobsUsed(sub, employer.id);
       }
     } catch {}
   }
+
+  const { featuredJobIds: _internalFeaturedIds, ...publicUsage } = usage;
 
   return {
     hasSubscription: true,
     subscriptionId: sub.id,
     package: sub.package,
     status: sub.status,
-    usage,
+    usage: publicUsage,
     limits,
     features,
     daysRemaining,

@@ -1,9 +1,19 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getSubscriptionSummary = exports.expireSubscriptions = exports.updateSubscriptionStatus = exports.extendSubscription = exports.activateSubscription = exports.consumeCredit = exports.checkLimit = exports.hasPackageLimitRemaining = exports.hasPackageFeature = exports.getActiveSubscription = exports.autoEnrollFreePackage = exports.getFreePackage = exports.getUserRole = void 0;
+exports.getSubscriptionSummary = exports.syncFeaturedJobSlot = exports.getSubscriptionFeaturedJobsUsed = exports.expireSubscriptions = exports.updateSubscriptionStatus = exports.extendSubscription = exports.activateSubscription = exports.consumeCredit = exports.checkLimit = exports.hasPackageLimitRemaining = exports.hasPackageFeature = exports.getActiveSubscription = exports.autoEnrollFreePackage = exports.getFreePackage = exports.getUserRole = exports.createInitialUsageData = void 0;
 const prisma_1 = require("../lib/prisma");
 const errors_1 = require("../lib/errors");
 const mysql_auto_init_1 = require("../lib/mysql-auto-init");
+const createInitialUsageData = () => JSON.stringify({ featuredJobs: 0, featuredJobIds: [] });
+exports.createInitialUsageData = createInitialUsageData;
+const parseUsageData = (raw) => {
+    try {
+        return JSON.parse(raw || '{}');
+    }
+    catch {
+        return {};
+    }
+};
 /**
  * Get user role helper
  */
@@ -48,7 +58,7 @@ const autoEnrollFreePackage = async (userId) => {
                 userId,
                 packageId: freePkg.id,
                 limitsSnapshot: freePkg.limits,
-                usageData: '{}',
+                usageData: (0, exports.createInitialUsageData)(),
                 status: 'ACTIVE',
                 startDate: new Date(),
                 endDate,
@@ -207,9 +217,15 @@ const hasPackageLimitRemaining = async (userId, featureKey, amount = 1) => {
         return { allowed: false, remaining: 0, limit: 0, used: 0 };
     }
     const limits = JSON.parse(sub.limitsSnapshot || '{}');
-    const usage = JSON.parse(sub.usageData || '{}');
+    const usage = parseUsageData(sub.usageData);
     const limit = limits[featureKey];
-    const used = usage[featureKey] || 0;
+    let used = usage[featureKey] || 0;
+    if (featureKey === 'featuredJobs' && typeof usage.featuredJobs !== 'number') {
+        const employer = await prisma_1.prisma.employer.findUnique({ where: { userId }, select: { id: true } }).catch(() => null);
+        if (employer) {
+            used = await (0, exports.getSubscriptionFeaturedJobsUsed)(sub, employer.id);
+        }
+    }
     if (limit === undefined || limit === null) {
         return { allowed: true, remaining: null, limit: null, used };
     }
@@ -295,7 +311,7 @@ const activateSubscription = async (userId, packageId, paymentId) => {
                 userId,
                 packageId,
                 limitsSnapshot: pkg.limits,
-                usageData: '{}',
+                usageData: (0, exports.createInitialUsageData)(),
                 status: 'ACTIVE',
                 startDate,
                 endDate,
@@ -386,6 +402,100 @@ const expireSubscriptions = async () => {
 };
 exports.expireSubscriptions = expireSubscriptions;
 /**
+ * Computes featured job slots used within the scope of the given subscription.
+ * Prioritizes explicit per-subscription tracking in `usageData.featuredJobs`;
+ * falls back to active featured jobs created since `sub.startDate` for legacy rows.
+ */
+const getSubscriptionFeaturedJobsUsed = async (sub, employerId) => {
+    if (!sub)
+        return 0;
+    const usage = parseUsageData(sub.usageData);
+    if (typeof usage.featuredJobs === 'number') {
+        return Math.max(0, usage.featuredJobs);
+    }
+    if (!employerId)
+        return 0;
+    try {
+        return await prisma_1.prisma.job.count({
+            where: {
+                employerId,
+                isFeatured: true,
+                deletedAt: null,
+                status: { notIn: ['CLOSED', 'EXPIRED'] },
+                ...(sub.startDate ? { createdAt: { gte: new Date(sub.startDate) } } : {}),
+            },
+        });
+    }
+    catch {
+        return 0;
+    }
+};
+exports.getSubscriptionFeaturedJobsUsed = getSubscriptionFeaturedJobsUsed;
+/**
+ * Consumes or releases a featured job credit on the user's current active subscription
+ * without counting jobs featured under previous packages.
+ */
+const syncFeaturedJobSlot = async (userId, jobId, action) => {
+    const sub = await (0, exports.getActiveSubscription)(userId);
+    if (!sub)
+        return;
+    const usage = parseUsageData(sub.usageData);
+    const wasInitialized = typeof usage.featuredJobs === 'number';
+    let featuredIds = Array.isArray(usage.featuredJobIds)
+        ? usage.featuredJobIds.filter((id) => typeof id === 'string')
+        : [];
+    if (!wasInitialized) {
+        try {
+            const employer = await prisma_1.prisma.employer.findUnique({ where: { userId }, select: { id: true } });
+            if (employer) {
+                const subJobs = await prisma_1.prisma.job.findMany({
+                    where: {
+                        employerId: employer.id,
+                        isFeatured: true,
+                        deletedAt: null,
+                        status: { notIn: ['CLOSED', 'EXPIRED'] },
+                        ...(sub.startDate ? { createdAt: { gte: new Date(sub.startDate) } } : {}),
+                    },
+                    select: { id: true },
+                });
+                featuredIds = subJobs.map((j) => j.id);
+            }
+        }
+        catch { }
+        if (action === 'CONSUME' && !featuredIds.includes(jobId)) {
+            featuredIds.push(jobId);
+        }
+        else if (action === 'RELEASE') {
+            featuredIds = featuredIds.filter((id) => id !== jobId);
+        }
+        usage.featuredJobs = featuredIds.length;
+        usage.featuredJobIds = featuredIds;
+    }
+    else if (action === 'CONSUME') {
+        if (!featuredIds.includes(jobId)) {
+            featuredIds.push(jobId);
+            usage.featuredJobs = Math.max(0, Number(usage.featuredJobs) + 1);
+        }
+        usage.featuredJobIds = featuredIds;
+    }
+    else {
+        // RELEASE only frees a slot if this job consumed one in the active subscription
+        if (featuredIds.includes(jobId)) {
+            featuredIds = featuredIds.filter((id) => id !== jobId);
+            usage.featuredJobs = Math.max(0, Number(usage.featuredJobs) - 1);
+            usage.featuredJobIds = featuredIds;
+        }
+        else {
+            return;
+        }
+    }
+    await prisma_1.prisma.subscription.update({
+        where: { id: sub.id },
+        data: { usageData: JSON.stringify(usage) },
+    });
+};
+exports.syncFeaturedJobSlot = syncFeaturedJobSlot;
+/**
  * Comprehensive Subscription Summary for dashboard display
  */
 const getSubscriptionSummary = async (userId) => {
@@ -429,30 +539,23 @@ const getSubscriptionSummary = async (userId) => {
         features = JSON.parse(sub.package.features || '[]');
     }
     catch { }
-    // Sync live featured jobs count for employer
+    // Resolve per-subscription featured job usage for employer
     if (role === 'EMPLOYER') {
         try {
             const employer = await prisma_1.prisma.employer.findUnique({ where: { userId }, select: { id: true } });
             if (employer) {
-                const activeFeaturedCount = await prisma_1.prisma.job.count({
-                    where: {
-                        employerId: employer.id,
-                        isFeatured: true,
-                        deletedAt: null,
-                        status: { notIn: ['CLOSED', 'EXPIRED'] },
-                    },
-                });
-                usage.featuredJobs = activeFeaturedCount;
+                usage.featuredJobs = await (0, exports.getSubscriptionFeaturedJobsUsed)(sub, employer.id);
             }
         }
         catch { }
     }
+    const { featuredJobIds: _internalFeaturedIds, ...publicUsage } = usage;
     return {
         hasSubscription: true,
         subscriptionId: sub.id,
         package: sub.package,
         status: sub.status,
-        usage,
+        usage: publicUsage,
         limits,
         features,
         daysRemaining,

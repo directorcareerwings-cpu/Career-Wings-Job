@@ -140,14 +140,7 @@ const getEmployerFeaturedJobQuota = async (userId, employerId) => {
             catch { }
         }
         const isUnlimited = limit === -1;
-        const used = await prisma_1.prisma.job.count({
-            where: {
-                employerId,
-                isFeatured: true,
-                deletedAt: null,
-                status: { notIn: ['CLOSED', 'EXPIRED'] },
-            },
-        }).catch(() => 0);
+        const used = await (0, subscription_service_1.getSubscriptionFeaturedJobsUsed)(sub, employerId);
         const remaining = isUnlimited ? 999999 : Math.max(0, limit - used);
         const canFeature = isUnlimited || used < limit;
         return {
@@ -384,8 +377,11 @@ const postJob = async (req, res, next) => {
             }
             return newJob;
         });
-        // Consume posting credit
+        // Consume posting credit (and featured slot if requested)
         await (0, subscription_service_1.consumeCredit)(req.user.id, 'jobPostings').catch(console.error);
+        if (wantsFeatured) {
+            await (0, subscription_service_1.syncFeaturedJobSlot)(req.user.id, job.id, 'CONSUME').catch(console.error);
+        }
         // Notify admin about new job submission for review
         if (status === 'PENDING') {
             prisma_1.prisma.user.findMany({ where: { role: 'ADMIN', isActive: true } }).then((admins) => {
@@ -485,6 +481,12 @@ const updateJob = async (req, res, next) => {
             }
             return updatedJob;
         });
+        if (!job.isFeatured && finalIsFeatured) {
+            await (0, subscription_service_1.syncFeaturedJobSlot)(req.user.id, job.id, 'CONSUME').catch(console.error);
+        }
+        else if (job.isFeatured && !finalIsFeatured) {
+            await (0, subscription_service_1.syncFeaturedJobSlot)(req.user.id, job.id, 'RELEASE').catch(console.error);
+        }
         // If edited job went back to PENDING, notify admins
         if (needsApproval) {
             prisma_1.prisma.user.findMany({ where: { role: 'ADMIN', isActive: true } }).then((admins) => {
@@ -512,10 +514,13 @@ const updateJobStatus = async (req, res, next) => {
         if (!allowedStatuses.includes(status)) {
             throw new errors_1.AppError(`Employers can only change status to: ${allowedStatuses.join(', ')}. Jobs must be approved by Admin before going live.`, 400);
         }
-        await prisma_1.prisma.job.updateMany({
+        const result = await prisma_1.prisma.job.updateMany({
             where: { id: req.params.id, employerId: employer.id, deletedAt: null },
             data: { status },
         });
+        if (result.count > 0 && status === 'CLOSED') {
+            await (0, subscription_service_1.syncFeaturedJobSlot)(req.user.id, req.params.id, 'RELEASE').catch(console.error);
+        }
         (0, response_1.sendSuccess)(res, null, `Job ${status.toLowerCase()}`);
     }
     catch (error) {
@@ -528,10 +533,13 @@ const deleteJob = async (req, res, next) => {
         const employer = await prisma_1.prisma.employer.findUnique({ where: { userId: req.user.id } });
         if (!employer)
             throw new errors_1.AppError('Employer not found', 404);
-        await prisma_1.prisma.job.updateMany({
+        const result = await prisma_1.prisma.job.updateMany({
             where: { id: req.params.id, employerId: employer.id },
             data: { deletedAt: new Date() },
         });
+        if (result.count > 0) {
+            await (0, subscription_service_1.syncFeaturedJobSlot)(req.user.id, req.params.id, 'RELEASE').catch(console.error);
+        }
         (0, response_1.sendSuccess)(res, null, 'Job deleted');
     }
     catch (error) {
@@ -582,6 +590,9 @@ const toggleJobFeatured = async (req, res, next) => {
                     status: job.status === 'PUBLISHED' ? 'FEATURED' : job.status,
                 },
             });
+            if (!job.isFeatured) {
+                await (0, subscription_service_1.syncFeaturedJobSlot)(req.user.id, job.id, 'CONSUME').catch(console.error);
+            }
             const updatedQuota = await (0, exports.getEmployerFeaturedJobQuota)(req.user.id, employer.id);
             (0, response_1.sendSuccess)(res, { job: updatedJob, quota: updatedQuota }, 'Job is now Featured on homepage and top of search!');
         }
@@ -593,6 +604,9 @@ const toggleJobFeatured = async (req, res, next) => {
                     status: job.status === 'FEATURED' ? 'PUBLISHED' : job.status,
                 },
             });
+            if (job.isFeatured) {
+                await (0, subscription_service_1.syncFeaturedJobSlot)(req.user.id, job.id, 'RELEASE').catch(console.error);
+            }
             const updatedQuota = await (0, exports.getEmployerFeaturedJobQuota)(req.user.id, employer.id);
             (0, response_1.sendSuccess)(res, { job: updatedJob, quota: updatedQuota }, 'Job unfeatured. 1 slot freed up in your package.');
         }
