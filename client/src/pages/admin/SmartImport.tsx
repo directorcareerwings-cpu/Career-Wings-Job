@@ -840,6 +840,7 @@ export default function SmartImport() {
                           <th className="py-3 px-3">Candidate Name</th>
                           <th className="py-3 px-3">Mobile</th>
                           <th className="py-3 px-3">Email Address</th>
+                          <th className="py-3 px-3">Job Applied For</th>
                           <th className="py-3 px-3">Role / Designation</th>
                           <th className="py-3 px-3">Company</th>
                           <th className="py-3 px-3">Experience</th>
@@ -882,6 +883,9 @@ export default function SmartImport() {
                               ) : (
                                 row.email
                               )}
+                            </td>
+                            <td className="py-3 px-3 text-slate-800 whitespace-nowrap">
+                              {row.jobAppliedFor || '—'}
                             </td>
                             <td className="py-3 px-3 text-slate-800 whitespace-nowrap">
                               {row.currentRole || '—'}

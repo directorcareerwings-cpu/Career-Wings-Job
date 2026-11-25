@@ -360,6 +360,8 @@ async function runBatchImport(jobId, rawRows, mappings, duplicateStrategy, origi
                             updatePayload.state = data.state;
                         if (data.currentRole && !existingCandidate.currentRole)
                             updatePayload.currentRole = data.currentRole;
+                        else if (data.jobAppliedFor && !existingCandidate.currentRole)
+                            updatePayload.currentRole = data.jobAppliedFor;
                         if (data.currentCompany && !existingCandidate.currentCompany)
                             updatePayload.currentCompany = data.currentCompany;
                         if (data.highestDegree && !existingCandidate.highestDegree)
@@ -374,8 +376,15 @@ async function runBatchImport(jobId, rawRows, mappings, duplicateStrategy, origi
                             updatePayload.expectedSalaryMin = data.expectedSalary;
                         if (data.preferredLocations && !existingCandidate.preferredLocations)
                             updatePayload.preferredLocations = data.preferredLocations;
-                        if (data.summary && !existingCandidate.summary)
-                            updatePayload.summary = data.summary;
+                        if (data.jobAppliedFor && !existingCandidate.headline) {
+                            updatePayload.headline = `Applied for: ${data.jobAppliedFor}`;
+                        }
+                        if (data.summary && !existingCandidate.summary) {
+                            updatePayload.summary = data.jobAppliedFor ? `${data.summary} | Job Applied For: ${data.jobAppliedFor}` : data.summary;
+                        }
+                        else if (data.jobAppliedFor && !existingCandidate.summary) {
+                            updatePayload.summary = `Job Applied For: ${data.jobAppliedFor}`;
+                        }
                         if (Object.keys(updatePayload).length > 0) {
                             await prisma_1.prisma.candidate.update({
                                 where: { id: existingCandidate.id },
@@ -427,7 +436,7 @@ async function runBatchImport(jobId, rawRows, mappings, duplicateStrategy, origi
                         city: data.city || null,
                         state: data.state || null,
                         country: 'India',
-                        currentRole: data.currentRole || null,
+                        currentRole: data.currentRole || data.jobAppliedFor || null,
                         currentCompany: data.currentCompany || null,
                         highestDegree: data.highestDegree || null,
                         college: data.college || null,
@@ -435,8 +444,12 @@ async function runBatchImport(jobId, rawRows, mappings, duplicateStrategy, origi
                         currentSalary: data.currentSalary || null,
                         expectedSalaryMin: data.expectedSalary || null,
                         preferredLocations: data.preferredLocations || null,
-                        summary: data.summary || null,
-                        headline: data.currentRole ? `${data.currentRole} at ${data.currentCompany || 'Company'}` : null,
+                        summary: data.summary
+                            ? (data.jobAppliedFor ? `${data.summary} | Job Applied For: ${data.jobAppliedFor}` : data.summary)
+                            : (data.jobAppliedFor ? `Job Applied For: ${data.jobAppliedFor}` : null),
+                        headline: data.currentRole
+                            ? `${data.currentRole} at ${data.currentCompany || 'Company'}`
+                            : (data.jobAppliedFor ? `Applied for: ${data.jobAppliedFor}` : null),
                         noticePeriod: data.noticePeriod || null,
                         availabilityStatus: 'ACTIVELY_LOOKING',
                         profileCompletion: 70,

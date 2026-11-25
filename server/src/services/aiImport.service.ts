@@ -102,6 +102,12 @@ export const TARGET_FIELDS: ColumnMappingDefinition[] = [
     synonyms: ['currentrole', 'currentdesignation', 'designation', 'jobprofile', 'role', 'profile', 'position', 'currentposition', 'currenttitle', 'jobtitle', 'post', 'designationrole'],
   },
   {
+    field: 'jobAppliedFor',
+    label: 'Job Applied For',
+    description: 'Job title or position applied for (e.g. Sales Executive, Java Developer)',
+    synonyms: ['jobappliedfor', 'appliedfor', 'jobapplied', 'appliedjob', 'appliedposition', 'appliedrole', 'positionapplied', 'postapplied', 'postappliedfor', 'jobopening', 'vacancy', 'appliedvacancy', 'jobname'],
+  },
+  {
     field: 'currentCompany',
     label: 'Current Company / Employer',
     description: 'Current or latest organization',
@@ -743,8 +749,9 @@ export class AIImportService {
     data.college = fieldValues.college ? String(fieldValues.college).trim() : null;
     data.passingYear = fieldValues.passingYear ? parseInt(String(fieldValues.passingYear).replace(/\D/g, ''), 10) || null : null;
 
-    // 9. Current Role & Company
+    // 9. Current Role, Job Applied For & Company
     data.currentRole = sanitizeCleanText(fieldValues.currentRole);
+    data.jobAppliedFor = sanitizeCleanText(fieldValues.jobAppliedFor);
     data.currentCompany = sanitizeCleanText(fieldValues.currentCompany);
 
     // 10. Location

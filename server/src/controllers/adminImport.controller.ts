@@ -385,6 +385,7 @@ async function runBatchImport(
             if (data.city && !existingCandidate.city) updatePayload.city = data.city;
             if (data.state && !existingCandidate.state) updatePayload.state = data.state;
             if (data.currentRole && !existingCandidate.currentRole) updatePayload.currentRole = data.currentRole;
+            else if (data.jobAppliedFor && !existingCandidate.currentRole) updatePayload.currentRole = data.jobAppliedFor;
             if (data.currentCompany && !existingCandidate.currentCompany) updatePayload.currentCompany = data.currentCompany;
             if (data.highestDegree && !existingCandidate.highestDegree) updatePayload.highestDegree = data.highestDegree;
             if (data.college && !existingCandidate.college) updatePayload.college = data.college;
@@ -392,7 +393,14 @@ async function runBatchImport(
             if (data.currentSalary && !existingCandidate.currentSalary) updatePayload.currentSalary = data.currentSalary;
             if (data.expectedSalary && !existingCandidate.expectedSalaryMin) updatePayload.expectedSalaryMin = data.expectedSalary;
             if (data.preferredLocations && !existingCandidate.preferredLocations) updatePayload.preferredLocations = data.preferredLocations;
-            if (data.summary && !existingCandidate.summary) updatePayload.summary = data.summary;
+            if (data.jobAppliedFor && !existingCandidate.headline) {
+              updatePayload.headline = `Applied for: ${data.jobAppliedFor}`;
+            }
+            if (data.summary && !existingCandidate.summary) {
+              updatePayload.summary = data.jobAppliedFor ? `${data.summary} | Job Applied For: ${data.jobAppliedFor}` : data.summary;
+            } else if (data.jobAppliedFor && !existingCandidate.summary) {
+              updatePayload.summary = `Job Applied For: ${data.jobAppliedFor}`;
+            }
 
             if (Object.keys(updatePayload).length > 0) {
               await prisma.candidate.update({
@@ -450,7 +458,7 @@ async function runBatchImport(
             city: data.city || null,
             state: data.state || null,
             country: 'India',
-            currentRole: data.currentRole || null,
+            currentRole: data.currentRole || data.jobAppliedFor || null,
             currentCompany: data.currentCompany || null,
             highestDegree: data.highestDegree || null,
             college: data.college || null,
@@ -458,8 +466,12 @@ async function runBatchImport(
             currentSalary: data.currentSalary || null,
             expectedSalaryMin: data.expectedSalary || null,
             preferredLocations: data.preferredLocations || null,
-            summary: data.summary || null,
-            headline: data.currentRole ? `${data.currentRole} at ${data.currentCompany || 'Company'}` : null,
+            summary: data.summary
+              ? (data.jobAppliedFor ? `${data.summary} | Job Applied For: ${data.jobAppliedFor}` : data.summary)
+              : (data.jobAppliedFor ? `Job Applied For: ${data.jobAppliedFor}` : null),
+            headline: data.currentRole
+              ? `${data.currentRole} at ${data.currentCompany || 'Company'}`
+              : (data.jobAppliedFor ? `Applied for: ${data.jobAppliedFor}` : null),
             noticePeriod: data.noticePeriod || null,
             availabilityStatus: 'ACTIVELY_LOOKING',
             profileCompletion: 70,
