@@ -1164,7 +1164,24 @@ export const searchCandidates = async (req: AuthenticatedRequest, res: Response,
           experience: {
             take: 5,
             orderBy: { startDate: 'desc' },
-            select: { id: true, title: true, company: true, location: true, isCurrent: true },
+            select: {
+              id: true,
+              title: true,
+              company: true,
+              location: true,
+              startDate: true,
+              endDate: true,
+              isCurrent: true,
+              description: true,
+            },
+          },
+          certifications: {
+            take: 5,
+            select: { id: true, name: true, issuer: true, issueDate: true },
+          },
+          languages: {
+            take: 8,
+            select: { id: true, language: true, proficiency: true },
           },
           applications: {
             take: 10,
@@ -1247,6 +1264,8 @@ export const searchCandidates = async (req: AuthenticatedRequest, res: Response,
         appliedJobs,
         education: cand.education || [],
         experience: cand.experience || [],
+        certifications: cand.certifications || [],
+        languages: cand.languages || [],
         profilePhoto: cand.profilePhoto,
         resumeFile: cand.resumeFile,
         resumeFileName: cand.resumeFileName || (cand.resumeFile ? 'Verified_Resume.pdf' : null),
@@ -1489,6 +1508,26 @@ export const getCandidateDetail = async (req: AuthenticatedRequest, res: Respons
         experience: { orderBy: { startDate: 'desc' } },
         certifications: true,
         languages: true,
+        applications: {
+          take: 10,
+          orderBy: { appliedAt: 'desc' },
+          select: {
+            id: true,
+            status: true,
+            appliedAt: true,
+            job: {
+              select: {
+                id: true,
+                title: true,
+                city: true,
+                district: true,
+                state: true,
+                jobType: true,
+                company: { select: { name: true } },
+              },
+            },
+          },
+        },
       },
     });
 
@@ -1510,10 +1549,32 @@ export const getCandidateDetail = async (req: AuthenticatedRequest, res: Respons
     const rawPhone = candidate.phone || '+91 98765 43210';
     const maskedPhone = '📱 -';
 
+    let jobAppliedFor: string | null = null;
+    if (candidate.summary && candidate.summary.includes('Job Applied For:')) {
+      const match = candidate.summary.match(/Job Applied For:\s*([^|\n]+)/i);
+      if (match && match[1]) jobAppliedFor = match[1].trim();
+    } else if (candidate.headline && candidate.headline.startsWith('Applied for:')) {
+      jobAppliedFor = candidate.headline.replace(/^Applied for:\s*/i, '').trim();
+    }
+
+    const appliedJobs = (candidate.applications || []).map((app) => ({
+      id: app.id,
+      status: app.status,
+      appliedAt: app.appliedAt,
+      jobId: app.job?.id,
+      jobTitle: app.job?.title,
+      companyName: app.job?.company?.name || null,
+      location: [app.job?.city, app.job?.district, app.job?.state].filter(Boolean).join(', ') || null,
+      jobType: app.job?.jobType || null,
+    }));
+
     const result = {
       ...candidate,
+      user: { email: isUnlocked ? rawEmail : maskedEmail },
       email: isUnlocked ? rawEmail : maskedEmail,
       phone: isUnlocked ? rawPhone : maskedPhone,
+      jobAppliedFor,
+      appliedJobs,
       isUnlocked,
     };
 

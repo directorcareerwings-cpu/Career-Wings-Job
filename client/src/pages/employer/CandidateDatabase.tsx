@@ -32,6 +32,11 @@ import {
 import toast from 'react-hot-toast'
 import { cn } from '@/lib/utils'
 import { useEducationMaster } from '@/hooks/useEducationMaster'
+import {
+  downloadProfessionalCandidatePDF,
+  buildProfessionalCandidatePDFDoc,
+  createZipArchiveBlob,
+} from '@/lib/resumePdfBuilder'
 
 const WhatsAppIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
   <svg
@@ -102,7 +107,22 @@ interface CandidateRecord {
     title: string
     company: string
     location?: string | null
+    startDate?: string | Date | null
+    endDate?: string | Date | null
     isCurrent?: boolean
+    description?: string | null
+  }[]
+  certifications?: {
+    id?: string
+    name: string
+    issuer?: string | null
+    issueDate?: string | Date | null
+  }[]
+  languages?: {
+    id?: string
+    language?: string | null
+    name?: string | null
+    proficiency?: string | null
   }[]
   updatedAt?: string | Date
   createdAt?: string | Date
@@ -645,6 +665,8 @@ export default function CandidateDatabase() {
           appliedJobs: Array.isArray(c.appliedJobs) ? c.appliedJobs : [],
           education: Array.isArray(c.education) ? c.education : [],
           experience: Array.isArray(c.experience) ? c.experience : [],
+          certifications: Array.isArray(c.certifications) ? c.certifications : [],
+          languages: Array.isArray(c.languages) ? c.languages : [],
           updatedAt: c.updatedAt || new Date().toISOString(),
           createdAt: c.createdAt || new Date().toISOString(),
         }))
@@ -920,235 +942,14 @@ export default function CandidateDatabase() {
     setIsWhatsAppModalOpen(false)
   }
 
-  // ─── Generate & Download Resume in PDF Format ──────────────────────────────
-  const generateCandidateResumePDF = async (cand: CandidateRecord, isUnlocked: boolean) => {
-    const { jsPDF } = await import('jspdf')
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-
-    const margin = 18
-    const pageW = 210
-    const contentW = pageW - margin * 2
-    let y = 0
-
-    // Top Red Header Banner
-    doc.setFillColor(186, 26, 26) // #BA1A1A Career Wings Crimson Red
-    doc.rect(0, 0, pageW, 28, 'F')
-
-    doc.setFillColor(15, 23, 42) // #0F172A Slate 900
-    doc.rect(0, 26, pageW, 2.5, 'F')
-
-    // Career Wings Branding
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(18)
-    doc.setTextColor(255, 255, 255)
-    doc.text('CAREER WINGS', margin, 12)
-
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(8.5)
-    doc.setTextColor(254, 226, 226)
-    doc.text('Premier Northeast & Pan-India Placement Portal • www.careerwings.in', margin, 18)
-
-    // Top Right Verified Badge
-    doc.setFillColor(255, 255, 255)
-    doc.roundedRect(pageW - margin - 60, 6, 60, 15, 2, 2, 'F')
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(8)
-    doc.setTextColor(186, 26, 26)
-    doc.text('VERIFIED RESUME (PDF)', pageW - margin - 30, 11.5, { align: 'center' })
-    doc.setFontSize(7)
-    doc.setTextColor(71, 85, 105)
-    doc.text(`ID: CW-${cand.id.toUpperCase()}`, pageW - margin - 30, 16.5, { align: 'center' })
-
-    y = 38
-
-    // Candidate Name
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(22)
-    doc.setTextColor(15, 23, 42)
-    doc.text(`${cand.firstName} ${cand.lastName}`, margin, y)
-    y += 7
-
-    // Priority / Pool Badges
-    if (cand.priorityTier === 'PREMIUM') {
-      doc.setFillColor(254, 243, 199)
-      doc.roundedRect(margin, y - 4, 60, 6, 1.5, 1.5, 'F')
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(7.5)
-      doc.setTextColor(180, 83, 9)
-      doc.text('★ PREMIUM VERIFIED CANDIDATE (+25% BOOST)', margin + 30, y, { align: 'center' })
-      y += 6.5
-    } else if (cand.priorityTier === 'BASIC') {
-      doc.setFillColor(239, 246, 255)
-      doc.roundedRect(margin, y - 4, 55, 6, 1.5, 1.5, 'F')
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(7.5)
-      doc.setTextColor(29, 78, 216)
-      doc.text('🔷 BASIC VERIFIED CANDIDATE (+15% BOOST)', margin + 27.5, y, { align: 'center' })
-      y += 6.5
-    }
-
-    // Headline
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(11)
-    doc.setTextColor(186, 26, 26)
-    const headlineLines = doc.splitTextToSize(cand.headline || 'Active Job Seeker', contentW)
-    doc.text(headlineLines, margin, y)
-    y += headlineLines.length * 5 + 3
-
-    // ─── Metadata Information Box ──────────────────────────────────────────
-    doc.setFillColor(248, 250, 252)
-    doc.setDrawColor(226, 232, 240)
-    doc.roundedRect(margin, y, contentW, 48, 3, 3, 'FD')
-
-    const col1 = margin + 6
-    const col2 = margin + contentW / 2 + 4
-    let boxY = y + 7.5
-
-    // Row 1
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(7.5)
-    doc.setTextColor(148, 163, 184)
-    doc.text('FULL QUALIFICATION / DEGREE', col1, boxY)
-    doc.text('CURRENT LOCATION', col2, boxY)
-    boxY += 4.5
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(9.5)
-    doc.setTextColor(15, 23, 42)
-    doc.text(`${cand.highestDegree} (${cand.educationLevel})`, col1, boxY)
-    doc.text(`${cand.currentLocation}`, col2, boxY)
-
-    // Row 2
-    boxY += 9
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(7.5)
-    doc.setTextColor(148, 163, 184)
-    doc.text('TOTAL WORK EXPERIENCE', col1, boxY)
-    doc.text('GENDER & ACTIVE STATUS', col2, boxY)
-    boxY += 4.5
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(9.5)
-    doc.setTextColor(15, 23, 42)
-    doc.text(`${cand.totalExperience} Years Professional Experience`, col1, boxY)
-    doc.text(`${cand.gender} • Active Job Seeker`, col2, boxY)
-
-    // Row 3 (Contact Details)
-    boxY += 9
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(7.5)
-    doc.setTextColor(148, 163, 184)
-    doc.text('CONTACT EMAIL', col1, boxY)
-    doc.text('PHONE / WHATSAPP NUMBER', col2, boxY)
-    boxY += 4.5
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(9.5)
-    if (isUnlocked) {
-      doc.setTextColor(2, 132, 199)
-      doc.text(cand.realEmail || cand.email, col1, boxY)
-      doc.setTextColor(22, 163, 74)
-      doc.text(cand.realPhone || cand.phone, col2, boxY)
-    } else {
-      doc.setTextColor(100, 116, 139)
-      doc.text(`${cand.email} (Reveal contact on portal)`, col1, boxY)
-      doc.text(`${cand.phone} (Reveal contact on portal)`, col2, boxY)
-    }
-
-    y += 56
-
-    // ─── Key Skills ─────────────────────────────────────────
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(11)
-    doc.setTextColor(15, 23, 42)
-    doc.text('KEY SKILLS', margin, y)
-    y += 3.5
-
-    doc.setDrawColor(186, 26, 26)
-    doc.setLineWidth(0.6)
-    doc.line(margin, y, margin + 25, y)
-    doc.setDrawColor(226, 232, 240)
-    doc.setLineWidth(0.2)
-    doc.line(margin + 25, y, pageW - margin, y)
-    y += 7
-
-    const skillsList = (cand.skills || ['Communication', 'Domain Knowledge', 'Workforce Readiness']).filter((sk) => {
-      if (!sk) return false
-      const s = sk.toLowerCase().trim()
-      return !s.includes('apna') && !s.includes('4767') && !s.includes('1874') && !s.includes('http') && !s.includes('competenc') && !s.includes('key skills') && !/^\d+$/.test(s)
-    })
-    let skillX = margin
-    skillsList.forEach((sk) => {
-      const textW = doc.getStringUnitWidth(sk) * 8.5 * 0.352778 + 8
-      if (skillX + textW > pageW - margin) {
-        skillX = margin
-        y += 8
-      }
-      doc.setFillColor(241, 245, 249)
-      doc.setDrawColor(203, 213, 225)
-      doc.roundedRect(skillX, y - 4.5, textW, 6.5, 1.5, 1.5, 'FD')
-      doc.setFont('helvetica', 'bold')
-      doc.setFontSize(8)
-      doc.setTextColor(30, 41, 59)
-      doc.text(sk, skillX + 4, y)
-      skillX += textW + 4
-    })
-    y += 14
-
-    // ─── Profile Overview ──────────────────────────────────────────────────
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(11)
-    doc.setTextColor(15, 23, 42)
-    doc.text('PROFESSIONAL PROFILE OVERVIEW', margin, y)
-    y += 3.5
-
-    doc.setDrawColor(186, 26, 26)
-    doc.setLineWidth(0.6)
-    doc.line(margin, y, margin + 25, y)
-    doc.setDrawColor(226, 232, 240)
-    doc.setLineWidth(0.2)
-    doc.line(margin + 25, y, pageW - margin, y)
-    y += 7
-
-    const overviewText = `${cand.firstName} ${cand.lastName} is a verified candidate registered on Career Wings placement database. Currently residing in ${cand.currentLocation}, holding a ${cand.highestDegree} in ${cand.educationLevel} with ${cand.totalExperience} years of experience. Actively seeking opportunities matching skills in ${skillsList.slice(0, 4).join(', ')}.`
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9)
-    doc.setTextColor(51, 65, 85)
-    const overviewLines = doc.splitTextToSize(overviewText, contentW)
-    doc.text(overviewLines, margin, y)
-    y += overviewLines.length * 5 + 12
-
-    // ─── Verification Seal Box ─────────────────────────────────────────────
-    doc.setFillColor(240, 253, 244)
-    doc.setDrawColor(187, 247, 208)
-    doc.roundedRect(margin, y, contentW, 26, 3, 3, 'FD')
-
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(9)
-    doc.setTextColor(21, 128, 61)
-    doc.text('✔ OFFICIALLY VERIFIED BY CAREER WINGS PLACEMENT SERVICES', margin + 6, y + 7)
-
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(8)
-    doc.setTextColor(71, 85, 105)
-    doc.text('This resume was generated directly from the authenticated Career Wings Candidate Database.', margin + 6, y + 13)
-    doc.text(`Verification Timestamp: ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} • Candidate Active Validity: ${cand.activeUntil}`, margin + 6, y + 19)
-
-    // ─── Footer ────────────────────────────────────────────────────────────
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(7.5)
-    doc.setTextColor(148, 163, 184)
-    doc.text('Career Wings Placement Services • G.S. Road, Guwahati, Assam • www.careerwings.in • Confidential Recruiter Document', pageW / 2, 287, { align: 'center' })
-
-    const safeName = `${cand.firstName}_${cand.lastName}_Resume.pdf`.replace(/\s+/g, '_')
-    doc.save(safeName)
-  }
-
-  // ─── Download Resume Helper (Instant PDF) ──────────────────────────────────
+  // ─── Download Resume Helper (AI-Enhanced Full Professional PDF) ────────────
   const handleDownloadResume = async (cand: CandidateRecord) => {
     markAsViewed(cand.id)
     const isUnlocked = cand.isUnlocked || unlockedCandidateIds.has(cand.id)
     try {
-      toast.loading(`Generating PDF resume for ${cand.firstName}...`, { id: 'pdf-toast' })
-      await generateCandidateResumePDF(cand, isUnlocked)
-      toast.success(`Downloaded ${cand.firstName}'s resume in PDF format!`, { id: 'pdf-toast' })
+      toast.loading(`Generating AI professional resume PDF for ${cand.firstName}...`, { id: 'pdf-toast' })
+      await downloadProfessionalCandidatePDF(cand, isUnlocked)
+      toast.success(`Downloaded ${cand.firstName}'s verified resume in PDF format!`, { id: 'pdf-toast' })
     } catch (err) {
       console.error('PDF generation error:', err)
       toast.error('Failed to generate PDF resume', { id: 'pdf-toast' })
@@ -1310,14 +1111,56 @@ export default function CandidateDatabase() {
   }
 
   // ─── Bulk Resumes ZIP Action ───────────────────────────────────────────────
-  const handleBulkResumesZip = () => {
-    const targetList =
+  const handleBulkResumesZip = async () => {
+    const rawList =
       selectedIds.size > 0
         ? candidates.filter((c) => selectedIds.has(c.id))
         : filteredCandidates
-    const targetCount = targetList.length
+
+    if (rawList.length === 0) {
+      toast.error('No candidates available to download.')
+      return
+    }
+
+    const targetList = rawList.slice(0, 50)
+    if (rawList.length > 50) {
+      toast(`Generating ZIP for first 50 of ${rawList.length} candidates for fast browser export.`, { icon: '📦' })
+    }
+
     markMultipleAsViewed(targetList.map((c) => c.id))
-    toast.success(`Bundling ${targetCount} verified resumes into ZIP archive. Download will start shortly.`)
+    toast.loading(`Preparing ${targetList.length} AI professional PDF resumes...`, { id: 'zip-toast' })
+
+    try {
+      const files: Array<{ name: string; data: Uint8Array }> = []
+      const usedNames = new Set<string>()
+
+      for (const cand of targetList) {
+        const isUnlocked = cand.isUnlocked || unlockedCandidateIds.has(cand.id)
+        const { doc, fileName } = await buildProfessionalCandidatePDFDoc(cand, isUnlocked)
+        let uniqueName = fileName
+        if (usedNames.has(uniqueName)) {
+          uniqueName = uniqueName.replace(/\.pdf$/i, `_${cand.id.slice(-4)}.pdf`)
+        }
+        usedNames.add(uniqueName)
+        const arrayBuf = doc.output('arraybuffer')
+        files.push({ name: uniqueName, data: new Uint8Array(arrayBuf) })
+      }
+
+      const zipBlob = createZipArchiveBlob(files)
+      const url = URL.createObjectURL(zipBlob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `Career_Wings_Resumes_${new Date().toISOString().slice(0, 10)}.zip`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+
+      toast.success(`Downloaded ZIP archive with ${files.length} verified resume PDF(s)!`, { id: 'zip-toast' })
+    } catch (err) {
+      console.error('Bulk ZIP generation error:', err)
+      toast.error('Failed to bundle resumes ZIP archive.', { id: 'zip-toast' })
+    }
   }
 
   // ─── Send Direct Interview Offer Submit ───────────────────────────────────
