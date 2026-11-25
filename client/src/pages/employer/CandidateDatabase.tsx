@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { employerAPI } from '@/lib/api'
+import { employerAPI, locationsAPI } from '@/lib/api'
 import EmployerLayout from '@/components/layout/EmployerLayout'
 import { SEOMeta } from '@/components/seo/SEOMeta'
 import {
@@ -418,6 +418,7 @@ const DEFAULT_CANDIDATES: CandidateRecord[] = [
 
 export default function CandidateDatabase() {
   const { educationLevels, highestDegrees } = useEducationMaster()
+  const [adminLocations, setAdminLocations] = useState<{ id: string; city: string; state: string }[]>([])
   const [candidates, setCandidates] = useState<CandidateRecord[]>(DEFAULT_CANDIDATES)
   const [loading, setLoading] = useState(false)
   const [sub, setSub] = useState<any>(null)
@@ -561,7 +562,11 @@ export default function CandidateDatabase() {
       employerAPI.getSubscription().catch(() => ({ data: { data: null } })),
       employerAPI.getJobs({ limit: 50 }).catch(() => ({ data: { data: [] } })),
       employerAPI.searchCandidates({ limit: 500 }).catch(() => ({ data: { data: [] } })),
-    ]).then(([subRes, jobsRes, candRes]) => {
+      locationsAPI.getAll().catch(() => ({ data: { data: [] } })),
+    ]).then(([subRes, jobsRes, candRes, locsRes]) => {
+      if (locsRes.data?.data && Array.isArray(locsRes.data.data)) {
+        setAdminLocations(locsRes.data.data)
+      }
       if (subRes.data?.data) {
         const s = subRes.data.data
         setSub(s)
@@ -1526,30 +1531,12 @@ export default function CandidateDatabase() {
                 onChange={(e) => setDistrict(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-[#c9252c]"
               >
-                <option>All Districts of India</option>
-                <option>Kamrup Metropolitan (Guwahati)</option>
-                <option>Kamrup Rural</option>
-                <option>Nagaon</option>
-                <option>Jorhat</option>
-                <option>Dibrugarh</option>
-                <option>Cachar (Silchar)</option>
-                <option>Sonitpur (Tezpur)</option>
-                <option>Barpeta</option>
-                <option>Tinsukia</option>
-                <option>Bongaigaon</option>
-                <option>Dhubri</option>
-                <option>Golaghat</option>
-                <option>Sivasagar</option>
-                <option>Karbi Anglong</option>
-                <option>East Khasi Hills (Shillong)</option>
-                <option>Dimapur</option>
-                <option>Papum Pare (Itanagar)</option>
-                <option>Imphal West</option>
-                <option>Aizawl</option>
-                <option>Kohima</option>
-                <option>West Tripura (Agartala)</option>
-                <option>Kolkata</option>
-                <option>New Delhi</option>
+                <option value="All Districts of India">All Locations</option>
+                {adminLocations.map((loc) => (
+                  <option key={loc.id} value={loc.city}>
+                    {loc.city}{loc.state ? ` (${loc.state})` : ''}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -1661,8 +1648,8 @@ export default function CandidateDatabase() {
                   type="button"
                   onClick={() => setViewFilter('all')}
                   className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition ${viewFilter === 'all'
-                      ? 'bg-white text-slate-800 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700'
+                    ? 'bg-white text-slate-800 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
                     }`}
                 >
                   All ({candidates.length})
@@ -1671,16 +1658,16 @@ export default function CandidateDatabase() {
                   type="button"
                   onClick={() => setViewFilter('not-viewed')}
                   className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition flex items-center gap-1.5 ${viewFilter === 'not-viewed'
-                      ? 'bg-white text-blue-700 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700'
+                    ? 'bg-white text-blue-700 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
                     }`}
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />
                   Not Viewed Yet
                   <span
                     className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${viewFilter === 'not-viewed'
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'bg-slate-200/90 text-slate-600'
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'bg-slate-200/90 text-slate-600'
                       }`}
                   >
                     {candidates.filter((c) => !viewedIds.has(c.id)).length}
@@ -1690,16 +1677,16 @@ export default function CandidateDatabase() {
                   type="button"
                   onClick={() => setViewFilter('viewed')}
                   className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition flex items-center gap-1.5 ${viewFilter === 'viewed'
-                      ? 'bg-white text-emerald-700 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700'
+                    ? 'bg-white text-emerald-700 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
                     }`}
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
                   Already Viewed
                   <span
                     className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${viewFilter === 'viewed'
-                        ? 'bg-emerald-100 text-emerald-700'
-                        : 'bg-slate-200/90 text-slate-600'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'bg-slate-200/90 text-slate-600'
                       }`}
                   >
                     {candidates.filter((c) => viewedIds.has(c.id)).length}
@@ -1892,10 +1879,10 @@ export default function CandidateDatabase() {
               <div
                 key={cand.id}
                 className={`bg-white rounded-2xl p-5 border transition-all ${isPremium
-                    ? 'border-amber-300/80 shadow-xs hover:border-amber-400'
-                    : isSelected
-                      ? 'border-red-300 shadow-xs'
-                      : 'border-slate-200/80 hover:border-slate-300'
+                  ? 'border-amber-300/80 shadow-xs hover:border-amber-400'
+                  : isSelected
+                    ? 'border-red-300 shadow-xs'
+                    : 'border-slate-200/80 hover:border-slate-300'
                   }`}
               >
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
