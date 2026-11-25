@@ -172,6 +172,7 @@ for (const dir of potentialUploadDirs) {
 }
 
 import { seoAdminRoutes, seoPublicRoutes } from './routes/seo.routes';
+import { getClientIndexHtmlTemplate, isCrawlerUserAgent, renderSeoHtmlForPath } from './services/seoRenderer.service';
 
 // 4. Health Check
 app.get('/api/health', async (req: Request, res: Response) => {
@@ -319,6 +320,31 @@ const clientDistDir = potentialClientDirs.find((dir) => fs.existsSync(path.join(
 
 if (clientDistDir) {
   console.log(`📦 Serving frontend static assets from: ${clientDistDir}`);
+
+  // Pre-render dynamic SEO meta tags & JSON-LD schema for search/social crawlers
+  app.get('*', async (req: Request, res: Response, next: NextFunction) => {
+    if (
+      req.path.startsWith('/api') ||
+      req.path.startsWith('/uploads') ||
+      req.path === '/robots.txt' ||
+      req.path.startsWith('/sitemap') ||
+      !isCrawlerUserAgent(req.headers['user-agent']) ||
+      /\.(js|css|map|png|jpe?g|webp|gif|svg|ico|woff2?|ttf|eot|json|xml|txt|pdf|webmanifest)$/i.test(req.path)
+    ) {
+      return next();
+    }
+    try {
+      const { statusCode, html } = await renderSeoHtmlForPath(
+        req.originalUrl || req.path,
+        getClientIndexHtmlTemplate()
+      );
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      return res.status(statusCode).type('text/html; charset=utf-8').send(html);
+    } catch {
+      return next();
+    }
+  });
+
   app.use(
     express.static(clientDistDir, {
       maxAge: '1d',

@@ -17,6 +17,7 @@ import {
 import { createNotification } from '../services/notification.service';
 import { sendApplicationStatusEmail } from '../services/email.service';
 import { generateCandidatePDFBuffer } from '../lib/pdfGenerator';
+import { onJobPublished, onJobRemovedOrExpired } from '../services/seo.service';
 
 // ---- COMPANY PROFILE ----
 
@@ -420,6 +421,11 @@ export const postJob = async (req: AuthenticatedRequest, res: Response, next: Ne
       }).catch(console.error);
     }
 
+    // If auto-approved, trigger SEO indexing hook immediately
+    if (job.status === 'PUBLISHED' || job.status === 'FEATURED') {
+      onJobPublished(job.id).catch(console.error);
+    }
+
     sendSuccess(res, job, status === 'PUBLISHED' ? 'Job posted successfully!' : 'Job submitted for Admin review and approval.', 201);
   } catch (error) { next(error); }
 };
@@ -519,6 +525,12 @@ export const updateJob = async (req: AuthenticatedRequest, res: Response, next: 
       await syncFeaturedJobSlot(req.user!.id, job.id, 'RELEASE').catch(console.error);
     }
 
+    if (newStatus === 'PUBLISHED' || newStatus === 'FEATURED') {
+      onJobPublished(updated.id).catch(console.error);
+    } else if (isLive && needsApproval) {
+      onJobRemovedOrExpired(updated.id).catch(console.error);
+    }
+
     // If edited job went back to PENDING, notify admins
     if (needsApproval) {
       prisma.user.findMany({ where: { role: 'ADMIN', isActive: true } }).then((admins) => {
@@ -562,6 +574,9 @@ export const updateJobStatus = async (req: AuthenticatedRequest, res: Response, 
     if (result.count > 0 && status === 'CLOSED') {
       await syncFeaturedJobSlot(req.user!.id, req.params.id, 'RELEASE').catch(console.error);
     }
+    if (result.count > 0) {
+      onJobRemovedOrExpired(req.params.id).catch(console.error);
+    }
     sendSuccess(res, null, `Job ${status.toLowerCase()}`);
   } catch (error) { next(error); }
 };
@@ -576,6 +591,7 @@ export const deleteJob = async (req: AuthenticatedRequest, res: Response, next: 
     });
     if (result.count > 0) {
       await syncFeaturedJobSlot(req.user!.id, req.params.id, 'RELEASE').catch(console.error);
+      onJobRemovedOrExpired(req.params.id).catch(console.error);
     }
     sendSuccess(res, null, 'Job deleted');
   } catch (error) { next(error); }

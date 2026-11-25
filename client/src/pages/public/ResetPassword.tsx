@@ -45,7 +45,7 @@ export default function ResetPassword() {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
-      <SEOMeta title="Set New Password | Career Wings" />
+      <SEOMeta title="Set New Password | Career Wings" noindex />
       <Header />
 
       <main className="flex-1 flex items-center justify-center py-12 px-4">

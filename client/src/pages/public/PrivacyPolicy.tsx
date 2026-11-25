@@ -6,7 +6,7 @@ import { SEOMeta } from '@/components/seo/SEOMeta'
 export default function PrivacyPolicy() {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
-      <SEOMeta title="Privacy Policy | Career Wings" />
+      <SEOMeta title="Privacy Policy | Career Wings" canonical="/privacy-policy" />
       <Header />
 
       <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-12">

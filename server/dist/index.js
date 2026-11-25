@@ -193,6 +193,7 @@ for (const dir of potentialUploadDirs) {
     }
 }
 const seo_routes_1 = require("./routes/seo.routes");
+const seoRenderer_service_1 = require("./services/seoRenderer.service");
 // 4. Health Check
 app.get('/api/health', async (req, res) => {
     try {
@@ -331,6 +332,25 @@ const potentialClientDirs = [
 const clientDistDir = potentialClientDirs.find((dir) => fs_1.default.existsSync(path_1.default.join(dir, 'index.html')));
 if (clientDistDir) {
     console.log(`📦 Serving frontend static assets from: ${clientDistDir}`);
+    // Pre-render dynamic SEO meta tags & JSON-LD schema for search/social crawlers
+    app.get('*', async (req, res, next) => {
+        if (req.path.startsWith('/api') ||
+            req.path.startsWith('/uploads') ||
+            req.path === '/robots.txt' ||
+            req.path.startsWith('/sitemap') ||
+            !(0, seoRenderer_service_1.isCrawlerUserAgent)(req.headers['user-agent']) ||
+            /\.(js|css|map|png|jpe?g|webp|gif|svg|ico|woff2?|ttf|eot|json|xml|txt|pdf|webmanifest)$/i.test(req.path)) {
+            return next();
+        }
+        try {
+            const { statusCode, html } = await (0, seoRenderer_service_1.renderSeoHtmlForPath)(req.originalUrl || req.path, (0, seoRenderer_service_1.getClientIndexHtmlTemplate)());
+            res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+            return res.status(statusCode).type('text/html; charset=utf-8').send(html);
+        }
+        catch {
+            return next();
+        }
+    });
     app.use(express_1.default.static(clientDistDir, {
         maxAge: '1d',
         etag: true,

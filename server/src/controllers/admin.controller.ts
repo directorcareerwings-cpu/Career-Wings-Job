@@ -5,7 +5,7 @@ import { AppError } from '../lib/errors';
 import { AuthenticatedRequest } from '../middleware/auth';
 import slugify from 'slugify';
 import { getRazorpayConfig, saveRazorpayConfig, testRazorpayConnection } from '../services/payment.service';
-import { onJobPublished } from '../services/seo.service';
+import { onJobPublished, onJobRemovedOrExpired } from '../services/seo.service';
 import { createInitialUsageData, extendSubscription, updateSubscriptionStatus } from '../services/subscription.service';
 import {
   sendPackageAssignedEmail,
@@ -403,6 +403,9 @@ export const rejectJob = async (req: AuthenticatedRequest, res: Response, next: 
       ).catch(console.error);
     }
 
+    // Mark job non-indexable and remove from XML sitemap
+    onJobRemovedOrExpired(job.id).catch(() => {});
+
     sendSuccess(res, null, 'Job rejected');
   } catch (error) { next(error); }
 };
@@ -415,6 +418,7 @@ export const toggleFeatureJob = async (req: AuthenticatedRequest, res: Response,
       where: { id: req.params.id },
       data: { isFeatured: !job.isFeatured, status: !job.isFeatured ? 'FEATURED' : 'PUBLISHED' },
     });
+    onJobPublished(job.id).catch(() => {});
     sendSuccess(res, null, `Job ${job.isFeatured ? 'unfeatured' : 'featured'}`);
   } catch (error) { next(error); }
 };

@@ -35,6 +35,7 @@ export default function Companies() {
       <SEOMeta
         title="Top Hiring Companies in Guwahati & Northeast | Career Wings"
         description="Browse top verified employers, IT firms, hospitals, and MNCs hiring in Guwahati, Assam and across Northeast India."
+        canonical="/companies"
       />
       <Header />
 

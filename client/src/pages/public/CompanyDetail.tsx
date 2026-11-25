@@ -58,12 +58,48 @@ export default function CompanyDetail() {
   }
 
   const jobs = company.jobs || []
+  const siteUrl = 'https://careerwings.in'
+  const canonicalPath = slug ? `/companies/${slug}` : `/companies/${company.slug}`
+  const companySchema = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Organization',
+        name: company.name,
+        url: company.website || `${siteUrl}${canonicalPath}`,
+        logo: company.logo
+          ? (company.logo.startsWith('http') ? company.logo : `${siteUrl}${company.logo}`)
+          : `${siteUrl}/images/logo.png`,
+        description: company.description || `Explore verified job openings at ${company.name} on Career Wings.`,
+        ...(company.headquarters
+          ? {
+              address: {
+                '@type': 'PostalAddress',
+                addressLocality: company.headquarters,
+                addressCountry: 'IN',
+              },
+            }
+          : {}),
+      },
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: `${siteUrl}/` },
+          { '@type': 'ListItem', position: 2, name: 'Companies', item: `${siteUrl}/companies` },
+          { '@type': 'ListItem', position: 3, name: company.name, item: `${siteUrl}${canonicalPath}` },
+        ],
+      },
+    ],
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
       <SEOMeta
         title={`${company.name} Careers & Job Vacancies | Career Wings`}
-        description={`Explore open job vacancies at ${company.name} in Guwahati & Northeast India. Apply directly on Career Wings.`}
+        description={`Explore ${jobs.length > 0 ? `${jobs.length} ` : ''}open job vacancies at ${company.name} in Guwahati & Northeast India. Apply directly on Career Wings.`}
+        canonical={canonicalPath}
+        image={company.logo}
+        schema={companySchema}
       />
       <Header />
 

@@ -15,6 +15,7 @@ const subscription_service_1 = require("../services/subscription.service");
 const notification_service_1 = require("../services/notification.service");
 const email_service_1 = require("../services/email.service");
 const pdfGenerator_1 = require("../lib/pdfGenerator");
+const seo_service_1 = require("../services/seo.service");
 // ---- COMPANY PROFILE ----
 const getCompanyProfile = async (req, res, next) => {
     try {
@@ -390,6 +391,10 @@ const postJob = async (req, res, next) => {
                 }
             }).catch(console.error);
         }
+        // If auto-approved, trigger SEO indexing hook immediately
+        if (job.status === 'PUBLISHED' || job.status === 'FEATURED') {
+            (0, seo_service_1.onJobPublished)(job.id).catch(console.error);
+        }
         (0, response_1.sendSuccess)(res, job, status === 'PUBLISHED' ? 'Job posted successfully!' : 'Job submitted for Admin review and approval.', 201);
     }
     catch (error) {
@@ -487,6 +492,12 @@ const updateJob = async (req, res, next) => {
         else if (job.isFeatured && !finalIsFeatured) {
             await (0, subscription_service_1.syncFeaturedJobSlot)(req.user.id, job.id, 'RELEASE').catch(console.error);
         }
+        if (newStatus === 'PUBLISHED' || newStatus === 'FEATURED') {
+            (0, seo_service_1.onJobPublished)(updated.id).catch(console.error);
+        }
+        else if (isLive && needsApproval) {
+            (0, seo_service_1.onJobRemovedOrExpired)(updated.id).catch(console.error);
+        }
         // If edited job went back to PENDING, notify admins
         if (needsApproval) {
             prisma_1.prisma.user.findMany({ where: { role: 'ADMIN', isActive: true } }).then((admins) => {
@@ -521,6 +532,9 @@ const updateJobStatus = async (req, res, next) => {
         if (result.count > 0 && status === 'CLOSED') {
             await (0, subscription_service_1.syncFeaturedJobSlot)(req.user.id, req.params.id, 'RELEASE').catch(console.error);
         }
+        if (result.count > 0) {
+            (0, seo_service_1.onJobRemovedOrExpired)(req.params.id).catch(console.error);
+        }
         (0, response_1.sendSuccess)(res, null, `Job ${status.toLowerCase()}`);
     }
     catch (error) {
@@ -539,6 +553,7 @@ const deleteJob = async (req, res, next) => {
         });
         if (result.count > 0) {
             await (0, subscription_service_1.syncFeaturedJobSlot)(req.user.id, req.params.id, 'RELEASE').catch(console.error);
+            (0, seo_service_1.onJobRemovedOrExpired)(req.params.id).catch(console.error);
         }
         (0, response_1.sendSuccess)(res, null, 'Job deleted');
     }

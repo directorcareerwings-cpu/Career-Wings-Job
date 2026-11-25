@@ -10,6 +10,7 @@ export default function About() {
       <SEOMeta
         title="About Career Wings | Guwahati's Leading Recruitment Agency & Job Portal"
         description="Learn about Career Wings - premier recruitment and placement agency connecting verified talent with employers across Northeast India."
+        canonical="/about"
       />
       <Header />
 

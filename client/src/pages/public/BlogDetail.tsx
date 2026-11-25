@@ -125,7 +125,9 @@ export default function BlogDetail() {
     '@type': 'BlogPosting',
     headline: post.title,
     description: post.excerpt,
-    image: post.coverImage || 'https://www.careerwings.in/images/hero-banner-hd.png',
+    image: post.coverImage
+      ? (post.coverImage.startsWith('http') ? post.coverImage : `https://careerwings.in${post.coverImage}`)
+      : 'https://careerwings.in/images/hero-banner-hd.png',
     datePublished: post.publishedAt || post.createdAt,
     dateModified: post.updatedAt || post.createdAt,
     author: {
@@ -138,12 +140,12 @@ export default function BlogDetail() {
       name: 'Career Wings',
       logo: {
         '@type': 'ImageObject',
-        url: 'https://www.careerwings.in/images/logo.png',
+        url: 'https://careerwings.in/images/logo.png',
       },
     },
     mainEntityOfPage: {
       '@type': 'WebPage',
-      '@id': currentUrl,
+      '@id': `https://careerwings.in/blog/${post.slug}`,
     },
   }
 
@@ -153,6 +155,7 @@ export default function BlogDetail() {
         title={`${post.title} | Career Wings Blog`}
         description={post.excerpt}
         canonical={`/blog/${post.slug}`}
+        image={post.coverImage || undefined}
         type="article"
       />
       <Helmet>

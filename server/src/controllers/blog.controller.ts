@@ -3,6 +3,7 @@ import slugify from 'slugify';
 import { prisma, isMysqlConfigured } from '../lib/prisma';
 import { sendSuccess } from '../lib/response';
 import { AppError } from '../lib/errors';
+import { onBlogDeleted, onBlogPublished } from '../services/seo.service';
 
 /**
  * Ensure BlogPost table exists in SQLite database (zero-dependency fail-safe)
@@ -522,6 +523,8 @@ export const adminCreateBlogPost = async (req: Request, res: Response, next: Nex
       },
     });
 
+    onBlogPublished(newPost.id).catch(() => {});
+
     return sendSuccess(res, { post: newPost }, 'Article created successfully', 201);
   } catch (err) {
     next(err);
@@ -587,6 +590,11 @@ export const adminUpdateBlogPost = async (req: Request, res: Response, next: Nex
       data,
     });
 
+    if (data.slug && data.slug !== existing.slug) {
+      onBlogDeleted(existing.slug).catch(() => {});
+    }
+    onBlogPublished(updated.id).catch(() => {});
+
     return sendSuccess(res, { post: updated }, 'Article updated successfully');
   } catch (err) {
     next(err);
@@ -605,6 +613,7 @@ export const adminDeleteBlogPost = async (req: Request, res: Response, next: Nex
     if (!existing) throw new AppError('Blog post not found', 404);
 
     await prisma.blogPost.delete({ where: { id } });
+    onBlogDeleted(existing.slug).catch(() => {});
 
     return sendSuccess(res, { id }, 'Article deleted successfully');
   } catch (err) {

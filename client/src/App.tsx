@@ -1,9 +1,13 @@
 import React, { useEffect, Suspense, lazy } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { Helmet } from 'react-helmet-async'
 import { useAuthStore } from '@/stores/auth.store'
+import { publicAPI } from '@/lib/api'
 import ProtectedRoute from '@/components/layout/ProtectedRoute'
 import { LoadingSpinner } from '@/components/ui/Spinner'
 import MobileNav from '@/components/layout/MobileNav'
+import { SEOMeta } from '@/components/seo/SEOMeta'
 
 // ─── Lazy-loaded pages ──────────────────────────────────────────────────────
 
@@ -95,11 +99,28 @@ const Checkout = lazy(() => import('@/pages/Checkout'))
 function NotFound() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center text-center px-4">
+      <SEOMeta title="Page Not Found | Career Wings" noindex />
       <div className="text-8xl font-bold text-primary-900 mb-4">404</div>
       <h1 className="text-2xl font-semibold text-gray-900 mb-2">Page Not Found</h1>
       <p className="text-gray-500 mb-6">The page you're looking for doesn't exist.</p>
       <a href="/" className="btn-primary">Go Home</a>
     </div>
+  )
+}
+
+function GlobalSeoHead() {
+  const { data } = useQuery({
+    queryKey: ['public-settings'],
+    queryFn: () => publicAPI.getSettings(),
+    staleTime: 60_000,
+  })
+  const verificationToken = data?.data?.data?.GOOGLE_SITE_VERIFICATION
+  if (!verificationToken) return null
+
+  return (
+    <Helmet>
+      <meta name="google-site-verification" content={verificationToken} />
+    </Helmet>
   )
 }
 
@@ -113,6 +134,7 @@ export default function App() {
 
   return (
     <Suspense fallback={<LoadingSpinner fullPage />}>
+      <GlobalSeoHead />
       <Routes>
         {/* Public */}
         <Route path="/" element={<Home />} />

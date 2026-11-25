@@ -2,16 +2,36 @@
   RewriteEngine On
   RewriteBase /
 
-  # 1. Reverse proxy API calls to the local Node.js application
-  RewriteRule ^api/(.*) http://127.0.0.1:5000/api/$1 [P,L]
+  # 1. Canonical non-www HTTPS redirect
+  RewriteCond %{HTTP_HOST} ^www\.careerwings\.in$ [NC]
+  RewriteRule ^(.*)$ https://careerwings.in/$1 [R=301,L]
 
-  # 2. Reverse proxy uploaded resumes/files to the backend
+  # 2. Reverse proxy API calls and uploaded files to the Node.js application
+  RewriteRule ^api/(.*) http://127.0.0.1:5000/api/$1 [P,L]
   RewriteRule ^uploads/(.*) http://127.0.0.1:5000/uploads/$1 [P,L]
 
-  # 3. React Router Single Page App fallback
+  # 3. Proxy robots.txt and dynamic XML Sitemaps directly to backend SEO engine
+  RewriteRule ^robots\.txt$ http://127.0.0.1:5000/robots.txt [P,L]
+  RewriteRule ^sitemap\.xml$ http://127.0.0.1:5000/sitemap.xml [P,L]
+  RewriteRule ^sitemap-index\.xml$ http://127.0.0.1:5000/sitemap-index.xml [P,L]
+  RewriteRule ^sitemap-([a-zA-Z0-9_-]+)\.xml$ http://127.0.0.1:5000/sitemap-$1.xml [P,L]
+
+  # 4. Serve dynamic pre-rendered meta tags & JSON-LD schema HTML to search/social crawlers
+  RewriteCond %{HTTP_USER_AGENT} (Googlebot|Google-InspectionTool|AdsBot-Google|Storebot-Google|bingbot|Slurp|DuckDuckBot|Baiduspider|YandexBot|facebot|facebookexternalhit|Twitterbot|LinkedInBot|WhatsApp|Slackbot|TelegramBot|Applebot|Pinterestbot|Discordbot) [NC]
+  RewriteCond %{REQUEST_URI} !^/(api|uploads|assets|images|icons)/ [NC]
+  RewriteCond %{REQUEST_URI} !\.(js|css|map|png|jpe?g|webp|gif|svg|ico|woff2?|ttf|eot|json|xml|txt|pdf|webmanifest|html)$ [NC]
+  RewriteRule ^(.*)$ http://127.0.0.1:5000/api/seo/render?path=/$1 [P,QSA,L]
+
+  # 5. React Router Single Page App fallback
   RewriteRule ^index\.html$ - [L]
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteCond %{REQUEST_FILENAME} !-l
   RewriteRule . /index.html [L]
+</IfModule>
+
+<IfModule mod_headers.c>
+  <FilesMatch "^(index\.html|sw\.js)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+  </FilesMatch>
 </IfModule>

@@ -41,6 +41,7 @@ const node_cron_1 = __importDefault(require("node-cron"));
 const prisma_1 = require("../lib/prisma");
 const subscription_service_1 = require("../services/subscription.service");
 const email_service_1 = require("../services/email.service");
+const seo_service_1 = require("../services/seo.service");
 const startCronJobs = () => {
     // 1. Expire subscriptions daily at midnight
     node_cron_1.default.schedule('0 0 * * *', async () => {
@@ -72,6 +73,7 @@ const startCronJobs = () => {
                     where: { id: job.id },
                     data: { status: 'EXPIRED' },
                 });
+                await (0, seo_service_1.onJobRemovedOrExpired)(job.id).catch(() => { });
                 await prisma_1.prisma.notification.create({
                     data: {
                         userId: job.employer.userId,
@@ -180,6 +182,31 @@ const startCronJobs = () => {
         }
         catch (err) {
             console.error('[CRON ERROR] Daily database backup failed:', err);
+        }
+    });
+    // 6. Auto-process SEO Google Indexing Queue every 15 minutes
+    node_cron_1.default.schedule('*/15 * * * *', async () => {
+        try {
+            const pendingCount = await prisma_1.prisma.indexingQueue.count({
+                where: { status: { in: ['PENDING', 'FAILED'] }, attemptCount: { lt: 3 } },
+            });
+            if (pendingCount > 0) {
+                console.log(`[CRON] Processing ${pendingCount} queued SEO indexing items...`);
+                await (0, seo_service_1.processIndexingQueueBatch)(20);
+            }
+        }
+        catch (err) {
+            console.error('[CRON ERROR] SEO indexing queue processing failed:', err);
+        }
+    });
+    // 7. Refresh full XML Sitemap & SEO catalog daily at 03:00 AM
+    node_cron_1.default.schedule('0 3 * * *', async () => {
+        try {
+            console.log('[CRON] Synchronizing SEO page catalog and XML sitemaps...');
+            await (0, seo_service_1.syncAllPublicPagesToCatalog)();
+        }
+        catch (err) {
+            console.error('[CRON ERROR] Daily SEO catalog sync failed:', err);
         }
     });
     console.log('✔ Background cron jobs initialized');

@@ -742,6 +742,8 @@ router.put('/jobs/:id/feature', toggleFeatureJob);
 router.delete('/jobs/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     await prisma.job.update({ where: { id: req.params.id }, data: { deletedAt: new Date(), status: 'CLOSED' } });
+    const { onJobRemovedOrExpired } = await import('../services/seo.service');
+    onJobRemovedOrExpired(req.params.id).catch(() => {});
     sendSuccess(res, null, 'Job deleted');
   } catch (error) { next(error); }
 });

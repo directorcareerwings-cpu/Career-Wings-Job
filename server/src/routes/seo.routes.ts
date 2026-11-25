@@ -24,6 +24,7 @@ import {
   getSitemapIndexXml,
   getSectionSitemapXml,
   getMasterSitemapXml,
+  renderCrawlerSeoHtml,
 } from '../controllers/seo.controller';
 
 const router = Router();
@@ -73,5 +74,6 @@ publicRouter.get('/robots.txt', getRobotsTxt);
 publicRouter.get('/sitemap.xml', getMasterSitemapXml);
 publicRouter.get('/sitemap-index.xml', getSitemapIndexXml);
 publicRouter.get('/sitemap-:section.xml', getSectionSitemapXml);
+publicRouter.get('/seo/render', renderCrawlerSeoHtml);
 
 export { publicRouter as seoPublicRoutes };

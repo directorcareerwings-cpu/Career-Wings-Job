@@ -1,8 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
+import fs from 'fs';
+import path from 'path';
 import { prisma } from '../lib/prisma';
 import { sendSuccess, sendPaginated } from '../lib/response';
 import { AppError } from '../lib/errors';
+import { invalidateCache } from '../lib/memoryCache';
 import { AuthenticatedRequest } from '../middleware/auth';
+import { renderSeoHtmlForPath } from '../services/seoRenderer.service';
 import {
   getOrCreateSeoGlobalSettings,
   calculatePageSeoAudit,
@@ -394,6 +398,18 @@ export const getMasterSitemapXml = async (req: Request, res: Response, next: Nex
   }
 };
 
+export const renderCrawlerSeoHtml = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { getClientIndexHtmlTemplate } = await import('../services/seoRenderer.service');
+    const targetPath = String(req.query.path || req.headers['x-original-url'] || '/');
+    const template = getClientIndexHtmlTemplate();
+    const { statusCode, html } = await renderSeoHtmlForPath(targetPath, template);
+    res.status(statusCode).header('Content-Type', 'text/html; charset=utf-8').send(html);
+  } catch (error) {
+    next(error);
+  }
+};
+
 // ─── 4. ROBOTS.TXT CONTROLLER ─────────────────────────────────────────────────
 
 export const getRobotsTxt = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -548,7 +564,10 @@ export const getGscConfig = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const settings = await getOrCreateSeoGlobalSettings();
+    const [settings, verificationSetting] = await Promise.all([
+      getOrCreateSeoGlobalSettings(),
+      prisma.adminSetting.findUnique({ where: { key: 'GOOGLE_SITE_VERIFICATION' } }).catch(() => null),
+    ]);
     sendSuccess(res, {
       isConnected: settings.gscConnected,
       property: settings.gscProperty || '',
@@ -557,6 +576,7 @@ export const getGscConfig = async (
       hasPrivateKey: Boolean(settings.gscPrivateKey),
       hasRefreshToken: Boolean(settings.gscRefreshToken),
       siteUrl: settings.siteUrl,
+      googleSiteVerification: verificationSetting?.value || '',
     });
   } catch (error) {
     next(error);
@@ -577,6 +597,7 @@ export const updateGscConfig = async (
       privateKey,
       refreshToken,
       serviceAccountJson,
+      googleSiteVerification,
     } = req.body;
 
     let parsedEmail = clientEmail;
@@ -612,6 +633,31 @@ export const updateGscConfig = async (
       data,
     });
 
+    if (googleSiteVerification !== undefined) {
+      const cleanToken = String(googleSiteVerification || '')
+        .trim()
+        .replace(/^<meta[^>]*content=["']([^"']+)["'][^>]*>$/i, '$1');
+      await prisma.adminSetting.upsert({
+        where: { key: 'GOOGLE_SITE_VERIFICATION' },
+        create: {
+          key: 'GOOGLE_SITE_VERIFICATION',
+          value: cleanToken,
+          group: 'SEO',
+          label: 'Google Search Console Verification Meta Token',
+          type: 'TEXT',
+        },
+        update: {
+          value: cleanToken,
+          group: 'SEO',
+        },
+      });
+      invalidateCache('public_settings');
+    }
+
+    const verificationSetting = await prisma.adminSetting
+      .findUnique({ where: { key: 'GOOGLE_SITE_VERIFICATION' } })
+      .catch(() => null);
+
     sendSuccess(
       res,
       {
@@ -619,6 +665,7 @@ export const updateGscConfig = async (
         property: updated.gscProperty,
         clientEmail: updated.gscClientEmail,
         hasPrivateKey: Boolean(updated.gscPrivateKey),
+        googleSiteVerification: verificationSetting?.value || '',
       },
       'Google Search Console configuration saved successfully'
     );

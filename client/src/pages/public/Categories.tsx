@@ -46,6 +46,7 @@ export default function Categories() {
       <SEOMeta
         title="Explore Job Categories in Guwahati & Northeast | Career Wings"
         description="Browse jobs by industry & category: IT, Banking, Healthcare, Civil Construction, Sales, and Teaching in Assam."
+        canonical="/categories"
       />
       <Header />
 

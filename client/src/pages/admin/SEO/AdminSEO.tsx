@@ -397,6 +397,7 @@ export default function AdminSEO() {
         property: gscConfig.property,
         authType: gscConfig.authType,
         clientEmail: gscConfig.clientEmail,
+        googleSiteVerification: gscConfig.googleSiteVerification ?? '',
         serviceAccountJson: serviceAccountJsonInput.trim() || undefined,
       })
       toast.success('Google Search Console configuration saved!')
@@ -1567,6 +1568,22 @@ export default function AdminSEO() {
                     />
                     <span className="text-[11px] text-slate-400 mt-1 block">
                       Must match the verified property in your Google Search Console account.
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      Google Site Verification Meta Token (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Paste content token from <meta name='google-site-verification' content='...' />"
+                      value={gscConfig.googleSiteVerification || ''}
+                      onChange={(e) => setGscConfig({ ...gscConfig, googleSiteVerification: e.target.value })}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono focus:bg-white focus:ring-2 focus:ring-primary-500 focus:outline-none"
+                    />
+                    <span className="text-[11px] text-slate-400 mt-1 block">
+                      Automatically injected as &lt;meta name=&quot;google-site-verification&quot; content=&quot;...&quot; /&gt; across careerwings.in for instant Search Console ownership verification.
                     </span>
                   </div>
 

@@ -6,7 +6,7 @@ import { SEOMeta } from '@/components/seo/SEOMeta'
 export default function TermsOfService() {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
-      <SEOMeta title="Terms of Service | Career Wings" />
+      <SEOMeta title="Terms of Service | Career Wings" canonical="/terms-of-service" />
       <Header />
 
       <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-12">

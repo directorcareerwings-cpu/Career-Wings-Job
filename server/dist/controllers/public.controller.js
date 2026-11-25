@@ -429,7 +429,7 @@ const getPublicSettings = async (req, res, next) => {
         }
         const settings = await prisma_1.prisma.adminSetting.findMany({
             where: {
-                group: { in: ['GENERAL', 'CMS', 'HERO'] },
+                group: { in: ['GENERAL', 'CMS', 'HERO', 'SEO'] },
             },
         });
         const map = {};

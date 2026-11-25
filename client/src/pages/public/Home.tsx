@@ -1087,12 +1087,46 @@ function EmployerCTA() {
 // ─── Main Home Page Component ───────────────────────────────────────────────
 
 export default function Home() {
+  const homeSchema = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Organization',
+        '@id': 'https://careerwings.in/#organization',
+        name: 'Career Wings',
+        url: 'https://careerwings.in/',
+        logo: 'https://careerwings.in/images/logo.png',
+        sameAs: ['https://careerwings.in'],
+        contactPoint: {
+          '@type': 'ContactPoint',
+          telephone: '+91-8876211864',
+          contactType: 'customer support',
+          email: 'info@careerwings.in',
+          areaServed: 'IN',
+        },
+      },
+      {
+        '@type': 'WebSite',
+        '@id': 'https://careerwings.in/#website',
+        url: 'https://careerwings.in/',
+        name: 'Career Wings',
+        publisher: { '@id': 'https://careerwings.in/#organization' },
+        potentialAction: {
+          '@type': 'SearchAction',
+          target: 'https://careerwings.in/jobs?keyword={search_term_string}',
+          'query-input': 'required name=search_term_string',
+        },
+      },
+    ],
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-white">
       <SEOMeta
         title="Jobs in Guwahati, Assam & Northeast India | Career Wings"
         description="Career Wings is Northeast India's premier job portal. Browse thousands of verified jobs in Guwahati, Shillong, Dibrugarh, Silchar, and across Northeast India. Apply in 1-click."
         canonical="/"
+        schema={homeSchema}
       />
       <Header />
       <main className="flex-grow">

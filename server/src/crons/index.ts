@@ -2,6 +2,11 @@ import cron from 'node-cron';
 import { prisma, getPersistentStoragePaths, createSafetyBackup } from '../lib/prisma';
 import { expireSubscriptions } from '../services/subscription.service';
 import { sendJobAlertEmail } from '../services/email.service';
+import {
+  onJobRemovedOrExpired,
+  processIndexingQueueBatch,
+  syncAllPublicPagesToCatalog,
+} from '../services/seo.service';
 
 export const startCronJobs = (): void => {
   // 1. Expire subscriptions daily at midnight
@@ -35,6 +40,8 @@ export const startCronJobs = (): void => {
           where: { id: job.id },
           data: { status: 'EXPIRED' },
         });
+
+        await onJobRemovedOrExpired(job.id).catch(() => {});
 
         await prisma.notification.create({
           data: {
@@ -162,6 +169,31 @@ export const startCronJobs = (): void => {
       }
     } catch (err) {
       console.error('[CRON ERROR] Daily database backup failed:', err);
+    }
+  });
+
+  // 6. Auto-process SEO Google Indexing Queue every 15 minutes
+  cron.schedule('*/15 * * * *', async () => {
+    try {
+      const pendingCount = await prisma.indexingQueue.count({
+        where: { status: { in: ['PENDING', 'FAILED'] }, attemptCount: { lt: 3 } },
+      });
+      if (pendingCount > 0) {
+        console.log(`[CRON] Processing ${pendingCount} queued SEO indexing items...`);
+        await processIndexingQueueBatch(20);
+      }
+    } catch (err) {
+      console.error('[CRON ERROR] SEO indexing queue processing failed:', err);
+    }
+  });
+
+  // 7. Refresh full XML Sitemap & SEO catalog daily at 03:00 AM
+  cron.schedule('0 3 * * *', async () => {
+    try {
+      console.log('[CRON] Synchronizing SEO page catalog and XML sitemaps...');
+      await syncAllPublicPagesToCatalog();
+    } catch (err) {
+      console.error('[CRON ERROR] Daily SEO catalog sync failed:', err);
     }
   });
 

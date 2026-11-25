@@ -25,6 +25,7 @@ export default function Contact() {
       <SEOMeta
         title="Contact Career Wings | Office in Guwahati, Assam"
         description="Get in touch with Career Wings recruitment team. Visit our Zoo Road Guwahati office or call +91-8876211864 for job inquiries and hiring solutions."
+        canonical="/contact"
       />
       <Header />
 

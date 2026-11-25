@@ -42,4 +42,5 @@ publicRouter.get('/robots.txt', seo_controller_1.getRobotsTxt);
 publicRouter.get('/sitemap.xml', seo_controller_1.getMasterSitemapXml);
 publicRouter.get('/sitemap-index.xml', seo_controller_1.getSitemapIndexXml);
 publicRouter.get('/sitemap-:section.xml', seo_controller_1.getSectionSitemapXml);
+publicRouter.get('/seo/render', seo_controller_1.renderCrawlerSeoHtml);
 //# sourceMappingURL=seo.routes.js.map

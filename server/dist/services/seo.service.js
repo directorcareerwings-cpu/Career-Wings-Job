@@ -3,14 +3,45 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.inspectUrlWithGoogleSearchConsole = exports.submitUrlToGoogleIndexingApi = exports.processIndexingQueueBatch = exports.enqueueUrlsForIndexing = exports.validateRobotsTxtContent = exports.generateMasterSitemapXml = exports.generateSectionSitemapXml = exports.generateSitemapIndexXml = exports.getAllJobSchemasValidation = exports.regenerateJobSchemaAndAudit = exports.onJobPublished = exports.validateJobPostingSchema = exports.buildJobBreadcrumbsSchema = exports.buildJobPostingSchema = exports.cleanJobDescriptionForSchema = exports.mapEmploymentTypeToSchema = exports.syncAllPublicPagesToCatalog = exports.calculatePageSeoAudit = exports.getOrCreateSeoGlobalSettings = void 0;
+exports.inspectUrlWithGoogleSearchConsole = exports.submitUrlToGoogleIndexingApi = exports.processIndexingQueueBatch = exports.submitUrlsToIndexNow = exports.enqueueUrlsForIndexing = exports.validateRobotsTxtContent = exports.generateMasterSitemapXml = exports.generateSectionSitemapXml = exports.generateSitemapIndexXml = exports.getAllJobSchemasValidation = exports.regenerateJobSchemaAndAudit = exports.onBlogDeleted = exports.onBlogPublished = exports.onJobRemovedOrExpired = exports.onJobPublished = exports.validateJobPostingSchema = exports.buildJobBreadcrumbsSchema = exports.buildJobPostingSchema = exports.cleanJobDescriptionForSchema = exports.mapEmploymentTypeToSchema = exports.ensureSeoCatalogInitialized = exports.syncAllPublicPagesToCatalog = exports.calculatePageSeoAudit = exports.getOrCreateSeoGlobalSettings = exports.resolveProductionSiteUrl = void 0;
 const prisma_1 = require("../lib/prisma");
 const crypto_1 = __importDefault(require("crypto"));
 // ─── 1. GLOBAL SETTINGS ───────────────────────────────────────────────────────
+const DEFAULT_SITE_URL = 'https://careerwings.in';
+const isLocalHostUrl = (url) => Boolean(url && /(localhost|127\.0\.0\.1|0\.0\.0\.0|192\.168\.|10\.)/i.test(url));
+const resolveProductionSiteUrl = (raw) => {
+    const candidate = (raw || process.env.CLIENT_URL || DEFAULT_SITE_URL).trim().replace(/\/+$/, '');
+    if (!candidate || isLocalHostUrl(candidate)) {
+        return DEFAULT_SITE_URL;
+    }
+    return candidate.replace(/^https?:\/\/www\.careerwings\.in/i, 'https://careerwings.in');
+};
+exports.resolveProductionSiteUrl = resolveProductionSiteUrl;
+const buildDefaultRobotsTxt = (siteUrl) => `User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /dashboard/
+Disallow: /employer/
+Disallow: /candidate/
+Disallow: /checkout
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /api/
+
+Sitemap: ${siteUrl}/sitemap.xml
+Sitemap: ${siteUrl}/sitemap-index.xml`;
+const escapeXml = (str) => String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+let activeSeoSyncPromise = null;
 const getOrCreateSeoGlobalSettings = async () => {
     let settings = await prisma_1.prisma.seoGlobalSetting.findUnique({
         where: { key: 'GLOBAL' },
     });
+    const targetSiteUrl = (0, exports.resolveProductionSiteUrl)(process.env.CLIENT_URL);
     if (!settings) {
         settings = await prisma_1.prisma.seoGlobalSetting.create({
             data: {
@@ -22,17 +53,29 @@ const getOrCreateSeoGlobalSettings = async () => {
                 defaultCanonicalPolicy: 'self',
                 autoSubmitPublishedJobs: true,
                 autoUpdateSitemap: true,
-                siteUrl: process.env.CLIENT_URL || 'https://careerwings.in',
-                robotsTxtContent: `User-agent: *
-Allow: /
-Disallow: /admin/
-Disallow: /dashboard/
-Disallow: /employer/
-Disallow: /api/
-Sitemap: ${process.env.CLIENT_URL || 'https://careerwings.in'}/sitemap.xml
-Sitemap: ${process.env.CLIENT_URL || 'https://careerwings.in'}/sitemap-index.xml`,
+                siteUrl: targetSiteUrl,
+                robotsTxtContent: buildDefaultRobotsTxt(targetSiteUrl),
             },
         });
+    }
+    else {
+        const needsSiteUrlHeal = isLocalHostUrl(settings.siteUrl) || /www\.careerwings\.in/i.test(settings.siteUrl || '');
+        const needsRobotsHeal = !settings.robotsTxtContent || isLocalHostUrl(settings.robotsTxtContent);
+        if (needsSiteUrlHeal || needsRobotsHeal) {
+            const healedSiteUrl = (0, exports.resolveProductionSiteUrl)(settings.siteUrl);
+            const healedRobots = settings.robotsTxtContent
+                ? isLocalHostUrl(settings.robotsTxtContent)
+                    ? settings.robotsTxtContent.replace(/https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/gi, healedSiteUrl)
+                    : settings.robotsTxtContent
+                : buildDefaultRobotsTxt(healedSiteUrl);
+            settings = await prisma_1.prisma.seoGlobalSetting.update({
+                where: { key: 'GLOBAL' },
+                data: {
+                    siteUrl: healedSiteUrl,
+                    robotsTxtContent: healedRobots,
+                },
+            });
+        }
     }
     return settings;
 };
@@ -198,6 +241,15 @@ const syncAllPublicPagesToCatalog = async () => {
             seoDescription: 'Find jobs by city and state across Assam and Northeast India. Browse top vacancies in your preferred location.',
             sitemapPriority: 0.8,
             sitemapChangeFreq: 'weekly',
+        },
+        {
+            url: '/blog',
+            name: 'Career Wings Blog',
+            pageType: 'BLOG_LISTING',
+            seoTitle: 'Career Wings Blog — Career Advice, Resume Tips & Job Insights',
+            seoDescription: 'Expert career advice, resume guides, interview preparation, and recruitment trends across Assam and Northeast India.',
+            sitemapPriority: 0.8,
+            sitemapChangeFreq: 'daily',
         },
         {
             url: '/pricing',
@@ -544,9 +596,124 @@ const syncAllPublicPagesToCatalog = async () => {
             },
         });
     }
+    // Mark expired, closed, rejected, or deleted jobs as non-indexable and remove from sitemap
+    const inactiveJobs = await prisma_1.prisma.job.findMany({
+        where: {
+            OR: [
+                { deletedAt: { not: null } },
+                { status: { notIn: ['PUBLISHED', 'FEATURED'] } },
+            ],
+        },
+        select: { slug: true },
+    });
+    if (inactiveJobs.length > 0) {
+        const inactiveUrls = inactiveJobs.map((j) => `/jobs/${j.slug}`);
+        await prisma_1.prisma.seoPage.updateMany({
+            where: { url: { in: inactiveUrls } },
+            data: {
+                isIndexable: false,
+                inSitemap: false,
+                indexStatus: 'NOT_INDEXED',
+            },
+        });
+    }
+    // 6. Published Blog Posts
+    try {
+        const blogPosts = await prisma_1.prisma.blogPost.findMany({
+            where: { isPublished: true },
+        });
+        for (const post of blogPosts) {
+            const postUrl = `/blog/${post.slug}`;
+            const postTitle = `${post.title} | Career Wings Blog`;
+            const postDesc = (post.excerpt || post.title).slice(0, 160);
+            const ogImg = post.coverImage
+                ? (post.coverImage.startsWith('http') ? post.coverImage : `${siteUrl}${post.coverImage}`)
+                : `${siteUrl}/og-image.jpg`;
+            const blogSchema = {
+                '@context': 'https://schema.org',
+                '@type': 'BlogPosting',
+                headline: post.title,
+                description: postDesc,
+                image: ogImg,
+                datePublished: (post.publishedAt || post.createdAt).toISOString(),
+                dateModified: post.updatedAt.toISOString(),
+                author: {
+                    '@type': 'Person',
+                    name: post.authorName || 'Career Wings Editorial Team',
+                },
+                publisher: {
+                    '@type': 'Organization',
+                    name: 'Career Wings',
+                    logo: { '@type': 'ImageObject', url: `${siteUrl}/images/logo.png` },
+                },
+                mainEntityOfPage: { '@type': 'WebPage', '@id': `${siteUrl}${postUrl}` },
+            };
+            const audit = (0, exports.calculatePageSeoAudit)({
+                url: postUrl,
+                seoTitle: postTitle,
+                seoDescription: postDesc,
+                canonicalUrl: postUrl,
+                isIndexable: true,
+                inSitemap: true,
+                structuredData: JSON.stringify(blogSchema),
+                ogTitle: postTitle,
+                ogDescription: postDesc,
+                ogImage: ogImg,
+            });
+            await prisma_1.prisma.seoPage.upsert({
+                where: { url: postUrl },
+                update: {
+                    name: post.title,
+                    pageType: 'BLOG_POST',
+                    entityId: post.id,
+                    isIndexable: true,
+                    inSitemap: true,
+                    seoScore: audit.score,
+                    seoAuditResults: JSON.stringify(audit),
+                    structuredData: JSON.stringify(blogSchema),
+                    ogImage: ogImg,
+                },
+                create: {
+                    url: postUrl,
+                    name: post.title,
+                    pageType: 'BLOG_POST',
+                    entityId: post.id,
+                    seoTitle: postTitle,
+                    seoDescription: postDesc,
+                    canonicalUrl: postUrl,
+                    ogTitle: postTitle,
+                    ogDescription: postDesc,
+                    ogImage: ogImg,
+                    isIndexable: true,
+                    isFollowable: true,
+                    inSitemap: true,
+                    sitemapPriority: 0.7,
+                    sitemapChangeFreq: 'weekly',
+                    structuredData: JSON.stringify(blogSchema),
+                    seoScore: audit.score,
+                    seoAuditResults: JSON.stringify(audit),
+                },
+            });
+        }
+    }
+    catch (blogSyncErr) {
+        console.warn('SEO blog catalog sync notice:', blogSyncErr);
+    }
     return { success: true, message: 'SEO Page catalog synced successfully' };
 };
 exports.syncAllPublicPagesToCatalog = syncAllPublicPagesToCatalog;
+const ensureSeoCatalogInitialized = async () => {
+    const count = await prisma_1.prisma.seoPage.count().catch(() => 0);
+    if (count > 0)
+        return;
+    if (!activeSeoSyncPromise) {
+        activeSeoSyncPromise = (0, exports.syncAllPublicPagesToCatalog)().finally(() => {
+            activeSeoSyncPromise = null;
+        });
+    }
+    await activeSeoSyncPromise;
+};
+exports.ensureSeoCatalogInitialized = ensureSeoCatalogInitialized;
 // ─── 3B. SCHEMA.ORG JOBPOSTING ENGINE & VALIDATOR ───────────────────────────
 const mapEmploymentTypeToSchema = (type) => {
     if (!type)
@@ -838,6 +1005,138 @@ const onJobPublished = async (jobId) => {
     }
 };
 exports.onJobPublished = onJobPublished;
+const onJobRemovedOrExpired = async (jobId) => {
+    try {
+        const settings = await (0, exports.getOrCreateSeoGlobalSettings)();
+        const job = await prisma_1.prisma.job.findUnique({
+            where: { id: jobId },
+            select: { slug: true },
+        });
+        if (!job)
+            return;
+        const jobUrl = `/jobs/${job.slug}`;
+        await prisma_1.prisma.seoPage.updateMany({
+            where: { url: jobUrl },
+            data: {
+                isIndexable: false,
+                inSitemap: false,
+                indexStatus: 'NOT_INDEXED',
+            },
+        });
+        if (settings.autoSubmitPublishedJobs && settings.gscConnected) {
+            await (0, exports.enqueueUrlsForIndexing)([jobUrl], 'SYSTEM_AUTO_REMOVE', 'REMOVE');
+        }
+    }
+    catch (err) {
+        console.error('Error in onJobRemovedOrExpired SEO hook:', err);
+    }
+};
+exports.onJobRemovedOrExpired = onJobRemovedOrExpired;
+const onBlogPublished = async (postId) => {
+    try {
+        const settings = await (0, exports.getOrCreateSeoGlobalSettings)();
+        const siteUrl = settings.siteUrl.replace(/\/$/, '');
+        const post = await prisma_1.prisma.blogPost.findUnique({ where: { id: postId } });
+        if (!post)
+            return;
+        const postUrl = `/blog/${post.slug}`;
+        const isAvailable = Boolean(post.isPublished);
+        const postTitle = `${post.title} | Career Wings Blog`;
+        const postDesc = (post.excerpt || post.title).slice(0, 160);
+        const ogImg = post.coverImage
+            ? (post.coverImage.startsWith('http') ? post.coverImage : `${siteUrl}${post.coverImage}`)
+            : `${siteUrl}/og-image.jpg`;
+        const blogSchema = {
+            '@context': 'https://schema.org',
+            '@type': 'BlogPosting',
+            headline: post.title,
+            description: postDesc,
+            image: ogImg,
+            datePublished: (post.publishedAt || post.createdAt).toISOString(),
+            dateModified: post.updatedAt.toISOString(),
+            author: { '@type': 'Person', name: post.authorName || 'Career Wings Editorial Team' },
+            publisher: {
+                '@type': 'Organization',
+                name: 'Career Wings',
+                logo: { '@type': 'ImageObject', url: `${siteUrl}/images/logo.png` },
+            },
+            mainEntityOfPage: { '@type': 'WebPage', '@id': `${siteUrl}${postUrl}` },
+        };
+        const audit = (0, exports.calculatePageSeoAudit)({
+            url: postUrl,
+            seoTitle: postTitle,
+            seoDescription: postDesc,
+            canonicalUrl: postUrl,
+            isIndexable: isAvailable,
+            inSitemap: isAvailable,
+            structuredData: JSON.stringify(blogSchema),
+            ogTitle: postTitle,
+            ogDescription: postDesc,
+            ogImage: ogImg,
+        });
+        await prisma_1.prisma.seoPage.upsert({
+            where: { url: postUrl },
+            update: {
+                name: post.title,
+                pageType: 'BLOG_POST',
+                entityId: post.id,
+                isIndexable: isAvailable,
+                inSitemap: isAvailable,
+                seoScore: audit.score,
+                seoAuditResults: JSON.stringify(audit),
+                structuredData: JSON.stringify(blogSchema),
+                ogImage: ogImg,
+            },
+            create: {
+                url: postUrl,
+                name: post.title,
+                pageType: 'BLOG_POST',
+                entityId: post.id,
+                seoTitle: postTitle,
+                seoDescription: postDesc,
+                canonicalUrl: postUrl,
+                ogTitle: postTitle,
+                ogDescription: postDesc,
+                ogImage: ogImg,
+                isIndexable: isAvailable,
+                isFollowable: isAvailable,
+                inSitemap: isAvailable,
+                sitemapPriority: 0.7,
+                sitemapChangeFreq: 'weekly',
+                structuredData: JSON.stringify(blogSchema),
+                seoScore: audit.score,
+                seoAuditResults: JSON.stringify(audit),
+            },
+        });
+        if (isAvailable && settings.autoSubmitPublishedJobs) {
+            await (0, exports.enqueueUrlsForIndexing)([postUrl], 'SYSTEM_AUTO_PUBLISH');
+        }
+        else if (!isAvailable && settings.autoSubmitPublishedJobs && settings.gscConnected) {
+            await (0, exports.enqueueUrlsForIndexing)([postUrl], 'SYSTEM_AUTO_REMOVE', 'REMOVE');
+        }
+    }
+    catch (err) {
+        console.error('Error in onBlogPublished SEO hook:', err);
+    }
+};
+exports.onBlogPublished = onBlogPublished;
+const onBlogDeleted = async (slug) => {
+    try {
+        const settings = await (0, exports.getOrCreateSeoGlobalSettings)();
+        const postUrl = `/blog/${slug}`;
+        await prisma_1.prisma.seoPage.updateMany({
+            where: { url: postUrl },
+            data: { isIndexable: false, inSitemap: false, indexStatus: 'NOT_INDEXED' },
+        });
+        if (settings.autoSubmitPublishedJobs && settings.gscConnected) {
+            await (0, exports.enqueueUrlsForIndexing)([postUrl], 'SYSTEM_AUTO_REMOVE', 'REMOVE');
+        }
+    }
+    catch (err) {
+        console.error('Error in onBlogDeleted SEO hook:', err);
+    }
+};
+exports.onBlogDeleted = onBlogDeleted;
 const regenerateJobSchemaAndAudit = async (jobId) => {
     const settings = await (0, exports.getOrCreateSeoGlobalSettings)();
     const siteUrl = settings.siteUrl.replace(/\/$/, '');
@@ -951,6 +1250,7 @@ const getAllJobSchemasValidation = async (params) => {
 exports.getAllJobSchemasValidation = getAllJobSchemasValidation;
 // ─── 4. DYNAMIC XML SITEMAP GENERATION ────────────────────────────────────────
 const generateSitemapIndexXml = async () => {
+    await (0, exports.ensureSeoCatalogInitialized)();
     const settings = await (0, exports.getOrCreateSeoGlobalSettings)();
     const siteUrl = settings.siteUrl.replace(/\/$/, '');
     const now = new Date().toISOString();
@@ -966,7 +1266,7 @@ const generateSitemapIndexXml = async () => {
     xml += `<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
     for (const s of sections) {
         xml += `  <sitemap>\n`;
-        xml += `    <loc>${s.loc}</loc>\n`;
+        xml += `    <loc>${escapeXml(s.loc)}</loc>\n`;
         xml += `    <lastmod>${s.lastmod}</lastmod>\n`;
         xml += `  </sitemap>\n`;
     }
@@ -975,12 +1275,13 @@ const generateSitemapIndexXml = async () => {
 };
 exports.generateSitemapIndexXml = generateSitemapIndexXml;
 const generateSectionSitemapXml = async (section) => {
+    await (0, exports.ensureSeoCatalogInitialized)();
     const settings = await (0, exports.getOrCreateSeoGlobalSettings)();
     const siteUrl = settings.siteUrl.replace(/\/$/, '');
     let pageTypeFilter = [];
     switch (section.toLowerCase()) {
         case 'pages':
-            pageTypeFilter = ['HOMEPAGE', 'JOB_LISTING', 'COMPANY_LISTING', 'CATEGORY_LISTING', 'LOCATION_LISTING', 'STATIC_PAGE'];
+            pageTypeFilter = ['HOMEPAGE', 'JOB_LISTING', 'COMPANY_LISTING', 'CATEGORY_LISTING', 'LOCATION_LISTING', 'BLOG_LISTING', 'STATIC_PAGE'];
             break;
         case 'jobs':
             pageTypeFilter = ['JOB_DETAIL'];
@@ -995,6 +1296,8 @@ const generateSectionSitemapXml = async (section) => {
             pageTypeFilter = ['LOCATION_DETAIL'];
             break;
         case 'blog':
+            pageTypeFilter = ['BLOG_POST', 'BLOG_LISTING', 'SEO_LANDING'];
+            break;
         case 'landings':
             pageTypeFilter = ['SEO_LANDING'];
             break;
@@ -1017,7 +1320,7 @@ const generateSectionSitemapXml = async (section) => {
         const priority = page.sitemapPriority?.toFixed(1) || '0.7';
         const changefreq = page.sitemapChangeFreq || 'weekly';
         xml += `  <url>\n`;
-        xml += `    <loc>${loc}</loc>\n`;
+        xml += `    <loc>${escapeXml(loc)}</loc>\n`;
         xml += `    <lastmod>${lastmod}</lastmod>\n`;
         xml += `    <changefreq>${changefreq}</changefreq>\n`;
         xml += `    <priority>${priority}</priority>\n`;
@@ -1028,7 +1331,8 @@ const generateSectionSitemapXml = async (section) => {
 };
 exports.generateSectionSitemapXml = generateSectionSitemapXml;
 const generateMasterSitemapXml = async () => {
-    // If count is greater than 1000, serve as sitemapindex. Otherwise direct urlset
+    await (0, exports.ensureSeoCatalogInitialized)();
+    // If count is greater than 500, serve as sitemapindex. Otherwise direct urlset
     const count = await prisma_1.prisma.seoPage.count({
         where: { isIndexable: true, inSitemap: true },
     });
@@ -1049,7 +1353,7 @@ const generateMasterSitemapXml = async () => {
         const priority = page.sitemapPriority?.toFixed(1) || '0.7';
         const changefreq = page.sitemapChangeFreq || 'weekly';
         xml += `  <url>\n`;
-        xml += `    <loc>${loc}</loc>\n`;
+        xml += `    <loc>${escapeXml(loc)}</loc>\n`;
         xml += `    <lastmod>${lastmod}</lastmod>\n`;
         xml += `    <changefreq>${changefreq}</changefreq>\n`;
         xml += `    <priority>${priority}</priority>\n`;
@@ -1095,7 +1399,7 @@ const validateRobotsTxtContent = (content) => {
 };
 exports.validateRobotsTxtContent = validateRobotsTxtContent;
 // ─── 6. INDEXING QUEUE PROCESSOR ──────────────────────────────────────────────
-const enqueueUrlsForIndexing = async (urls, requestedBy = 'ADMIN') => {
+const enqueueUrlsForIndexing = async (urls, requestedBy = 'ADMIN', action = 'INDEX') => {
     const settings = await (0, exports.getOrCreateSeoGlobalSettings)();
     const siteUrl = settings.siteUrl.replace(/\/$/, '');
     const queuedItems = [];
@@ -1104,10 +1408,11 @@ const enqueueUrlsForIndexing = async (urls, requestedBy = 'ADMIN') => {
         const relativeUrl = rawUrl.startsWith('http') ? new URL(rawUrl).pathname : (rawUrl.startsWith('/') ? rawUrl : `/${rawUrl}`);
         // Find corresponding page if any
         const page = await prisma_1.prisma.seoPage.findUnique({ where: { url: relativeUrl } });
-        // Deduplicate: avoid creating queue item if pending or already processing within last 1 hour
+        // Deduplicate: avoid creating queue item if pending or already processing
         const existing = await prisma_1.prisma.indexingQueue.findFirst({
             where: {
                 url: formattedUrl,
+                action,
                 status: { in: ['PENDING', 'PROCESSING'] },
             },
         });
@@ -1117,7 +1422,7 @@ const enqueueUrlsForIndexing = async (urls, requestedBy = 'ADMIN') => {
                     url: formattedUrl,
                     pageId: page?.id,
                     status: 'PENDING',
-                    action: 'INDEX',
+                    action,
                     requestedBy,
                 },
             });
@@ -1127,6 +1432,28 @@ const enqueueUrlsForIndexing = async (urls, requestedBy = 'ADMIN') => {
     return queuedItems;
 };
 exports.enqueueUrlsForIndexing = enqueueUrlsForIndexing;
+const submitUrlsToIndexNow = async (urls, settings) => {
+    if (!settings?.bingApiKey || urls.length === 0)
+        return;
+    try {
+        const siteUrl = (settings.siteUrl || DEFAULT_SITE_URL).replace(/\/$/, '');
+        const host = new URL(siteUrl).host;
+        await fetch('https://api.indexnow.org/indexnow', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                host,
+                key: settings.bingApiKey,
+                keyLocation: `${siteUrl}/${settings.bingApiKey}.txt`,
+                urlList: urls,
+            }),
+        });
+    }
+    catch (err) {
+        console.warn('IndexNow submission notice:', err);
+    }
+};
+exports.submitUrlsToIndexNow = submitUrlsToIndexNow;
 const processIndexingQueueBatch = async (limit = 10) => {
     const settings = await (0, exports.getOrCreateSeoGlobalSettings)();
     const items = await prisma_1.prisma.indexingQueue.findMany({
@@ -1141,6 +1468,7 @@ const processIndexingQueueBatch = async (limit = 10) => {
         return { processed: 0, message: 'Queue is currently empty' };
     }
     let processedCount = 0;
+    const submittedUrlsForIndexNow = [];
     for (const item of items) {
         await prisma_1.prisma.indexingQueue.update({
             where: { id: item.id },
@@ -1150,12 +1478,15 @@ const processIndexingQueueBatch = async (limit = 10) => {
             },
         });
         try {
+            const normalizedItemUrl = item.url.replace(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i, (0, exports.resolveProductionSiteUrl)(settings.siteUrl));
+            const relativeUrl = new URL(normalizedItemUrl).pathname;
             // Check if Google Search Console credentials exist
             if (!settings.gscConnected && !settings.gscClientEmail && !settings.gscRefreshToken) {
                 // Record honest submission attempt: Not configured
                 await prisma_1.prisma.indexingQueue.update({
                     where: { id: item.id },
                     data: {
+                        url: normalizedItemUrl,
                         status: 'SUBMITTED',
                         lastResponse: JSON.stringify({
                             status: 'LOCAL_SUBMITTED',
@@ -1164,36 +1495,39 @@ const processIndexingQueueBatch = async (limit = 10) => {
                         }),
                     },
                 });
-                // Update page lastSubmittedAt
-                const relativeUrl = new URL(item.url).pathname;
                 await prisma_1.prisma.seoPage.updateMany({
                     where: { url: relativeUrl },
                     data: {
-                        indexStatus: 'SUBMITTED',
+                        indexStatus: item.action === 'REMOVE' ? 'NOT_INDEXED' : 'SUBMITTED',
                         lastSubmittedAt: new Date(),
                     },
                 });
+                submittedUrlsForIndexNow.push(normalizedItemUrl);
                 processedCount++;
                 continue;
             }
             // If Google credentials are provided, call Google Indexing API
-            const result = await (0, exports.submitUrlToGoogleIndexingApi)(item.url, settings);
+            const notificationType = item.action === 'REMOVE' ? 'URL_DELETED' : 'URL_UPDATED';
+            const result = await (0, exports.submitUrlToGoogleIndexingApi)(normalizedItemUrl, settings, notificationType);
             await prisma_1.prisma.indexingQueue.update({
                 where: { id: item.id },
                 data: {
+                    url: normalizedItemUrl,
                     status: result.success ? 'COMPLETED' : 'FAILED',
                     lastResponse: JSON.stringify(result.data || result.error),
                     errorMessage: result.error ? String(result.error) : null,
                 },
             });
-            const relativeUrl = new URL(item.url).pathname;
             await prisma_1.prisma.seoPage.updateMany({
                 where: { url: relativeUrl },
                 data: {
-                    indexStatus: result.success ? 'SUBMITTED' : 'FAILED',
+                    indexStatus: result.success ? (item.action === 'REMOVE' ? 'NOT_INDEXED' : 'SUBMITTED') : 'FAILED',
                     lastSubmittedAt: new Date(),
                 },
             });
+            if (result.success) {
+                submittedUrlsForIndexNow.push(normalizedItemUrl);
+            }
             processedCount++;
         }
         catch (err) {
@@ -1206,11 +1540,14 @@ const processIndexingQueueBatch = async (limit = 10) => {
             });
         }
     }
+    if (submittedUrlsForIndexNow.length > 0 && settings.bingApiKey) {
+        await (0, exports.submitUrlsToIndexNow)(submittedUrlsForIndexNow, settings);
+    }
     return { processed: processedCount, totalFound: items.length };
 };
 exports.processIndexingQueueBatch = processIndexingQueueBatch;
 // ─── 7. GOOGLE SEARCH CONSOLE & GOOGLE INDEXING API CLIENT ────────────────────
-const submitUrlToGoogleIndexingApi = async (targetUrl, settings) => {
+const submitUrlToGoogleIndexingApi = async (targetUrl, settings, type = 'URL_UPDATED') => {
     if (!settings.gscClientEmail || !settings.gscPrivateKey) {
         return {
             success: false,
@@ -1231,7 +1568,7 @@ const submitUrlToGoogleIndexingApi = async (targetUrl, settings) => {
             },
             body: JSON.stringify({
                 url: targetUrl,
-                type: 'URL_UPDATED',
+                type,
             }),
         });
         const data = await response.json();

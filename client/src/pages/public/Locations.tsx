@@ -30,6 +30,7 @@ export default function Locations() {
       <SEOMeta
         title="Jobs by City & Location in Assam & Northeast | Career Wings"
         description="Search job vacancies by location: Guwahati, Dibrugarh, Silchar, Jorhat, Shillong, Dimapur, Kolkata and more on Career Wings."
+        canonical="/locations"
       />
       <Header />
 

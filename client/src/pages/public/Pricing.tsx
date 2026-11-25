@@ -73,6 +73,7 @@ export default function Pricing() {
       <SEOMeta
         title="Subscription Plans & Packages | Career Wings"
         description="Affordable recruitment packages for employers and career boosters for job seekers. Transparent pricing in INR for Northeast India."
+        canonical="/pricing"
       />
       <Header />
 

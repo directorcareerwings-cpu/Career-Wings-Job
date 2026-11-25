@@ -1,5 +1,6 @@
 import React from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
+import { Helmet } from 'react-helmet-async'
 import { useAuth } from '@/hooks/useAuth'
 import { LoadingSpinner } from '@/components/ui/Spinner'
 import type { UserRole } from '@/types'
@@ -21,10 +22,21 @@ export default function ProtectedRoute({ children, role }: ProtectedRouteProps) 
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
+  const noIndexHelmet = (
+    <Helmet>
+      <meta name="robots" content="noindex,nofollow" />
+    </Helmet>
+  )
+
   if (role && user?.role?.toLowerCase() !== role.toLowerCase()) {
     // Admin has superuser privileges to preview/access candidate and employer pages
     if (user?.role?.toUpperCase() === 'ADMIN') {
-      return <>{children}</>
+      return (
+        <>
+          {noIndexHelmet}
+          {children}
+        </>
+      )
     }
 
     // Redirect to appropriate dashboard
@@ -34,5 +46,10 @@ export default function ProtectedRoute({ children, role }: ProtectedRouteProps) 
     return <Navigate to="/dashboard" replace />
   }
 
-  return <>{children}</>
+  return (
+    <>
+      {noIndexHelmet}
+      {children}
+    </>
+  )
 }

@@ -8,6 +8,7 @@ const slugify_1 = __importDefault(require("slugify"));
 const prisma_1 = require("../lib/prisma");
 const response_1 = require("../lib/response");
 const errors_1 = require("../lib/errors");
+const seo_service_1 = require("../services/seo.service");
 /**
  * Ensure BlogPost table exists in SQLite database (zero-dependency fail-safe)
  */
@@ -493,6 +494,7 @@ const adminCreateBlogPost = async (req, res, next) => {
                 publishedAt: isPublished !== false ? new Date() : null,
             },
         });
+        (0, seo_service_1.onBlogPublished)(newPost.id).catch(() => { });
         return (0, response_1.sendSuccess)(res, { post: newPost }, 'Article created successfully', 201);
     }
     catch (err) {
@@ -550,6 +552,10 @@ const adminUpdateBlogPost = async (req, res, next) => {
             where: { id },
             data,
         });
+        if (data.slug && data.slug !== existing.slug) {
+            (0, seo_service_1.onBlogDeleted)(existing.slug).catch(() => { });
+        }
+        (0, seo_service_1.onBlogPublished)(updated.id).catch(() => { });
         return (0, response_1.sendSuccess)(res, { post: updated }, 'Article updated successfully');
     }
     catch (err) {
@@ -568,6 +574,7 @@ const adminDeleteBlogPost = async (req, res, next) => {
         if (!existing)
             throw new errors_1.AppError('Blog post not found', 404);
         await prisma_1.prisma.blogPost.delete({ where: { id } });
+        (0, seo_service_1.onBlogDeleted)(existing.slug).catch(() => { });
         return (0, response_1.sendSuccess)(res, { id }, 'Article deleted successfully');
     }
     catch (err) {

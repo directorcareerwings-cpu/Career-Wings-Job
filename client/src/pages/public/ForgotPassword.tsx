@@ -119,7 +119,7 @@ export default function ForgotPassword() {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
-      <SEOMeta title="Reset Password | Career Wings" />
+      <SEOMeta title="Reset Password | Career Wings" noindex />
       <Header />
 
       <main className="flex-1 flex items-center justify-center py-12 px-4 sm:px-6">

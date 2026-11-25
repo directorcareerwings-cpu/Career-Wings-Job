@@ -30,12 +30,29 @@ export default function CategoryJobs() {
   }, [slug])
 
   const jobs = category?.jobs || []
+  const canonicalPath =
+    typeof window !== 'undefined' && window.location.pathname.startsWith('/jobs/category/')
+      ? `/jobs/category/${slug}`
+      : `/categories/${slug}`
+  const categorySchema = category
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://careerwings.in/' },
+          { '@type': 'ListItem', position: 2, name: 'Categories', item: 'https://careerwings.in/categories' },
+          { '@type': 'ListItem', position: 3, name: category.name, item: `https://careerwings.in${canonicalPath}` },
+        ],
+      }
+    : undefined
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
       <SEOMeta
         title={`${category?.name || 'Category'} Jobs in Guwahati & Northeast | Career Wings`}
-        description={`Find verified ${category?.name} jobs in Guwahati, Assam & Pan-India on Career Wings.`}
+        description={`Find verified ${category?.name || ''} jobs in Guwahati, Assam & Pan-India on Career Wings.`}
+        canonical={slug ? canonicalPath : '/categories'}
+        schema={categorySchema}
       />
       <Header />
 

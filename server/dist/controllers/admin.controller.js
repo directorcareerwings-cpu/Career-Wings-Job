@@ -374,6 +374,8 @@ const rejectJob = async (req, res, next) => {
         if (job.employer?.user?.email) {
             (0, email_service_1.sendJobRejectedEmail)(job.employer.user.email, `${job.employer.firstName} ${job.employer.lastName}`, job.title, job.company?.name || 'Your Company', reason, job.employer.userId).catch(console.error);
         }
+        // Mark job non-indexable and remove from XML sitemap
+        (0, seo_service_1.onJobRemovedOrExpired)(job.id).catch(() => { });
         (0, response_1.sendSuccess)(res, null, 'Job rejected');
     }
     catch (error) {
@@ -390,6 +392,7 @@ const toggleFeatureJob = async (req, res, next) => {
             where: { id: req.params.id },
             data: { isFeatured: !job.isFeatured, status: !job.isFeatured ? 'FEATURED' : 'PUBLISHED' },
         });
+        (0, seo_service_1.onJobPublished)(job.id).catch(() => { });
         (0, response_1.sendSuccess)(res, null, `Job ${job.isFeatured ? 'unfeatured' : 'featured'}`);
     }
     catch (error) {

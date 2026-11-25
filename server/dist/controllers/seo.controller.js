@@ -1,9 +1,44 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.validateRawSchema = exports.regenerateJobSchema = exports.getJobSchemasList = exports.updateGlobalSeoSettings = exports.getGlobalSeoSettings = exports.inspectGscUrl = exports.updateGscConfig = exports.getGscConfig = exports.retryFailedQueueItem = exports.processQueueNow = exports.enqueueIndexing = exports.getIndexingQueue = exports.updateRobotsTxt = exports.getRobotsTxt = exports.getMasterSitemapXml = exports.getSectionSitemapXml = exports.getSitemapIndexXml = exports.syncAllPages = exports.bulkUpdateSeoPages = exports.updateSeoPage = exports.getSeoPageById = exports.getSeoPages = exports.getSeoDashboardStats = void 0;
+exports.validateRawSchema = exports.regenerateJobSchema = exports.getJobSchemasList = exports.updateGlobalSeoSettings = exports.getGlobalSeoSettings = exports.inspectGscUrl = exports.updateGscConfig = exports.getGscConfig = exports.retryFailedQueueItem = exports.processQueueNow = exports.enqueueIndexing = exports.getIndexingQueue = exports.updateRobotsTxt = exports.getRobotsTxt = exports.renderCrawlerSeoHtml = exports.getMasterSitemapXml = exports.getSectionSitemapXml = exports.getSitemapIndexXml = exports.syncAllPages = exports.bulkUpdateSeoPages = exports.updateSeoPage = exports.getSeoPageById = exports.getSeoPages = exports.getSeoDashboardStats = void 0;
 const prisma_1 = require("../lib/prisma");
 const response_1 = require("../lib/response");
 const errors_1 = require("../lib/errors");
+const memoryCache_1 = require("../lib/memoryCache");
+const seoRenderer_service_1 = require("../services/seoRenderer.service");
 const seo_service_1 = require("../services/seo.service");
 // ─── 1. SEO DASHBOARD STATS ───────────────────────────────────────────────────
 const getSeoDashboardStats = async (req, res, next) => {
@@ -307,6 +342,19 @@ const getMasterSitemapXml = async (req, res, next) => {
     }
 };
 exports.getMasterSitemapXml = getMasterSitemapXml;
+const renderCrawlerSeoHtml = async (req, res, next) => {
+    try {
+        const { getClientIndexHtmlTemplate } = await Promise.resolve().then(() => __importStar(require('../services/seoRenderer.service')));
+        const targetPath = String(req.query.path || req.headers['x-original-url'] || '/');
+        const template = getClientIndexHtmlTemplate();
+        const { statusCode, html } = await (0, seoRenderer_service_1.renderSeoHtmlForPath)(targetPath, template);
+        res.status(statusCode).header('Content-Type', 'text/html; charset=utf-8').send(html);
+    }
+    catch (error) {
+        next(error);
+    }
+};
+exports.renderCrawlerSeoHtml = renderCrawlerSeoHtml;
 // ─── 4. ROBOTS.TXT CONTROLLER ─────────────────────────────────────────────────
 const getRobotsTxt = async (req, res, next) => {
     try {
@@ -430,7 +478,10 @@ exports.retryFailedQueueItem = retryFailedQueueItem;
 // ─── 6. GOOGLE SEARCH CONSOLE INTEGRATION ────────────────────────────────────
 const getGscConfig = async (req, res, next) => {
     try {
-        const settings = await (0, seo_service_1.getOrCreateSeoGlobalSettings)();
+        const [settings, verificationSetting] = await Promise.all([
+            (0, seo_service_1.getOrCreateSeoGlobalSettings)(),
+            prisma_1.prisma.adminSetting.findUnique({ where: { key: 'GOOGLE_SITE_VERIFICATION' } }).catch(() => null),
+        ]);
         (0, response_1.sendSuccess)(res, {
             isConnected: settings.gscConnected,
             property: settings.gscProperty || '',
@@ -439,6 +490,7 @@ const getGscConfig = async (req, res, next) => {
             hasPrivateKey: Boolean(settings.gscPrivateKey),
             hasRefreshToken: Boolean(settings.gscRefreshToken),
             siteUrl: settings.siteUrl,
+            googleSiteVerification: verificationSetting?.value || '',
         });
     }
     catch (error) {
@@ -448,7 +500,7 @@ const getGscConfig = async (req, res, next) => {
 exports.getGscConfig = getGscConfig;
 const updateGscConfig = async (req, res, next) => {
     try {
-        const { isConnected, property, authType, clientEmail, privateKey, refreshToken, serviceAccountJson, } = req.body;
+        const { isConnected, property, authType, clientEmail, privateKey, refreshToken, serviceAccountJson, googleSiteVerification, } = req.body;
         let parsedEmail = clientEmail;
         let parsedKey = privateKey;
         // Handle direct Service Account JSON upload / paste
@@ -480,11 +532,35 @@ const updateGscConfig = async (req, res, next) => {
             where: { key: 'GLOBAL' },
             data,
         });
+        if (googleSiteVerification !== undefined) {
+            const cleanToken = String(googleSiteVerification || '')
+                .trim()
+                .replace(/^<meta[^>]*content=["']([^"']+)["'][^>]*>$/i, '$1');
+            await prisma_1.prisma.adminSetting.upsert({
+                where: { key: 'GOOGLE_SITE_VERIFICATION' },
+                create: {
+                    key: 'GOOGLE_SITE_VERIFICATION',
+                    value: cleanToken,
+                    group: 'SEO',
+                    label: 'Google Search Console Verification Meta Token',
+                    type: 'TEXT',
+                },
+                update: {
+                    value: cleanToken,
+                    group: 'SEO',
+                },
+            });
+            (0, memoryCache_1.invalidateCache)('public_settings');
+        }
+        const verificationSetting = await prisma_1.prisma.adminSetting
+            .findUnique({ where: { key: 'GOOGLE_SITE_VERIFICATION' } })
+            .catch(() => null);
         (0, response_1.sendSuccess)(res, {
             isConnected: updated.gscConnected,
             property: updated.gscProperty,
             clientEmail: updated.gscClientEmail,
             hasPrivateKey: Boolean(updated.gscPrivateKey),
+            googleSiteVerification: verificationSetting?.value || '',
         }, 'Google Search Console configuration saved successfully');
     }
     catch (error) {

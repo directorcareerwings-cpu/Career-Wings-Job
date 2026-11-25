@@ -30,12 +30,31 @@ export default function LocationJobs() {
   }, [slug])
 
   const jobs = location?.jobs || []
+  const canonicalPath =
+    typeof window !== 'undefined' && window.location.pathname.startsWith('/jobs-in-')
+      ? window.location.pathname
+      : slug
+      ? `/locations/${slug}`
+      : '/locations'
+  const locationSchema = location
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://careerwings.in/' },
+          { '@type': 'ListItem', position: 2, name: 'Locations', item: 'https://careerwings.in/locations' },
+          { '@type': 'ListItem', position: 3, name: `${location.city}, ${location.state}`, item: `https://careerwings.in${canonicalPath}` },
+        ],
+      }
+    : undefined
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
       <SEOMeta
-        title={`Jobs in ${location?.city || 'City'}, ${location?.state || 'Assam'} | Career Wings`}
-        description={`Explore verified job vacancies in ${location?.city}, ${location?.state}. Direct recruitment, zero placement fees on Career Wings.`}
+        title={`Jobs in ${location?.city || 'Assam'}, ${location?.state || 'Northeast India'} | Career Wings`}
+        description={`Explore verified job vacancies in ${location?.city || 'Guwahati'}, ${location?.state || 'Assam'}. Direct recruitment, zero placement fees on Career Wings.`}
+        canonical={canonicalPath}
+        schema={locationSchema}
       />
       <Header />
 
