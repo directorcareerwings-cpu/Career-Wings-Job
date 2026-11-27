@@ -161,8 +161,13 @@ const generalLimiter = (0, express_rate_limit_1.default)({
     skip: (req) => isDev || req.ip === '127.0.0.1' || req.ip === '::1' || req.hostname === 'localhost',
 });
 app.use('/api', generalLimiter);
-// 2.1 Smart Caching: Allow short-term cache on public catalogs, no-store on dynamic/auth routes
+// 2.1 Smart Caching & Crawl Directives: Prevent indexing raw JSON APIs while letting crawlers render SPA data
 app.use('/api', (req, res, next) => {
+    if (!req.path.startsWith('/robots.txt') &&
+        !req.path.startsWith('/sitemap') &&
+        !req.path.startsWith('/seo/render')) {
+        res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    }
     const isPublicCatalog = req.method === 'GET' && (req.path.startsWith('/categories') ||
         req.path.startsWith('/locations') ||
         req.path.startsWith('/cool-places') ||

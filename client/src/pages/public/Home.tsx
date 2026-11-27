@@ -352,6 +352,7 @@ function HeroSection() {
 // ─── Featured Jobs Component ────────────────────────────────────────────────
 
 function FeaturedJobs() {
+  const { isAuthenticated, isEmployer, isAdmin } = useAuth()
   const [activeTab, setActiveTab] = useState<'all' | 'it' | 'healthcare' | 'finance' | 'urgent'>('all')
 
   const { data, isLoading } = useQuery({
@@ -441,7 +442,16 @@ function FeaturedJobs() {
                   Browse All Jobs
                 </Button>
               </Link>
-              <Link to="/employer/jobs/post">
+              <Link
+                to={
+                  isAuthenticated
+                    ? isEmployer || isAdmin
+                      ? '/employer/jobs/post'
+                      : '/login?redirect=/employer/jobs/post'
+                    : '/register?role=EMPLOYER&redirect=/employer/jobs/post'
+                }
+                rel={isAuthenticated && (isEmployer || isAdmin) ? undefined : 'nofollow'}
+              >
                 <Button variant="primary" size="sm" className="rounded-xl text-xs font-semibold bg-orange-500 hover:bg-orange-600 text-white shadow-xs">
                   Post a Job
                 </Button>
@@ -999,10 +1009,11 @@ function EmployerCTA() {
                 to={
                   isAuthenticated
                     ? isEmployer || isAdmin
-                    ? '/employer/jobs/post'
-                    : '/login?redirect=/employer/jobs/post'
+                      ? '/employer/jobs/post'
+                      : '/login?redirect=/employer/jobs/post'
                     : '/register?role=EMPLOYER&redirect=/employer/jobs/post'
                 }
+                rel={isAuthenticated && (isEmployer || isAdmin) ? undefined : 'nofollow'}
               >
                 <Button variant="primary" size="lg" className="rounded-2xl px-6 font-bold shadow-lg shadow-orange-500/25 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white border-0">
                   Post a Job Free

@@ -62,7 +62,7 @@ export default function Login() {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
-      <SEOMeta title="Login to Career Wings | Guwahati & Northeast Job Portal" description="Log in to your Career Wings account as a job seeker or recruiter to apply for jobs or hire talent." />
+      <SEOMeta title="Login to Career Wings | Guwahati & Northeast Job Portal" description="Log in to your Career Wings account as a job seeker or recruiter to apply for jobs or hire talent." canonical="/login" />
       <Header />
 
       <main className="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">

@@ -134,8 +134,16 @@ const generalLimiter = rateLimit({
 });
 app.use('/api', generalLimiter);
 
-// 2.1 Smart Caching: Allow short-term cache on public catalogs, no-store on dynamic/auth routes
+// 2.1 Smart Caching & Crawl Directives: Prevent indexing raw JSON APIs while letting crawlers render SPA data
 app.use('/api', (req, res, next) => {
+  if (
+    !req.path.startsWith('/robots.txt') &&
+    !req.path.startsWith('/sitemap') &&
+    !req.path.startsWith('/seo/render')
+  ) {
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+  }
+
   const isPublicCatalog = req.method === 'GET' && (
     req.path.startsWith('/categories') ||
     req.path.startsWith('/locations') ||

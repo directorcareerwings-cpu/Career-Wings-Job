@@ -39,6 +39,24 @@ export const resolveProductionSiteUrl = (raw?: string | null): string => {
 
 const buildDefaultRobotsTxt = (siteUrl: string): string => `User-agent: *
 Allow: /
+Allow: /api/jobs
+Allow: /api/companies
+Allow: /api/categories
+Allow: /api/locations
+Allow: /api/blog
+Allow: /api/settings
+Allow: /api/stats
+Allow: /api/packages
+Allow: /api/cool-places
+Allow: /api/education-master
+Disallow: /api/admin/
+Disallow: /api/auth/
+Disallow: /api/candidate/
+Disallow: /api/employer/
+Disallow: /api/payments/
+Disallow: /api/chat/
+Disallow: /api/setup-db
+Disallow: /api/init-db
 Disallow: /admin/
 Disallow: /dashboard/
 Disallow: /employer/
@@ -46,7 +64,6 @@ Disallow: /candidate/
 Disallow: /checkout
 Disallow: /forgot-password
 Disallow: /reset-password
-Disallow: /api/
 
 Sitemap: ${siteUrl}/sitemap.xml
 Sitemap: ${siteUrl}/sitemap-index.xml`;
@@ -86,16 +103,24 @@ export const getOrCreateSeoGlobalSettings = async () => {
   } else {
     const needsSiteUrlHeal =
       isLocalHostUrl(settings.siteUrl) || /www\.careerwings\.in/i.test(settings.siteUrl || '');
+    const hasLegacyBlanketApiDisallow = Boolean(
+      settings.robotsTxtContent &&
+        /^\s*Disallow:\s*\/api\/\s*$/im.test(settings.robotsTxtContent) &&
+        !/Disallow:\s*\/api\/admin\//im.test(settings.robotsTxtContent)
+    );
     const needsRobotsHeal =
-      !settings.robotsTxtContent || isLocalHostUrl(settings.robotsTxtContent);
+      !settings.robotsTxtContent ||
+      isLocalHostUrl(settings.robotsTxtContent) ||
+      hasLegacyBlanketApiDisallow;
 
     if (needsSiteUrlHeal || needsRobotsHeal) {
       const healedSiteUrl = resolveProductionSiteUrl(settings.siteUrl);
-      const healedRobots = settings.robotsTxtContent
-        ? isLocalHostUrl(settings.robotsTxtContent)
-          ? settings.robotsTxtContent.replace(/https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/gi, healedSiteUrl)
-          : settings.robotsTxtContent
-        : buildDefaultRobotsTxt(healedSiteUrl);
+      const healedRobots =
+        settings.robotsTxtContent && !hasLegacyBlanketApiDisallow
+          ? isLocalHostUrl(settings.robotsTxtContent)
+            ? settings.robotsTxtContent.replace(/https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/gi, healedSiteUrl)
+            : settings.robotsTxtContent
+          : buildDefaultRobotsTxt(healedSiteUrl);
 
       settings = await prisma.seoGlobalSetting.update({
         where: { key: 'GLOBAL' },
@@ -1495,6 +1520,11 @@ export const validateRobotsTxtContent = (
   }
   if (lines.some((l) => /^disallow:\s*\/locations\/?$/.test(l) || /^disallow:\s*\/location\/?$/.test(l))) {
     warnings.push('WARNING: "Disallow: /locations" blocks city & regional job pages from search results!');
+  }
+  if (lines.some((l) => /^disallow:\s*\/api\/?$/.test(l))) {
+    warnings.push(
+      'WARNING: Blanket "Disallow: /api/" blocks Googlebot from loading jobs and company data while rendering React pages. Disallow private APIs (/api/admin/, /api/auth/, etc.) instead.'
+    );
   }
 
   // Check 3: Sitemap directive present

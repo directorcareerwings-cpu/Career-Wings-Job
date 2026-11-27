@@ -775,7 +775,7 @@ export default function AdminSEO() {
                   <div className="flex justify-between">
                     <span className="text-slate-500">Public Address:</span>
                     <a
-                      href="http://localhost:5000/robots.txt"
+                      href="/robots.txt"
                       target="_blank"
                       rel="noreferrer"
                       className="font-mono text-primary-600 hover:underline flex items-center gap-1"
@@ -790,7 +790,7 @@ export default function AdminSEO() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-slate-500">Protected Areas:</span>
-                    <span className="font-semibold text-slate-700">/admin/, /employer/, /api/</span>
+                    <span className="font-semibold text-slate-700">/admin/, /employer/, /api/admin/</span>
                   </div>
                 </div>
 
@@ -1892,7 +1892,7 @@ export default function AdminSEO() {
                   <p className="text-xs text-slate-500 mt-1">
                     Manage search crawler access instructions. Served live at{' '}
                     <a
-                      href="http://localhost:5000/robots.txt"
+                      href="/robots.txt"
                       target="_blank"
                       rel="noreferrer"
                       className="text-primary-600 underline"
@@ -1908,7 +1908,9 @@ export default function AdminSEO() {
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      setRobotsContent(`User-agent: *\nAllow: /\nDisallow: /admin/\nDisallow: /dashboard/\nDisallow: /employer/\nDisallow: /api/\nSitemap: https://careerwings.in/sitemap.xml\nSitemap: https://careerwings.in/sitemap-index.xml`)
+                      setRobotsContent(
+                        `User-agent: *\nAllow: /\nAllow: /api/jobs\nAllow: /api/companies\nAllow: /api/categories\nAllow: /api/locations\nAllow: /api/blog\nAllow: /api/settings\nAllow: /api/stats\nAllow: /api/packages\nAllow: /api/cool-places\nAllow: /api/education-master\nDisallow: /api/admin/\nDisallow: /api/auth/\nDisallow: /api/candidate/\nDisallow: /api/employer/\nDisallow: /api/payments/\nDisallow: /api/chat/\nDisallow: /api/setup-db\nDisallow: /api/init-db\nDisallow: /admin/\nDisallow: /dashboard/\nDisallow: /employer/\nDisallow: /candidate/\nDisallow: /checkout\nDisallow: /forgot-password\nDisallow: /reset-password\n\nSitemap: https://careerwings.in/sitemap.xml\nSitemap: https://careerwings.in/sitemap-index.xml`
+                      )
                       toast.success('Loaded safe default rules')
                     }}
                     className="text-xs"

@@ -415,6 +415,7 @@ export const renderCrawlerSeoHtml = async (req: Request, res: Response, next: Ne
 export const getRobotsTxt = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const settings = await getOrCreateSeoGlobalSettings();
+    res.setHeader('Cache-Control', 'no-cache, must-revalidate');
     res.type('text/plain');
     res.send(settings.robotsTxtContent || 'User-agent: *\nAllow: /\n');
   } catch (error) {

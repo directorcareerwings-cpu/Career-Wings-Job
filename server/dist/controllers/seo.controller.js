@@ -359,6 +359,7 @@ exports.renderCrawlerSeoHtml = renderCrawlerSeoHtml;
 const getRobotsTxt = async (req, res, next) => {
     try {
         const settings = await (0, seo_service_1.getOrCreateSeoGlobalSettings)();
+        res.setHeader('Cache-Control', 'no-cache, must-revalidate');
         res.type('text/plain');
         res.send(settings.robotsTxtContent || 'User-agent: *\nAllow: /\n');
     }

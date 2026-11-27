@@ -304,6 +304,7 @@ export default function Header() {
                     : '/login?redirect=/employer/jobs/post'
                   : '/register?role=EMPLOYER&redirect=/employer/jobs/post'
               }
+              rel={isAuthenticated && (isEmployer || isAdmin) ? undefined : 'nofollow'}
               onClick={(e) => {
                 if (isAuthenticated && isCandidate) {
                   e.preventDefault()
@@ -370,6 +371,7 @@ export default function Header() {
                     : '/login?redirect=/employer/jobs/post'
                   : '/register?role=EMPLOYER&redirect=/employer/jobs/post'
               }
+              rel={isAuthenticated && (isEmployer || isAdmin) ? undefined : 'nofollow'}
               onClick={(e) => {
                 setMobileOpen(false)
                 if (isAuthenticated && isCandidate) {

@@ -3,39 +3,71 @@ import { Link } from 'react-router-dom'
 import { MapPin, Phone, Mail, Facebook, Linkedin, Twitter, Heart } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { publicAPI } from '@/lib/api'
+import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 
-const footerLinks = {
-  forCandidates: [
-    { label: 'Browse Jobs', to: '/jobs' },
-    { label: 'Companies', to: '/companies' },
-    { label: 'Job Categories', to: '/categories' },
-    { label: 'Jobs by Location', to: '/locations' },
-    { label: 'Job Alerts', to: '/job-alerts' },
-    { label: 'Candidate Plans', to: '/pricing' },
-  ],
-  forEmployers: [
-    { label: 'Post a Job', to: '/employer/jobs/post' },
-    { label: 'Search Resumes', to: '/employer/candidates' },
-    { label: 'Employer Dashboard', to: '/employer/dashboard' },
-    { label: 'Employer Plans', to: '/pricing' },
-    { label: 'Analytics', to: '/employer/analytics' },
-  ],
-  company: [
-    { label: 'About Us', to: '/about' },
-    { label: 'Contact', to: '/contact' },
-    { label: 'Pricing', to: '/pricing' },
-    { label: 'Blog', to: '/blog' },
-  ],
-  legal: [
-    { label: 'Privacy Policy', to: '/privacy-policy' },
-    { label: 'Terms of Service', to: '/terms-of-service' },
-    { label: 'Refund Policy', to: '/refund-policy' },
-  ],
-}
+const publicCompanyLinks = [
+  { label: 'About Us', to: '/about' },
+  { label: 'Contact', to: '/contact' },
+  { label: 'Pricing', to: '/pricing' },
+  { label: 'Blog', to: '/blog' },
+]
+
+const legalLinks = [
+  { label: 'Privacy Policy', to: '/privacy-policy' },
+  { label: 'Terms of Service', to: '/terms-of-service' },
+  { label: 'Refund Policy', to: '/refund-policy' },
+]
 
 export default function Footer() {
   const year = new Date().getFullYear()
+  const { isAuthenticated, isCandidate, isEmployer, isAdmin } = useAuth()
+  const canAccessEmployerRoutes = isAuthenticated && (isEmployer || isAdmin)
+  const canAccessCandidateRoutes = isAuthenticated && (isCandidate || isAdmin)
+
+  const footerLinks = {
+    forCandidates: [
+      { label: 'Browse Jobs', to: '/jobs', nofollow: false },
+      { label: 'Companies', to: '/companies', nofollow: false },
+      { label: 'Job Categories', to: '/categories', nofollow: false },
+      { label: 'Jobs by Location', to: '/locations', nofollow: false },
+      {
+        label: 'Job Alerts',
+        to: canAccessCandidateRoutes ? '/job-alerts' : '/login?redirect=/job-alerts',
+        nofollow: !canAccessCandidateRoutes,
+      },
+      { label: 'Candidate Plans', to: '/pricing?role=CANDIDATE', nofollow: false },
+    ],
+    forEmployers: [
+      {
+        label: 'Post a Job',
+        to: isAuthenticated
+          ? canAccessEmployerRoutes
+            ? '/employer/jobs/post'
+            : '/login?redirect=/employer/jobs/post'
+          : '/register?role=EMPLOYER&redirect=/employer/jobs/post',
+        nofollow: !canAccessEmployerRoutes,
+      },
+      {
+        label: 'Search Resumes',
+        to: canAccessEmployerRoutes ? '/employer/candidates' : '/login?redirect=/employer/candidates',
+        nofollow: !canAccessEmployerRoutes,
+      },
+      {
+        label: 'Employer Dashboard',
+        to: canAccessEmployerRoutes ? '/employer/dashboard' : '/login?redirect=/employer/dashboard',
+        nofollow: !canAccessEmployerRoutes,
+      },
+      { label: 'Employer Plans', to: '/pricing?role=EMPLOYER', nofollow: false },
+      {
+        label: 'Analytics',
+        to: canAccessEmployerRoutes ? '/employer/analytics' : '/login?redirect=/employer/analytics',
+        nofollow: !canAccessEmployerRoutes,
+      },
+    ],
+    company: publicCompanyLinks,
+    legal: legalLinks,
+  }
 
   const { data: settingsData } = useQuery({
     queryKey: ['public-settings'],
@@ -124,10 +156,11 @@ export default function Footer() {
               For Candidates
             </h3>
             <ul className="space-y-2">
-              {footerLinks.forCandidates.map(({ label, to }) => (
-                <li key={to}>
+              {footerLinks.forCandidates.map(({ label, to, nofollow }) => (
+                <li key={label}>
                   <Link
                     to={to}
+                    rel={nofollow ? 'nofollow' : undefined}
                     className="text-sm text-primary-200 hover:text-white transition-colors"
                   >
                     {label}
@@ -143,10 +176,11 @@ export default function Footer() {
               For Employers
             </h3>
             <ul className="space-y-2">
-              {footerLinks.forEmployers.map(({ label, to }) => (
-                <li key={to}>
+              {footerLinks.forEmployers.map(({ label, to, nofollow }) => (
+                <li key={label}>
                   <Link
                     to={to}
+                    rel={nofollow ? 'nofollow' : undefined}
                     className="text-sm text-primary-200 hover:text-white transition-colors"
                   >
                     {label}

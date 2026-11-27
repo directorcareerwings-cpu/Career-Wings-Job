@@ -378,9 +378,14 @@ export const getSitemap = async (req: Request, res: Response, next: NextFunction
 };
 
 export const getRobots = (req: Request, res: Response): void => {
-  const baseUrl = process.env.CLIENT_URL || 'https://careerwings.in';
+  const baseUrl = (process.env.CLIENT_URL || 'https://careerwings.in')
+    .replace(/\/+$/, '')
+    .replace(/^https?:\/\/www\.careerwings\.in/i, 'https://careerwings.in');
+  res.setHeader('Cache-Control', 'no-cache, must-revalidate');
   res.type('text/plain');
-  res.send(`User-agent: *\nAllow: /\nDisallow: /admin/\nDisallow: /dashboard/\nDisallow: /employer/\nSitemap: ${baseUrl}/sitemap.xml`);
+  res.send(
+    `User-agent: *\nAllow: /\nAllow: /api/jobs\nAllow: /api/companies\nAllow: /api/categories\nAllow: /api/locations\nAllow: /api/blog\nAllow: /api/settings\nAllow: /api/stats\nAllow: /api/packages\nAllow: /api/cool-places\nAllow: /api/education-master\nDisallow: /api/admin/\nDisallow: /api/auth/\nDisallow: /api/candidate/\nDisallow: /api/employer/\nDisallow: /api/payments/\nDisallow: /api/chat/\nDisallow: /admin/\nDisallow: /dashboard/\nDisallow: /employer/\nDisallow: /candidate/\nDisallow: /checkout\nDisallow: /forgot-password\nDisallow: /reset-password\n\nSitemap: ${baseUrl}/sitemap.xml\nSitemap: ${baseUrl}/sitemap-index.xml`
+  );
 };
 
 // ---- COOL PLACES TO WORK ----

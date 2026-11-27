@@ -20,6 +20,7 @@ import {
   Tag,
 } from 'lucide-react'
 import { blogAPI } from '@/lib/api'
+import { useAuth } from '@/hooks/useAuth'
 import Header from '@/components/layout/Header'
 import Footer from '@/components/layout/Footer'
 import SEOMeta from '@/components/seo/SEOMeta'
@@ -31,6 +32,7 @@ import toast from 'react-hot-toast'
 export default function BlogDetail() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
+  const { isAuthenticated, isEmployer, isAdmin } = useAuth()
   const [copied, setCopied] = useState(false)
 
   const { data, isLoading, isError } = useQuery({
@@ -382,7 +384,16 @@ export default function BlogDetail() {
                   Search 15,000+ Jobs
                 </Button>
               </Link>
-              <Link to="/employer/jobs/post">
+              <Link
+                to={
+                  isAuthenticated
+                    ? isEmployer || isAdmin
+                      ? '/employer/jobs/post'
+                      : '/login?redirect=/employer/jobs/post'
+                    : '/register?role=EMPLOYER&redirect=/employer/jobs/post'
+                }
+                rel={isAuthenticated && (isEmployer || isAdmin) ? undefined : 'nofollow'}
+              >
                 <Button size="lg" variant="outline" className="rounded-2xl px-6 border-white/30 text-white hover:bg-white/10 font-bold">
                   Post a Job for Free
                 </Button>
