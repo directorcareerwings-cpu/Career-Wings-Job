@@ -128,15 +128,16 @@ export default function AdminCoolPlaces() {
             {logos.filter((l) => l.isActive).slice(0, 6).map((logo) => (
               <div
                 key={logo.id}
-                className="flex items-center justify-center bg-white rounded-xl border border-gray-100 shadow-xs px-5 py-3 min-w-[140px] h-[64px] shrink-0"
+                className="flex items-center justify-center bg-white rounded-xl border border-gray-100 shadow-xs px-4 py-2.5 w-[164px] h-[72px] shrink-0"
               >
-                <img
-                  src={logo.logoUrl}
-                  alt={logo.name}
-                  className="max-h-8 max-w-[110px] w-auto object-contain"
-                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
-                />
-                <span className="text-xs font-semibold text-gray-600 ml-1 truncate">{logo.name}</span>
+                <div className="w-[124px] h-[40px] flex items-center justify-center overflow-hidden">
+                  <img
+                    src={logo.logoUrl}
+                    alt={logo.name}
+                    className="w-full h-full object-contain"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+                  />
+                </div>
               </div>
             ))}
             {logos.filter((l) => l.isActive).length === 0 && (

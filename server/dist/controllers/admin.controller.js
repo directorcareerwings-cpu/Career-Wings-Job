@@ -16,6 +16,9 @@ const subscription_service_1 = require("../services/subscription.service");
 const email_service_1 = require("../services/email.service");
 const mysql_auto_init_1 = require("../lib/mysql-auto-init");
 const memoryCache_1 = require("../lib/memoryCache");
+const public_controller_1 = require("./public.controller");
+const fs_1 = __importDefault(require("fs"));
+const sharp_1 = __importDefault(require("sharp"));
 // ---- DASHBOARD ----
 const getDashboard = async (req, res, next) => {
     try {
@@ -1251,7 +1254,8 @@ exports.broadcastNotification = broadcastNotification;
 // ---- COOL PLACES TO WORK (ADMIN) ----
 const getAdminCoolPlaces = async (req, res, next) => {
     try {
-        const logos = await prisma_1.prisma.coolPlaceLogo.findMany({ orderBy: { displayOrder: 'asc' } });
+        const rawLogos = await prisma_1.prisma.coolPlaceLogo.findMany({ orderBy: { displayOrder: 'asc' } });
+        const logos = await (0, public_controller_1.healCoolPlaceLogos)(rawLogos);
         (0, response_1.sendSuccess)(res, logos);
     }
     catch (error) {
@@ -1267,6 +1271,7 @@ const createCoolPlace = async (req, res, next) => {
         const logo = await prisma_1.prisma.coolPlaceLogo.create({
             data: { name, logoUrl, website, displayOrder: Number(displayOrder) || 0, isActive: isActive !== false },
         });
+        (0, memoryCache_1.invalidateCache)('public_cool_places');
         (0, response_1.sendSuccess)(res, logo, 'Company logo added');
     }
     catch (error) {
@@ -1281,6 +1286,7 @@ const updateCoolPlace = async (req, res, next) => {
             where: { id: req.params.id },
             data: { name, logoUrl, website, displayOrder: displayOrder !== undefined ? Number(displayOrder) : undefined, isActive },
         });
+        (0, memoryCache_1.invalidateCache)('public_cool_places');
         (0, response_1.sendSuccess)(res, logo, 'Company logo updated');
     }
     catch (error) {
@@ -1291,6 +1297,7 @@ exports.updateCoolPlace = updateCoolPlace;
 const deleteCoolPlace = async (req, res, next) => {
     try {
         await prisma_1.prisma.coolPlaceLogo.delete({ where: { id: req.params.id } });
+        (0, memoryCache_1.invalidateCache)('public_cool_places');
         (0, response_1.sendSuccess)(res, null, 'Company logo deleted');
     }
     catch (error) {
@@ -1302,7 +1309,19 @@ const uploadCoolPlaceLogo = async (req, res, next) => {
     try {
         if (!req.file)
             throw new errors_1.AppError('No file uploaded', 400);
+        if (req.file.path && req.file.mimetype !== 'image/svg+xml') {
+            try {
+                const buf = fs_1.default.readFileSync(req.file.path);
+                const normalized = await (0, sharp_1.default)(buf)
+                    .trim({ threshold: 15 })
+                    .resize(400, 160, { fit: 'inside', withoutEnlargement: true })
+                    .toBuffer();
+                fs_1.default.writeFileSync(req.file.path, normalized);
+            }
+            catch { }
+        }
         const logoUrl = `/uploads/images/${req.file.filename}`;
+        (0, memoryCache_1.invalidateCache)('public_cool_places');
         (0, response_1.sendSuccess)(res, { logoUrl }, 'Logo uploaded');
     }
     catch (error) {

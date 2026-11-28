@@ -18,6 +18,9 @@ import {
 } from '../services/email.service';
 import { sanitizeMysqlDatetimes } from '../lib/mysql-auto-init';
 import { invalidateCache } from '../lib/memoryCache';
+import { healCoolPlaceLogos } from './public.controller';
+import fs from 'fs';
+import sharp from 'sharp';
 
 // ---- DASHBOARD ----
 
@@ -1231,7 +1234,8 @@ export const broadcastNotification = async (req: AuthenticatedRequest, res: Resp
 
 export const getAdminCoolPlaces = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const logos = await prisma.coolPlaceLogo.findMany({ orderBy: { displayOrder: 'asc' } });
+    const rawLogos = await prisma.coolPlaceLogo.findMany({ orderBy: { displayOrder: 'asc' } });
+    const logos = await healCoolPlaceLogos(rawLogos);
     sendSuccess(res, logos);
   } catch (error) { next(error); }
 };
@@ -1243,6 +1247,7 @@ export const createCoolPlace = async (req: Request, res: Response, next: NextFun
     const logo = await prisma.coolPlaceLogo.create({
       data: { name, logoUrl, website, displayOrder: Number(displayOrder) || 0, isActive: isActive !== false },
     });
+    invalidateCache('public_cool_places');
     sendSuccess(res, logo, 'Company logo added');
   } catch (error) { next(error); }
 };
@@ -1254,6 +1259,7 @@ export const updateCoolPlace = async (req: Request, res: Response, next: NextFun
       where: { id: req.params.id },
       data: { name, logoUrl, website, displayOrder: displayOrder !== undefined ? Number(displayOrder) : undefined, isActive },
     });
+    invalidateCache('public_cool_places');
     sendSuccess(res, logo, 'Company logo updated');
   } catch (error) { next(error); }
 };
@@ -1261,6 +1267,7 @@ export const updateCoolPlace = async (req: Request, res: Response, next: NextFun
 export const deleteCoolPlace = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     await prisma.coolPlaceLogo.delete({ where: { id: req.params.id } });
+    invalidateCache('public_cool_places');
     sendSuccess(res, null, 'Company logo deleted');
   } catch (error) { next(error); }
 };
@@ -1268,7 +1275,18 @@ export const deleteCoolPlace = async (req: Request, res: Response, next: NextFun
 export const uploadCoolPlaceLogo = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     if (!req.file) throw new AppError('No file uploaded', 400);
+    if (req.file.path && req.file.mimetype !== 'image/svg+xml') {
+      try {
+        const buf = fs.readFileSync(req.file.path);
+        const normalized = await sharp(buf)
+          .trim({ threshold: 15 })
+          .resize(400, 160, { fit: 'inside', withoutEnlargement: true })
+          .toBuffer();
+        fs.writeFileSync(req.file.path, normalized);
+      } catch {}
+    }
     const logoUrl = `/uploads/images/${req.file.filename}`;
+    invalidateCache('public_cool_places');
     sendSuccess(res, { logoUrl }, 'Logo uploaded');
   } catch (error) { next(error); }
 };

@@ -390,17 +390,64 @@ export const getRobots = (req: Request, res: Response): void => {
 
 // ---- COOL PLACES TO WORK ----
 
+const BRAND_LOGO_MATCHERS: Array<[RegExp, string]> = [
+  [/axis/, '/images/brands/axis-bank.png'],
+  [/mahindra|mhindra/, '/images/brands/tech-mahindra.png'],
+  [/future|generali|generli/, '/images/brands/future-generali.png'],
+  [/iifl|infoline/, '/images/brands/iifl.png'],
+  [/wipro/, '/images/brands/wipro.png'],
+  [/tcs|tata\s*consultancy/, '/images/brands/tcs.png'],
+  [/hcl/, '/images/brands/hcl.png'],
+  [/hdfc/, '/images/brands/hdfc.png'],
+  [/infosys/, '/images/brands/infosys.png'],
+  [/capgemini/, '/images/brands/capgemini.png'],
+  [/kotak/, '/images/brands/kotak.png'],
+  [/ntt/, '/images/brands/ntt-data.png'],
+  [/lti|mindtree/, '/images/brands/ltimindtree.png'],
+  [/oil\s*india/, '/images/brands/oil-india.png'],
+];
+
+export const resolveCoolPlaceBrandFallback = (name?: string | null): string | null => {
+  const norm = (name || '').toLowerCase().trim();
+  if (!norm) return null;
+  const hit = BRAND_LOGO_MATCHERS.find(([regex]) => regex.test(norm));
+  return hit ? hit[1] : null;
+};
+
+export const healCoolPlaceLogos = async <T extends { id: string; name: string; logoUrl: string }>(
+  logos: T[]
+): Promise<T[]> => {
+  const healed: T[] = [];
+  for (const logo of logos) {
+    const isMissingUpload =
+      !logo.logoUrl ||
+      (logo.logoUrl.startsWith('/uploads/') && !doesUploadedAssetExist(logo.logoUrl));
+    if (isMissingUpload) {
+      const fallbackUrl = resolveCoolPlaceBrandFallback(logo.name);
+      if (fallbackUrl) {
+        await prisma.coolPlaceLogo
+          .update({ where: { id: logo.id }, data: { logoUrl: fallbackUrl } })
+          .catch(() => {});
+        healed.push({ ...logo, logoUrl: fallbackUrl });
+        continue;
+      }
+    }
+    healed.push(logo);
+  }
+  return healed;
+};
+
 const DEFAULT_COOL_PLACES = [
-  { name: 'Tata Consultancy', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/b/b1/Tata_Consultancy_Services_Logo.svg', website: 'https://www.tcs.com/careers', displayOrder: 1 },
-  { name: 'Wipro', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/a/a0/Wipro_Primary_Logo_Color_RGB.svg', website: 'https://careers.wipro.com', displayOrder: 2 },
-  { name: 'Infosys', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/9/95/Infosys_logo.svg', website: 'https://www.infosys.com/careers', displayOrder: 3 },
-  { name: 'Capgemini', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/6/62/Cap_gemini_Logo_2COL_RGB.svg', website: 'https://www.capgemini.com/in-en/careers', displayOrder: 4 },
-  { name: 'HCL Technologies', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/9/9e/HCL_Technologies_logo.svg', website: 'https://www.hcltech.com/careers', displayOrder: 5 },
-  { name: 'Kotak Mahindra', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/3/3c/Kotak_Mahindra_Bank_logo.svg', website: 'https://www.kotak.com/en/general/careers.html', displayOrder: 6 },
-  { name: 'NTT Data', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/8/8d/NTT_DATA_Logo.svg', website: 'https://in.nttdata.com/en/careers', displayOrder: 7 },
-  { name: 'LTIMindtree', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/LTIMindtree_Logo.svg/1200px-LTIMindtree_Logo.svg.png', website: 'https://www.ltimindtree.com/careers', displayOrder: 8 },
-  { name: 'Oil India Limited', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/9/97/Oil_India_Limited_logo.png', website: 'https://www.oil-india.com/careers', displayOrder: 9 },
-  { name: 'HDFC Bank', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/2/28/HDFC_Bank_Logo.svg', website: 'https://www.hdfcbank.com/content/bbp/repositories/723fb80a-2dde-42a3-9793-7ae1be57c87f/careers', displayOrder: 10 },
+  { name: 'Tata Consultancy', logoUrl: '/images/brands/tcs.png', website: 'https://www.tcs.com/careers', displayOrder: 1 },
+  { name: 'Wipro', logoUrl: '/images/brands/wipro.png', website: 'https://careers.wipro.com', displayOrder: 2 },
+  { name: 'Infosys', logoUrl: '/images/brands/infosys.png', website: 'https://www.infosys.com/careers', displayOrder: 3 },
+  { name: 'Capgemini', logoUrl: '/images/brands/capgemini.png', website: 'https://www.capgemini.com/in-en/careers', displayOrder: 4 },
+  { name: 'HCL Technologies', logoUrl: '/images/brands/hcl.png', website: 'https://www.hcltech.com/careers', displayOrder: 5 },
+  { name: 'Kotak Mahindra', logoUrl: '/images/brands/kotak.png', website: 'https://www.kotak.com/en/general/careers.html', displayOrder: 6 },
+  { name: 'NTT Data', logoUrl: '/images/brands/ntt-data.png', website: 'https://in.nttdata.com/en/careers', displayOrder: 7 },
+  { name: 'LTIMindtree', logoUrl: '/images/brands/ltimindtree.png', website: 'https://www.ltimindtree.com/careers', displayOrder: 8 },
+  { name: 'Oil India Limited', logoUrl: '/images/brands/oil-india.png', website: 'https://www.oil-india.com/careers', displayOrder: 9 },
+  { name: 'HDFC Bank', logoUrl: '/images/brands/hdfc.png', website: 'https://www.hdfcbank.com/content/bbp/repositories/723fb80a-2dde-42a3-9793-7ae1be57c87f/careers', displayOrder: 10 },
 ];
 
 export const getPublicCoolPlaces = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -425,6 +472,8 @@ export const getPublicCoolPlaces = async (req: Request, res: Response, next: Nex
         where: { isActive: true },
         orderBy: { displayOrder: 'asc' },
       });
+    } else {
+      logos = await healCoolPlaceLogos(logos);
     }
 
     setCached('public_cool_places', logos, 60);

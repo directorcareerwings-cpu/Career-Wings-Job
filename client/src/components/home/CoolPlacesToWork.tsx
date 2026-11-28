@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { publicAPI } from '@/lib/api'
 
@@ -10,38 +10,77 @@ interface CoolPlaceLogo {
   displayOrder: number
 }
 
+const BRAND_LOGO_MATCHERS: Array<[RegExp, string]> = [
+  [/axis/, '/images/brands/axis-bank.png'],
+  [/mahindra|mhindra/, '/images/brands/tech-mahindra.png'],
+  [/future|generali|generli/, '/images/brands/future-generali.png'],
+  [/iifl|infoline/, '/images/brands/iifl.png'],
+  [/wipro/, '/images/brands/wipro.png'],
+  [/tcs|tata\s*consultancy/, '/images/brands/tcs.png'],
+  [/hcl/, '/images/brands/hcl.png'],
+  [/hdfc/, '/images/brands/hdfc.png'],
+  [/infosys/, '/images/brands/infosys.png'],
+  [/capgemini/, '/images/brands/capgemini.png'],
+  [/kotak/, '/images/brands/kotak.png'],
+  [/ntt/, '/images/brands/ntt-data.png'],
+  [/lti|mindtree/, '/images/brands/ltimindtree.png'],
+  [/oil\s*india/, '/images/brands/oil-india.png'],
+]
+
+function resolveBrandLogoFallback(name?: string): string | null {
+  const norm = (name || '').toLowerCase().trim()
+  if (!norm) return null
+  const hit = BRAND_LOGO_MATCHERS.find(([regex]) => regex.test(norm))
+  return hit ? hit[1] : null
+}
+
 const FALLBACK_LOGOS: CoolPlaceLogo[] = [
-  { id: '1', name: 'TCS', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/b/b1/Tata_Consultancy_Services_Logo.svg', website: 'https://www.tcs.com/careers', displayOrder: 1 },
-  { id: '2', name: 'Wipro', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/a/a0/Wipro_Primary_Logo_Color_RGB.svg', website: 'https://careers.wipro.com', displayOrder: 2 },
-  { id: '3', name: 'Infosys', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/9/95/Infosys_logo.svg', website: 'https://www.infosys.com/careers', displayOrder: 3 },
-  { id: '4', name: 'Capgemini', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/6/62/Cap_gemini_Logo_2COL_RGB.svg', website: 'https://www.capgemini.com/in-en/careers', displayOrder: 4 },
-  { id: '5', name: 'HCL', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/9/9e/HCL_Technologies_logo.svg', website: 'https://www.hcltech.com/careers', displayOrder: 5 },
-  { id: '6', name: 'Kotak', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/3/3c/Kotak_Mahindra_Bank_logo.svg', website: 'https://www.kotak.com/en/general/careers.html', displayOrder: 6 },
-  { id: '7', name: 'NTT Data', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/8/8d/NTT_DATA_Logo.svg', website: 'https://in.nttdata.com/en/careers', displayOrder: 7 },
-  { id: '8', name: 'LTIMindtree', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/4b/LTIMindtree_Logo.svg/1200px-LTIMindtree_Logo.svg.png', website: 'https://www.ltimindtree.com/careers', displayOrder: 8 },
-  { id: '9', name: 'Oil India', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/9/97/Oil_India_Limited_logo.png', website: 'https://www.oil-india.com/careers', displayOrder: 9 },
-  { id: '10', name: 'HDFC Bank', logoUrl: 'https://upload.wikimedia.org/wikipedia/commons/2/28/HDFC_Bank_Logo.svg', website: 'https://www.hdfcbank.com', displayOrder: 10 },
+  { id: '1', name: 'TCS', logoUrl: '/images/brands/tcs.png', website: 'https://www.tcs.com/careers', displayOrder: 1 },
+  { id: '2', name: 'Wipro', logoUrl: '/images/brands/wipro.png', website: 'https://careers.wipro.com', displayOrder: 2 },
+  { id: '3', name: 'Infosys', logoUrl: '/images/brands/infosys.png', website: 'https://www.infosys.com/careers', displayOrder: 3 },
+  { id: '4', name: 'Capgemini', logoUrl: '/images/brands/capgemini.png', website: 'https://www.capgemini.com/in-en/careers', displayOrder: 4 },
+  { id: '5', name: 'HCL', logoUrl: '/images/brands/hcl.png', website: 'https://www.hcltech.com/careers', displayOrder: 5 },
+  { id: '6', name: 'Kotak', logoUrl: '/images/brands/kotak.png', website: 'https://www.kotak.com/en/general/careers.html', displayOrder: 6 },
+  { id: '7', name: 'NTT Data', logoUrl: '/images/brands/ntt-data.png', website: 'https://in.nttdata.com/en/careers', displayOrder: 7 },
+  { id: '8', name: 'LTIMindtree', logoUrl: '/images/brands/ltimindtree.png', website: 'https://www.ltimindtree.com/careers', displayOrder: 8 },
+  { id: '9', name: 'Oil India', logoUrl: '/images/brands/oil-india.png', website: 'https://www.oil-india.com/careers', displayOrder: 9 },
+  { id: '10', name: 'HDFC Bank', logoUrl: '/images/brands/hdfc.png', website: 'https://www.hdfcbank.com', displayOrder: 10 },
 ]
 
 function LogoCard({ logo }: { logo: CoolPlaceLogo }) {
+  const brandFallback = resolveBrandLogoFallback(logo.name)
+  const [src, setSrc] = useState(logo.logoUrl || brandFallback || '')
+  const [failed, setFailed] = useState(!logo.logoUrl && !brandFallback)
+
+  useEffect(() => {
+    setSrc(logo.logoUrl || brandFallback || '')
+    setFailed(!logo.logoUrl && !brandFallback)
+  }, [logo.logoUrl, brandFallback])
+
+  const handleImgError = () => {
+    if (brandFallback && src !== brandFallback) {
+      setSrc(brandFallback)
+    } else {
+      setFailed(true)
+    }
+  }
+
   const card = (
-    <div className="group flex items-center justify-center bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-sm hover:border-slate-300 transition-all duration-300 px-7 py-5 min-w-[170px] h-[80px]">
-      <img
-        src={logo.logoUrl}
-        alt={logo.name}
-        className="max-h-9 max-w-[130px] w-auto object-contain transition-all duration-300 group-hover:scale-105"
-        onError={(e) => {
-          const t = e.currentTarget as HTMLImageElement
-          t.style.display = 'none'
-          const p = t.parentElement
-          if (p && !p.querySelector('span')) {
-            const s = document.createElement('span')
-            s.className = 'text-sm font-bold text-gray-500'
-            s.textContent = logo.name
-            p.appendChild(s)
-          }
-        }}
-      />
+    <div className="group flex items-center justify-center bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-sm hover:border-slate-300 transition-all duration-300 w-[184px] h-[84px] sm:w-[196px] sm:h-[88px] px-5 py-3.5 shrink-0">
+      <div className="w-[136px] h-[44px] sm:w-[144px] sm:h-[46px] flex items-center justify-center overflow-hidden">
+        {!failed && src ? (
+          <img
+            src={src}
+            alt={logo.name}
+            onError={handleImgError}
+            className="w-full h-full object-contain transition-transform duration-300 group-hover:scale-105 select-none"
+          />
+        ) : (
+          <span className="text-xs sm:text-sm font-bold text-slate-700 text-center line-clamp-2 leading-tight">
+            {logo.name}
+          </span>
+        )}
+      </div>
     </div>
   )
   if (logo.website) {
