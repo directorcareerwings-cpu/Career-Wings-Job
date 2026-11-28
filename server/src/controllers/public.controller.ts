@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { prisma } from '../lib/prisma';
+import { prisma, doesUploadedAssetExist } from '../lib/prisma';
 import { sendSuccess, sendPaginated } from '../lib/response';
 import { AppError } from '../lib/errors';
 import { getCached, setCached } from '../lib/memoryCache';
@@ -451,6 +451,20 @@ export const getPublicSettings = async (req: Request, res: Response, next: NextF
     settings.forEach((s) => {
       map[s.key] = s.value;
     });
+
+    if (map.HERO_IMAGE_URL && map.HERO_IMAGE_URL.startsWith('/uploads/') && !doesUploadedAssetExist(map.HERO_IMAGE_URL)) {
+      map.HERO_IMAGE_URL = '/images/hero-banner.png';
+      prisma.adminSetting
+        .updateMany({ where: { key: 'HERO_IMAGE_URL' }, data: { value: '/images/hero-banner.png' } })
+        .catch(() => {});
+    }
+    if (map.SITE_LOGO_URL && map.SITE_LOGO_URL.startsWith('/uploads/') && !doesUploadedAssetExist(map.SITE_LOGO_URL)) {
+      map.SITE_LOGO_URL = '/images/logo.png';
+      prisma.adminSetting
+        .updateMany({ where: { key: 'SITE_LOGO_URL' }, data: { value: '/images/logo.png' } })
+        .catch(() => {});
+    }
+
     setCached('public_settings', map, 60);
     sendSuccess(res, map);
   } catch (error) {

@@ -138,6 +138,34 @@ export function getPersistentUploadsDir() {
 }
 
 /**
+ * Verify whether an uploaded `/uploads/...` URL points to an actual file in any upload directory
+ */
+export function doesUploadedAssetExist(assetUrl?: string | null): boolean {
+  if (!assetUrl || !assetUrl.startsWith('/uploads/')) return false;
+  const relPath = decodeURIComponent(assetUrl.replace(/^\/uploads\//, '').split('?')[0]);
+  if (!relPath || relPath.includes('..')) return false;
+
+  const persistentUploads = getPersistentUploadsDir();
+  const candidateRoots = [
+    persistentUploads.root,
+    path.join(process.cwd(), process.env.UPLOAD_DIR || 'uploads'),
+    path.join(process.cwd(), 'server', 'uploads'),
+    path.resolve(__dirname, '../uploads'),
+    path.resolve(__dirname, '../../uploads'),
+    path.resolve(__dirname, '../../server/uploads'),
+  ];
+
+  for (const rootDir of candidateRoots) {
+    const resolvedRoot = path.resolve(rootDir);
+    const resolvedFile = path.resolve(rootDir, relPath);
+    if (resolvedFile.startsWith(resolvedRoot) && fs.existsSync(resolvedFile)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Create a verified backup of the database with retention policy
  */
 export function createSafetyBackup(dbPath: string, backupsDir: string, label = 'auto'): string | null {

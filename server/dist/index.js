@@ -53,6 +53,7 @@ dotenv_1.default.config({ path: path_1.default.resolve(__dirname, '../.env') });
 dotenv_1.default.config({ path: path_1.default.resolve(__dirname, '../../.env') });
 const errors_1 = require("./lib/errors");
 const prisma_1 = require("./lib/prisma");
+const memoryCache_1 = require("./lib/memoryCache");
 const crons_1 = require("./crons");
 // Routers
 const auth_routes_1 = __importDefault(require("./routes/auth.routes"));
@@ -554,6 +555,21 @@ const ensureDatabaseAndAdmin = async () => {
                 update: { value: process.env.SMTP_PASS },
                 create: { key: 'SMTP_PASS', value: process.env.SMTP_PASS, type: 'TEXT', group: 'EMAIL', label: 'SMTP Password' },
             });
+        }
+        // Ensure default hero banner URL is valid (heal broken /uploads/ references back to default banner)
+        const heroSetting = await prisma_1.prisma.adminSetting.findUnique({ where: { key: 'HERO_IMAGE_URL' } }).catch(() => null);
+        if (!heroSetting) {
+            await prisma_1.prisma.adminSetting.create({
+                data: { key: 'HERO_IMAGE_URL', value: '/images/hero-banner.png', type: 'TEXT', group: 'CMS', label: 'Hero Banner Image URL' },
+            }).catch(() => { });
+        }
+        else if (heroSetting.value?.startsWith('/uploads/') && !(0, prisma_1.doesUploadedAssetExist)(heroSetting.value)) {
+            console.log(`🔧 Healing missing uploaded hero banner (${heroSetting.value}) -> /images/hero-banner.png`);
+            await prisma_1.prisma.adminSetting.update({
+                where: { key: 'HERO_IMAGE_URL' },
+                data: { value: '/images/hero-banner.png' },
+            }).catch(() => { });
+            (0, memoryCache_1.invalidateCache)('public_settings');
         }
     }
     catch (err) {

@@ -16,7 +16,8 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 import { errorHandler, notFoundHandler } from './lib/errors';
-import { prisma, getPersistentStoragePaths, getPersistentUploadsDir, findProjectRoot, isMysqlConfigured } from './lib/prisma';
+import { prisma, getPersistentStoragePaths, getPersistentUploadsDir, findProjectRoot, isMysqlConfigured, doesUploadedAssetExist } from './lib/prisma';
+import { invalidateCache } from './lib/memoryCache';
 import { startCronJobs } from './crons';
 
 // Routers
@@ -561,6 +562,21 @@ const ensureDatabaseAndAdmin = async () => {
         update: { value: process.env.SMTP_PASS },
         create: { key: 'SMTP_PASS', value: process.env.SMTP_PASS, type: 'TEXT', group: 'EMAIL', label: 'SMTP Password' },
       });
+    }
+
+    // Ensure default hero banner URL is valid (heal broken /uploads/ references back to default banner)
+    const heroSetting = await prisma.adminSetting.findUnique({ where: { key: 'HERO_IMAGE_URL' } }).catch(() => null);
+    if (!heroSetting) {
+      await prisma.adminSetting.create({
+        data: { key: 'HERO_IMAGE_URL', value: '/images/hero-banner.png', type: 'TEXT', group: 'CMS', label: 'Hero Banner Image URL' },
+      }).catch(() => {});
+    } else if (heroSetting.value?.startsWith('/uploads/') && !doesUploadedAssetExist(heroSetting.value)) {
+      console.log(`🔧 Healing missing uploaded hero banner (${heroSetting.value}) -> /images/hero-banner.png`);
+      await prisma.adminSetting.update({
+        where: { key: 'HERO_IMAGE_URL' },
+        data: { value: '/images/hero-banner.png' },
+      }).catch(() => {});
+      invalidateCache('public_settings');
     }
   } catch (err) {
     console.error('⚠️ [Database Notice during initialization]:', err);

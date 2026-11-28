@@ -7,6 +7,7 @@ exports.prisma = void 0;
 exports.findProjectRoot = findProjectRoot;
 exports.getPersistentStoragePaths = getPersistentStoragePaths;
 exports.getPersistentUploadsDir = getPersistentUploadsDir;
+exports.doesUploadedAssetExist = doesUploadedAssetExist;
 exports.createSafetyBackup = createSafetyBackup;
 exports.verifySqliteHeader = verifySqliteHeader;
 exports.isMysqlConfigured = isMysqlConfigured;
@@ -129,6 +130,33 @@ function getPersistentUploadsDir() {
         }
     });
     return dirs;
+}
+/**
+ * Verify whether an uploaded `/uploads/...` URL points to an actual file in any upload directory
+ */
+function doesUploadedAssetExist(assetUrl) {
+    if (!assetUrl || !assetUrl.startsWith('/uploads/'))
+        return false;
+    const relPath = decodeURIComponent(assetUrl.replace(/^\/uploads\//, '').split('?')[0]);
+    if (!relPath || relPath.includes('..'))
+        return false;
+    const persistentUploads = getPersistentUploadsDir();
+    const candidateRoots = [
+        persistentUploads.root,
+        path_1.default.join(process.cwd(), process.env.UPLOAD_DIR || 'uploads'),
+        path_1.default.join(process.cwd(), 'server', 'uploads'),
+        path_1.default.resolve(__dirname, '../uploads'),
+        path_1.default.resolve(__dirname, '../../uploads'),
+        path_1.default.resolve(__dirname, '../../server/uploads'),
+    ];
+    for (const rootDir of candidateRoots) {
+        const resolvedRoot = path_1.default.resolve(rootDir);
+        const resolvedFile = path_1.default.resolve(rootDir, relPath);
+        if (resolvedFile.startsWith(resolvedRoot) && fs_1.default.existsSync(resolvedFile)) {
+            return true;
+        }
+    }
+    return false;
 }
 /**
  * Create a verified backup of the database with retention policy

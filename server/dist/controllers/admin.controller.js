@@ -15,6 +15,7 @@ const seo_service_1 = require("../services/seo.service");
 const subscription_service_1 = require("../services/subscription.service");
 const email_service_1 = require("../services/email.service");
 const mysql_auto_init_1 = require("../lib/mysql-auto-init");
+const memoryCache_1 = require("../lib/memoryCache");
 // ---- DASHBOARD ----
 const getDashboard = async (req, res, next) => {
     try {
@@ -1154,6 +1155,7 @@ const updateSetting = async (req, res, next) => {
             create: { key: req.params.key, value: String(value), label, group: group || 'GENERAL', type: type || 'TEXT' },
             update: { value: String(value), label, group, type },
         });
+        (0, memoryCache_1.invalidateCache)('public_settings');
         (0, response_1.sendSuccess)(res, setting, 'Setting updated');
     }
     catch (error) {
@@ -1171,6 +1173,7 @@ const bulkUpdateSettings = async (req, res, next) => {
             create: { key: s.key, value: String(s.value), label: s.label, group: s.group || 'GENERAL', type: s.type || 'TEXT' },
             update: { value: String(s.value) },
         })));
+        (0, memoryCache_1.invalidateCache)('public_settings');
         (0, response_1.sendSuccess)(res, null, 'Settings updated');
     }
     catch (error) {
@@ -1325,6 +1328,7 @@ const uploadHeroImage = async (req, res, next) => {
                 value: imageUrl,
             },
         });
+        (0, memoryCache_1.invalidateCache)('public_settings');
         (0, response_1.sendSuccess)(res, { imageUrl, setting }, 'Hero image uploaded and saved successfully');
     }
     catch (error) {
@@ -1350,6 +1354,7 @@ const uploadLogo = async (req, res, next) => {
                 value: logoUrl,
             },
         });
+        (0, memoryCache_1.invalidateCache)('public_settings');
         (0, response_1.sendSuccess)(res, { logoUrl, setting }, 'Website logo uploaded and saved successfully');
     }
     catch (error) {

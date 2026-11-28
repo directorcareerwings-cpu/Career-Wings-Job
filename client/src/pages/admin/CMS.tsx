@@ -423,6 +423,9 @@ export default function AdminCMS() {
               <img
                 src={currentHeroImg}
                 alt="Homepage Hero Banner Preview"
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).src = '/images/hero-banner.png'
+                }}
                 className="w-full h-auto object-cover max-h-[380px] block"
               />
               <div className="absolute bottom-3 right-3 bg-black/65 backdrop-blur-xs text-white text-[11px] font-medium px-3 py-1 rounded-full pointer-events-none">

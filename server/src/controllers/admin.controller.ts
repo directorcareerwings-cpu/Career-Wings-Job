@@ -17,6 +17,7 @@ import {
   retryFailedEmail,
 } from '../services/email.service';
 import { sanitizeMysqlDatetimes } from '../lib/mysql-auto-init';
+import { invalidateCache } from '../lib/memoryCache';
 
 // ---- DASHBOARD ----
 
@@ -1137,6 +1138,7 @@ export const updateSetting = async (req: Request, res: Response, next: NextFunct
       create: { key: req.params.key, value: String(value), label, group: group || 'GENERAL', type: type || 'TEXT' },
       update: { value: String(value), label, group, type },
     });
+    invalidateCache('public_settings');
     sendSuccess(res, setting, 'Setting updated');
   } catch (error) { next(error); }
 };
@@ -1154,6 +1156,7 @@ export const bulkUpdateSettings = async (req: Request, res: Response, next: Next
       })
     ));
 
+    invalidateCache('public_settings');
     sendSuccess(res, null, 'Settings updated');
   } catch (error) { next(error); }
 };
@@ -1289,6 +1292,7 @@ export const uploadHeroImage = async (req: AuthenticatedRequest, res: Response, 
       },
     });
 
+    invalidateCache('public_settings');
     sendSuccess(res, { imageUrl, setting }, 'Hero image uploaded and saved successfully');
   } catch (error) { next(error); }
 };
@@ -1312,6 +1316,7 @@ export const uploadLogo = async (req: AuthenticatedRequest, res: Response, next:
       },
     });
 
+    invalidateCache('public_settings');
     sendSuccess(res, { logoUrl, setting }, 'Website logo uploaded and saved successfully');
   } catch (error) { next(error); }
 };

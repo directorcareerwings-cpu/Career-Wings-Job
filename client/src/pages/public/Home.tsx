@@ -147,7 +147,11 @@ function HeroSection() {
     queryFn: () => publicAPI.getSettings(),
   })
   const publicSettings = settingsData?.data?.data
-  const heroBannerUrl = publicSettings?.HERO_IMAGE_URL
+  const rawHeroBannerUrl = publicSettings?.HERO_IMAGE_URL?.trim()
+  const heroBannerUrl =
+    rawHeroBannerUrl && rawHeroBannerUrl !== '/images/hero-banner.png'
+      ? rawHeroBannerUrl
+      : null
 
   return (
     <section className="relative bg-[#F8FAFC] text-slate-900 pt-6 pb-14 md:pt-8 md:pb-20 border-b border-slate-200/70">
